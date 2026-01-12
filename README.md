@@ -18,12 +18,28 @@ Add `truman_shell` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:truman_shell, "~> 0.2.0"}
+    {:truman_shell, "~> 0.3.2"}
   ]
 end
 ```
 
 ## Usage
+
+### Execute Commands
+
+```elixir
+# Execute a shell command (sandboxed)
+{:ok, output} = TrumanShell.execute("ls lib")
+# => "truman_shell.ex\ntruman_shell/\n"
+
+# Unknown commands return bash-like errors
+{:error, msg} = TrumanShell.execute("fake_command")
+# => "bash: fake_command: command not found\n"
+
+# Path traversal is blocked (404 principle)
+{:error, msg} = TrumanShell.execute("ls /etc")
+# => "ls: /etc: No such file or directory\n"
+```
 
 ### Parse Commands
 
@@ -59,18 +75,19 @@ end
 - Identified top 15 commands covering 90%+ of real usage
 - Created 140 TDD test cases
 
-### v0.2 - Minimal Parser ✅ (Current)
+### v0.2 - Minimal Parser ✅
 - Tokenize command strings
 - Parse into `%Command{}` structs
 - Handle pipes, redirects, chains
-- 57 tests passing
 
-### v0.3 - Proof of Concept Loop (Next)
-- Integrate with IExReAct agent loop
-- Implement ONE command end-to-end: `ls`
-- Verify agent accepts response and continues
+### v0.3 - Executor POC ✅ (Current)
+- `TrumanShell.execute/1` - parse and run in one call
+- `ls` command with sandbox enforcement
+- Path traversal protection (404 principle)
+- Output truncation (max 200 lines)
+- 145 tests passing
 
-### v0.4+ - Core Commands
+### v0.4 - Read Operations (Next)
 - Read operations: `ls`, `cat`, `head`, `tail`, `pwd`, `cd`
 - Search operations: `grep`, `find`, `wc`
 - Write operations: `mkdir`, `touch`, `rm`, `mv`, `cp`, `echo`
