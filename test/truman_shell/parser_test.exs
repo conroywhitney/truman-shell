@@ -61,18 +61,29 @@ defmodule TrumanShell.ParserTest do
   end
 
   describe "unknown commands (v0.3)" do
-    test "unknown command parses as atom" do
-      assert {:ok, %Command{name: :nonexistent_cmd, args: []}} =
+    test "unknown command returns {:unknown, name} tuple (prevents atom DoS)" do
+      assert {:ok, %Command{name: {:unknown, "nonexistent_cmd"}, args: []}} =
                Parser.parse("nonexistent_cmd")
     end
 
-    test "kubectl parses correctly" do
-      assert {:ok, %Command{name: :kubectl, args: ["get", "pods"]}} =
+    test "kubectl is unknown (not in allowlist)" do
+      assert {:ok, %Command{name: {:unknown, "kubectl"}, args: ["get", "pods"]}} =
                Parser.parse("kubectl get pods")
     end
 
-    test "docker parses correctly" do
-      assert {:ok, %Command{name: :docker, args: ["ps"]}} = Parser.parse("docker ps")
+    test "docker is unknown (not in allowlist)" do
+      assert {:ok, %Command{name: {:unknown, "docker"}, args: ["ps"]}} =
+               Parser.parse("docker ps")
+    end
+
+    test "Command.known?/1 returns false for unknown commands" do
+      {:ok, cmd} = Parser.parse("kubectl get pods")
+      refute Command.known?(cmd)
+    end
+
+    test "Command.known?/1 returns true for known commands" do
+      {:ok, cmd} = Parser.parse("ls -la")
+      assert Command.known?(cmd)
     end
   end
 
@@ -312,6 +323,24 @@ defmodule TrumanShell.ParserTest do
       assert cmd.name == :ls
       assert cmd.args == ["/nonexistent"]
       assert cmd.redirects == [{:stderr, "error.log"}]
+    end
+
+    test "malformed redirect without target is skipped (lenient parsing)" do
+      # Parser is lenient: redirect without target is skipped rather than error
+      # This matches bash behavior where "echo hello >" at a prompt waits for more input
+      {:ok, cmd} = Parser.parse("echo hello >")
+
+      assert cmd.name == :echo
+      assert cmd.args == ["hello"]
+      assert cmd.redirects == []
+    end
+
+    test "malformed stderr redirect without target is skipped" do
+      {:ok, cmd} = Parser.parse("cat file.txt 2>")
+
+      assert cmd.name == :cat
+      assert cmd.args == ["file.txt"]
+      assert cmd.redirects == []
     end
   end
 

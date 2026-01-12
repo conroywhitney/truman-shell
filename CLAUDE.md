@@ -70,7 +70,7 @@ Key files:
 ## Commands
 
 ```bash
-mix test              # Run 103 tests (84 unit + 19 doctests)
+mix test              # Run 110 tests (88 unit + 22 doctests)
 mix deps.get          # Fetch dependencies
 mix format            # Format code
 ```
@@ -88,9 +88,9 @@ Doctests serve dual purposes:
 - The CSV fixtures test private functions through `TrumanShell.parse/1`
 
 ### Test Coverage
-- **Unit tests** (84): Derived from real Claude Code session analysis (CSV fixtures)
-- **Doctests** (19): Executable documentation for public API
-- **Total**: 103 tests
+- **Unit tests** (88): Derived from real Claude Code session analysis (CSV fixtures)
+- **Doctests** (22): Executable documentation for public API
+- **Total**: 110 tests
 
 ## For v0.3: Use /openspec:proposal
 

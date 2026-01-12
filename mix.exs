@@ -5,7 +5,7 @@ defmodule TrumanShell.MixProject do
     [
       app: :truman_shell,
       version: "0.2.0",
-      elixir: "~> 1.14",
+      elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: "A simulated shell environment for AI agents",
@@ -21,8 +21,7 @@ defmodule TrumanShell.MixProject do
 
   defp deps do
     [
-      {:nimble_parsec, "~> 1.4"},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.39", only: :dev, runtime: false}
     ]
   end
 

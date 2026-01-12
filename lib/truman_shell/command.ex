@@ -42,8 +42,11 @@ defmodule TrumanShell.Command do
 
   @type redirect_type :: :stdout | :stdout_append | :stderr | :stderr_append | :stdin
 
+  # Command name is either a known atom or {:unknown, "string"} for unrecognized commands
+  @type command_name :: atom() | {:unknown, String.t()}
+
   @type t :: %__MODULE__{
-          name: atom(),
+          name: command_name(),
           args: [String.t()],
           pipes: [t()],
           redirects: [{redirect_type(), String.t()}]
@@ -102,8 +105,18 @@ defmodule TrumanShell.Command do
       iex> paths
       ["/tmp"]
 
+  ## Unknown Commands
+
+      iex> TrumanShell.Command.new({:unknown, "kubectl"}, ["get", "pods"])
+      %TrumanShell.Command{
+        name: {:unknown, "kubectl"},
+        args: ["get", "pods"],
+        pipes: [],
+        redirects: []
+      }
+
   """
-  def new(name, args \\ [], opts \\ []) when is_atom(name) and is_list(args) do
+  def new(name, args \\ [], opts \\ []) when is_list(args) do
     %__MODULE__{
       name: name,
       args: args,
@@ -111,4 +124,19 @@ defmodule TrumanShell.Command do
       redirects: Keyword.get(opts, :redirects, [])
     }
   end
+
+  @doc """
+  Check if a command is a known (allowlisted) command.
+
+  ## Examples
+
+      iex> TrumanShell.Command.known?(%TrumanShell.Command{name: :ls})
+      true
+
+      iex> TrumanShell.Command.known?(%TrumanShell.Command{name: {:unknown, "kubectl"}})
+      false
+
+  """
+  def known?(%__MODULE__{name: {:unknown, _}}), do: false
+  def known?(%__MODULE__{name: name}) when is_atom(name), do: true
 end
