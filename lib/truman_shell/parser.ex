@@ -10,8 +10,8 @@ defmodule TrumanShell.Parser do
   Navigation: `cd`, `pwd`
   Read: `ls`, `cat`, `head`, `tail`
   Search: `grep`, `find`, `wc`
-  Write: `mkdir`, `touch`, `rm`, `mv`, `cp`, `echo`
-  Utility: `date`
+  Write: `mkdir`, `touch`, `rm`, `mv`, `cp`, `echo`, `date`
+  Utility: `which`, `type`, `true`, `false`
 
   ## Examples
 

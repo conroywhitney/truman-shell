@@ -254,6 +254,46 @@ defmodule TrumanShell.ParserTest do
     end
   end
 
+  describe "additional write commands (v0.6)" do
+    test "touch parses correctly" do
+      assert {:ok, %Command{name: :touch, args: ["newfile.txt"]}} =
+               Parser.parse("touch newfile.txt")
+    end
+
+    test "mv parses correctly" do
+      assert {:ok, %Command{name: :mv, args: ["old.txt", "new.txt"]}} =
+               Parser.parse("mv old.txt new.txt")
+    end
+
+    test "cp parses correctly" do
+      assert {:ok, %Command{name: :cp, args: ["-r", "src", "dest"]}} =
+               Parser.parse("cp -r src dest")
+    end
+
+    test "date parses correctly" do
+      assert {:ok, %Command{name: :date, args: ["+%Y-%m-%d"]}} =
+               Parser.parse("date +%Y-%m-%d")
+    end
+  end
+
+  describe "utility commands" do
+    test "which parses correctly" do
+      assert {:ok, %Command{name: :which, args: ["ls"]}} = Parser.parse("which ls")
+    end
+
+    test "type parses correctly" do
+      assert {:ok, %Command{name: :type, args: ["cd"]}} = Parser.parse("type cd")
+    end
+
+    test "true parses correctly" do
+      assert {:ok, %Command{name: :true, args: []}} = Parser.parse("true")
+    end
+
+    test "false parses correctly" do
+      assert {:ok, %Command{name: :false, args: []}} = Parser.parse("false")
+    end
+  end
+
   # ==========================================================================
   # Phase: v0.7 (Composition) - pipes, redirects, chains
   # ==========================================================================

@@ -71,8 +71,8 @@ defmodule TrumanShell.Command do
     # Utility
     "which" => :which,
     "type" => :type,
-    "true" => true,
-    "false" => false
+    "true" => :true,
+    "false" => :false
   }
 
   @type t :: %__MODULE__{
