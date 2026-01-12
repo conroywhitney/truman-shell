@@ -4,6 +4,19 @@ defmodule TrumanShell.SanitizerTest do
   alias TrumanShell.Sanitizer
 
   describe "validate_path/2" do
+    @tag :tmp_dir
+    test "rejects symlink that escapes sandbox", %{tmp_dir: sandbox} do
+      # Create a symlink inside sandbox that points to /tmp (outside sandbox)
+      symlink_path = Path.join(sandbox, "escape_link")
+      File.ln_s("/tmp", symlink_path)
+
+      # The symlink exists inside sandbox, but points outside
+      result = Sanitizer.validate_path("escape_link", sandbox)
+
+      # Should be rejected because following it escapes the sandbox
+      assert {:error, :outside_sandbox} = result
+    end
+
     test "allows path within sandbox" do
       sandbox = "/tmp/truman-test"
       path = "subdir/file.txt"
