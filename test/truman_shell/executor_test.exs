@@ -34,6 +34,24 @@ defmodule TrumanShell.ExecutorTest do
       assert output =~ "mix.exs"
     end
 
+    test "rejects unsupported flags" do
+      command = %Command{name: :cmd_ls, args: ["-la"], pipes: [], redirects: []}
+
+      result = Executor.run(command)
+
+      assert {:error, message} = result
+      assert message =~ "invalid option"
+    end
+
+    test "rejects multiple path arguments" do
+      command = %Command{name: :cmd_ls, args: ["lib", "test"], pipes: [], redirects: []}
+
+      result = Executor.run(command)
+
+      assert {:error, message} = result
+      assert message =~ "too many arguments"
+    end
+
     test "rejects access to system directories (404 principle)" do
       # Trying to access /etc should appear as "not found"
       # not "permission denied" - no information leakage

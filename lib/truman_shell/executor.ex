@@ -34,8 +34,29 @@ defmodule TrumanShell.Executor do
 
   # Dispatch to command handlers
   defp execute(%Command{name: :cmd_ls, args: args}) do
-    path = List.first(args) || "."
-    handle_ls(path)
+    with :ok <- validate_ls_args(args) do
+      path = List.first(args) || "."
+      handle_ls(path)
+    end
+  end
+
+  # Validate ls arguments
+  defp validate_ls_args(args) do
+    {flags, paths} = Enum.split_with(args, &String.starts_with?(&1, "-"))
+
+    cond do
+      # Reject any flags (not supported yet)
+      flags != [] ->
+        flag = hd(flags)
+        {:error, "ls: invalid option -- '#{String.trim_leading(flag, "-")}'\n"}
+
+      # Reject multiple paths
+      length(paths) > 1 ->
+        {:error, "ls: too many arguments\n"}
+
+      true ->
+        :ok
+    end
   end
 
   defp execute(%Command{name: {:unknown, name}}) do
