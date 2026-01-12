@@ -92,6 +92,21 @@ Doctests serve dual purposes:
 - **Doctests** (22): Executable documentation for public API
 - **Total**: 110 tests
 
+## Design Decisions
+
+### Pipes are flat lists (not nested)
+`cmd1 | cmd2 | cmd3` becomes:
+```elixir
+%Command{name: :cmd1, pipes: [%Command{name: :cmd2}, %Command{name: :cmd3}]}
+```
+Memory grows O(n), parser uses iterative functions (no stack overflow risk).
+
+### Depth limits belong in executor, not parser
+Parser faithfully parses any valid syntax. Executor enforces:
+- Max pipe depth (e.g., 10)
+- Max command length
+- Allowed paths
+
 ## For v0.3: Use /openspec:proposal
 
 When starting v0.3, use the OpenSpec workflow to capture requirements before implementation.
