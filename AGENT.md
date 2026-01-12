@@ -77,6 +77,21 @@ def run(%Command{} = command), do: # ...
 - Provenance and understandability are paramount
 - We use **squash merges** to main, so messy feature branches are fine
 
+### TDD Mode: Auto-Commit
+
+**During TDD, don't ask for commit approval** if all checks pass:
+
+```bash
+mix format && mix test  # All green? Commit without asking.
+```
+
+The TDD cycle naturally produces atomic, well-tested commits. If tests pass and code is formatted, just commit and continue. This keeps flow state intact.
+
+**Still ask before committing when:**
+- Making architectural decisions
+- Changing the approach mid-implementation
+- Anything outside the TDD red-green-refactor cycle
+
 ### Before Every Commit
 
 ```bash
