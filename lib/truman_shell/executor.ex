@@ -96,7 +96,8 @@ defmodule TrumanShell.Executor do
 
       final_output =
         if truncated? do
-          output <> "\n... (#{total_count - @max_output_lines} more entries, #{total_count} total)\n"
+          output <>
+            "\n... (#{total_count - @max_output_lines} more entries, #{total_count} total)\n"
         else
           output <> "\n"
         end
