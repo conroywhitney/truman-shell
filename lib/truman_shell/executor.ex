@@ -1,11 +1,20 @@
 defmodule TrumanShell.Executor do
   @moduledoc """
   Executes parsed commands in a sandboxed environment.
+
+  All filesystem operations are confined to the sandbox root directory.
+  Attempts to access paths outside the sandbox return "not found" errors
+  (404 principle - no information leakage about protected paths).
   """
 
   alias TrumanShell.Command
+  alias TrumanShell.Sanitizer
 
   @max_pipe_depth 10
+
+  # Default sandbox is current working directory
+  # Can be overridden via run/2 options in the future
+  defp sandbox_root, do: File.cwd!()
 
   @doc """
   Executes a parsed command and returns the output.
@@ -43,15 +52,19 @@ defmodule TrumanShell.Executor do
   # Private handlers
 
   defp handle_ls(path) do
-    case File.ls(path) do
-      {:ok, entries} ->
-        output =
-          entries
-          |> Enum.sort()
-          |> Enum.map(&format_entry(path, &1))
-          |> Enum.join("\n")
+    with {:ok, safe_path} <- Sanitizer.validate_path(path, sandbox_root()),
+         {:ok, entries} <- File.ls(safe_path) do
+      output =
+        entries
+        |> Enum.sort()
+        |> Enum.map(&format_entry(safe_path, &1))
+        |> Enum.join("\n")
 
-        {:ok, output <> "\n"}
+      {:ok, output <> "\n"}
+    else
+      {:error, :outside_sandbox} ->
+        # 404 principle: don't reveal that path exists but is protected
+        {:error, "ls: #{path}: No such file or directory\n"}
 
       {:error, :enoent} ->
         {:error, "ls: #{path}: No such file or directory\n"}

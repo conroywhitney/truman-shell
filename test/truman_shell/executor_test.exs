@@ -34,6 +34,19 @@ defmodule TrumanShell.ExecutorTest do
       assert output =~ "mix.exs"
     end
 
+    test "rejects access to system directories (404 principle)" do
+      # Trying to access /etc should appear as "not found"
+      # not "permission denied" - no information leakage
+      # SECURITY: This test MUST fail if /etc is accessible
+      command = %Command{name: :cmd_ls, args: ["/etc"], pipes: [], redirects: []}
+
+      result = Executor.run(command)
+
+      # Should NOT see real system files like passwd, hosts, etc
+      assert {:error, message} = result
+      assert message =~ "No such file or directory"
+    end
+
     test "lists files in specified directory" do
       command = %Command{name: :cmd_ls, args: ["lib"], pipes: [], redirects: []}
 
