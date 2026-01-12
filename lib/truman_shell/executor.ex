@@ -13,7 +13,14 @@ defmodule TrumanShell.Executor do
   @max_pipe_depth 10
   @max_output_lines 200
 
-  @doc "Returns the maximum output lines limit (for testing/introspection)"
+  @doc """
+  Returns the maximum output lines limit (for testing/introspection).
+
+  ## Examples
+
+      iex> TrumanShell.Executor.max_output_lines()
+      200
+  """
   def max_output_lines, do: @max_output_lines
 
   # Default sandbox is current working directory
@@ -24,6 +31,20 @@ defmodule TrumanShell.Executor do
   Executes a parsed command and returns the output.
 
   Returns `{:ok, output}` on success or `{:error, message}` on failure.
+
+  ## Examples
+
+      iex> alias TrumanShell.Command
+      iex> cmd = %Command{name: :cmd_ls, args: ["lib"], pipes: [], redirects: []}
+      iex> {:ok, output} = TrumanShell.Executor.run(cmd)
+      iex> output =~ "truman_shell"
+      true
+
+      iex> alias TrumanShell.Command
+      iex> cmd = %Command{name: {:unknown, "fake"}, args: [], pipes: [], redirects: []}
+      iex> TrumanShell.Executor.run(cmd)
+      {:error, "bash: fake: command not found\\n"}
+
   """
   @spec run(Command.t()) :: {:ok, String.t()} | {:error, String.t()}
   def run(%Command{} = command) do
