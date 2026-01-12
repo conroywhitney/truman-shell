@@ -1,3 +1,4 @@
+
 # Truman Shell - Claude Context
 
 > "We accept the reality of the world with which we are presented." — The Truman Show
@@ -38,14 +39,19 @@ Agent sends: "grep -r TODO . | head -5"
 | Version | Status | Description |
 |---------|--------|-------------|
 | v0.1 | ✅ Done | Pattern mining (3,330 commands from Claude sessions) |
-| v0.2 | ✅ Done | Minimal parser (tokenizer + parser + 120 tests) |
-| v0.3 | 🎯 Next | Proof of concept loop (integrate with agent, implement `ls`) |
+| v0.2 | ✅ Merged | Minimal parser (tokenizer + parser + 120 tests) — PR #1 merged 2026-01-12 |
+| v0.3 | 🎯 Active | Proof of concept loop (integrate with IExReAct, implement `ls` executor) |
 | v0.4 | Planned | Read operations (ls, cat, head, tail, pwd, cd) |
 | v0.5 | Planned | Search operations (grep, find, wc) |
 | v0.6 | Planned | Write operations (mkdir, touch, rm, mv, cp, echo) |
 | v0.7 | Planned | Piping & composition |
 | v0.8 | Planned | Safety (404 principle, permissions) |
 | v0.9 | Planned | WASM script sandboxing |
+
+## Related Projects
+
+- **IExReAct** (`../IExReAct`) — The agent loop that will consume Truman Shell
+  - Added as path dep: `{:truman_shell, path: "../truman-shell"}`
 
 ## Key Files
 
@@ -119,6 +125,18 @@ Parser faithfully parses any valid syntax. Executor enforces:
 - Max command length
 - Allowed paths
 
-## For v0.3: Use /openspec:proposal
+## Current Work: v0.3
 
-When starting v0.3, use the OpenSpec workflow to capture requirements before implementation.
+**Goal**: One working command end-to-end: `ls`
+
+```
+Agent (IExReAct) sends: "ls -la"
+      ↓
+TrumanShell.parse/1 → %Command{name: :cmd_ls, args: ["-la"]}
+      ↓
+Executor.run/1 → Actually list files (sandboxed)
+      ↓
+Agent receives: "total 64\ndrwxr-xr-x  5 user..."
+```
+
+**See**: `AGENT.md` for development workflow and best practices.

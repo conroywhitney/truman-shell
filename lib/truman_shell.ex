@@ -24,7 +24,36 @@ defmodule TrumanShell do
 
   """
 
+  alias TrumanShell.Executor
   alias TrumanShell.Parser
+
+  @doc """
+  Parse and execute a shell command string.
+
+  This is the main entry point for running commands. It parses the input,
+  validates it, and executes it in the sandboxed environment.
+
+  Returns `{:ok, output}` on success or `{:error, reason}` on failure.
+
+  ## Examples
+
+      iex> {:ok, output} = TrumanShell.execute("ls lib")
+      iex> output =~ "truman_shell.ex"
+      true
+
+      iex> TrumanShell.execute("")
+      {:error, "Empty command"}
+
+      iex> match?({:error, _}, TrumanShell.execute("ls nonexistent_path_12345"))
+      true
+
+  """
+  @spec execute(String.t()) :: {:ok, String.t()} | {:error, String.t()}
+  def execute(input) do
+    with {:ok, command} <- parse(input) do
+      Executor.run(command)
+    end
+  end
 
   @doc """
   Parse a shell command string into a structured Command.
