@@ -16,7 +16,7 @@ defmodule TrumanShell do
 
       iex> TrumanShell.parse("ls -la /tmp")
       {:ok, %TrumanShell.Command{
-        name: :ls,
+        name: :cmd_ls,
         args: ["-la", "/tmp"],
         pipes: [],
         redirects: []
@@ -34,27 +34,29 @@ defmodule TrumanShell do
   ## Simple Commands
 
       iex> TrumanShell.parse("pwd")
-      {:ok, %TrumanShell.Command{name: :pwd, args: []}}
+      {:ok, %TrumanShell.Command{name: :cmd_pwd, args: []}}
 
       iex> TrumanShell.parse("ls -la /tmp")
-      {:ok, %TrumanShell.Command{name: :ls, args: ["-la", "/tmp"]}}
+      {:ok, %TrumanShell.Command{name: :cmd_ls, args: ["-la", "/tmp"]}}
 
       iex> TrumanShell.parse("cd ~")
-      {:ok, %TrumanShell.Command{name: :cd, args: ["~"]}}
+      {:ok, %TrumanShell.Command{name: :cmd_cd, args: ["~"]}}
 
   ## Pipes
 
       iex> {:ok, cmd} = TrumanShell.parse("cat file.txt | grep pattern")
       iex> cmd.name
-      :cat
+      :cmd_cat
       iex> cmd.args
       ["file.txt"]
       iex> length(cmd.pipes)
       1
       iex> hd(cmd.pipes).name
-      :grep
+      :cmd_grep
 
       iex> {:ok, cmd} = TrumanShell.parse("ls | grep foo | head -5")
+      iex> cmd.name
+      :cmd_ls
       iex> length(cmd.pipes)
       2
 

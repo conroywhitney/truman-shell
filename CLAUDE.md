@@ -38,7 +38,7 @@ Agent sends: "grep -r TODO . | head -5"
 | Version | Status | Description |
 |---------|--------|-------------|
 | v0.1 | ✅ Done | Pattern mining (3,330 commands from Claude sessions) |
-| v0.2 | ✅ Done | Minimal parser (tokenizer + parser + 84 tests) |
+| v0.2 | ✅ Done | Minimal parser (tokenizer + parser + 120 tests) |
 | v0.3 | 🎯 Next | Proof of concept loop (integrate with agent, implement `ls`) |
 | v0.4 | Planned | Read operations (ls, cat, head, tail, pwd, cd) |
 | v0.5 | Planned | Search operations (grep, find, wc) |
@@ -70,7 +70,7 @@ Key files:
 ## Commands
 
 ```bash
-mix test              # Run 110 tests (88 unit + 22 doctests)
+mix test              # Run 120 tests (96 unit + 24 doctests)
 mix deps.get          # Fetch dependencies
 mix format            # Format code
 ```
@@ -88,16 +88,28 @@ Doctests serve dual purposes:
 - The CSV fixtures test private functions through `TrumanShell.parse/1`
 
 ### Test Coverage
-- **Unit tests** (88): Derived from real Claude Code session analysis (CSV fixtures)
-- **Doctests** (22): Executable documentation for public API
-- **Total**: 110 tests
+- **Unit tests** (96): Derived from real Claude Code session analysis (CSV fixtures)
+- **Doctests** (24): Executable documentation for public API
+- **Total**: 120 tests
 
 ## Design Decisions
+
+### Command names use `cmd_` prefix
+All command atoms use a `cmd_` prefix for namespace clarity:
+```elixir
+%Command{name: :cmd_ls, args: ["-la"]}
+%Command{name: :cmd_grep, args: ["pattern", "file.txt"]}
+```
+
+**Why?** Three reasons:
+1. **Atom DoS prevention** - Only allowlisted atoms are created (no `String.to_atom/1` on untrusted input)
+2. **Falsy footgun prevention** - `:cmd_true`/`:cmd_false` aren't falsy like `true`/`false`
+3. **Namespace clarity** - `:cmd_type` is unambiguous (`:type` is overloaded in Elixir)
 
 ### Pipes are flat lists (not nested)
 `cmd1 | cmd2 | cmd3` becomes:
 ```elixir
-%Command{name: :cmd1, pipes: [%Command{name: :cmd2}, %Command{name: :cmd3}]}
+%Command{name: :cmd_cat, pipes: [%Command{name: :cmd_grep}, %Command{name: :cmd_head}]}
 ```
 Memory grows O(n), parser uses iterative functions (no stack overflow risk).
 

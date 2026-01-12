@@ -4,7 +4,7 @@ defmodule TrumanShell.Command do
 
   ## Fields
 
-  - `name` - The command name as an atom (`:ls`, `:cat`, `:grep`, etc.)
+  - `name` - The command name as an atom (`:cmd_ls`, `:cmd_cat`, `:cmd_grep`, etc.)
   - `args` - List of arguments as strings
   - `pipes` - List of piped commands (each is another Command struct)
   - `redirects` - List of redirections as `{type, target}` tuples
@@ -20,19 +20,19 @@ defmodule TrumanShell.Command do
   ## Examples
 
       # Simple command
-      %Command{name: :ls, args: ["-la"], pipes: [], redirects: []}
+      %Command{name: :cmd_ls, args: ["-la"], pipes: [], redirects: []}
 
       # Command with pipe
       %Command{
-        name: :cat,
+        name: :cmd_cat,
         args: ["file.txt"],
-        pipes: [%Command{name: :grep, args: ["pattern"]}],
+        pipes: [%Command{name: :cmd_grep, args: ["pattern"]}],
         redirects: []
       }
 
       # Command with redirect
       %Command{
-        name: :echo,
+        name: :cmd_echo,
         args: ["hello"],
         pipes: [],
         redirects: [{:stdout, "output.txt"}]
@@ -45,34 +45,38 @@ defmodule TrumanShell.Command do
   # Command name is either a known atom or {:unknown, "string"} for unrecognized commands
   @type command_name :: atom() | {:unknown, String.t()}
 
-  # Authoritative allowlist of known commands (prevents atom DoS)
+  # Authoritative allowlist using cmd_ prefix for namespace clarity.
   # See: https://erlang.org/doc/efficiency_guide/commoncaveats.html#atoms
+  # This prevents:
+  # 1. Atom DoS attacks (no String.to_atom on untrusted input)
+  # 2. The true/false falsy footgun (cmd_true/cmd_false aren't falsy)
+  # 3. Namespace collisions (:type is common; :cmd_type is unambiguous)
   @known_commands %{
     # Navigation
-    "cd" => :cd,
-    "pwd" => :pwd,
+    "cd" => :cmd_cd,
+    "pwd" => :cmd_pwd,
     # Read operations
-    "ls" => :ls,
-    "cat" => :cat,
-    "head" => :head,
-    "tail" => :tail,
+    "ls" => :cmd_ls,
+    "cat" => :cmd_cat,
+    "head" => :cmd_head,
+    "tail" => :cmd_tail,
     # Search operations
-    "grep" => :grep,
-    "find" => :find,
-    "wc" => :wc,
+    "grep" => :cmd_grep,
+    "find" => :cmd_find,
+    "wc" => :cmd_wc,
     # Write operations
-    "mkdir" => :mkdir,
-    "touch" => :touch,
-    "rm" => :rm,
-    "mv" => :mv,
-    "cp" => :cp,
-    "echo" => :echo,
-    "date" => :date,
+    "mkdir" => :cmd_mkdir,
+    "touch" => :cmd_touch,
+    "rm" => :cmd_rm,
+    "mv" => :cmd_mv,
+    "cp" => :cmd_cp,
+    "echo" => :cmd_echo,
+    "date" => :cmd_date,
     # Utility
-    "which" => :which,
-    "type" => :type,
-    "true" => :true,
-    "false" => :false
+    "which" => :cmd_which,
+    "type" => :cmd_type,
+    "true" => :cmd_true,
+    "false" => :cmd_false
   }
 
   @type t :: %__MODULE__{
@@ -92,31 +96,31 @@ defmodule TrumanShell.Command do
 
   ## Basic Usage
 
-      iex> TrumanShell.Command.new(:ls)
-      %TrumanShell.Command{name: :ls, args: [], pipes: [], redirects: []}
+      iex> TrumanShell.Command.new(:cmd_ls)
+      %TrumanShell.Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
 
-      iex> TrumanShell.Command.new(:ls, ["-la"])
-      %TrumanShell.Command{name: :ls, args: ["-la"], pipes: [], redirects: []}
+      iex> TrumanShell.Command.new(:cmd_ls, ["-la"])
+      %TrumanShell.Command{name: :cmd_ls, args: ["-la"], pipes: [], redirects: []}
 
-      iex> TrumanShell.Command.new(:grep, ["-r", "TODO", "."])
-      %TrumanShell.Command{name: :grep, args: ["-r", "TODO", "."], pipes: [], redirects: []}
+      iex> TrumanShell.Command.new(:cmd_grep, ["-r", "TODO", "."])
+      %TrumanShell.Command{name: :cmd_grep, args: ["-r", "TODO", "."], pipes: [], redirects: []}
 
   ## With Pipes
 
-      iex> grep_cmd = TrumanShell.Command.new(:grep, ["pattern"])
-      iex> TrumanShell.Command.new(:cat, ["file.txt"], pipes: [grep_cmd])
+      iex> grep_cmd = TrumanShell.Command.new(:cmd_grep, ["pattern"])
+      iex> TrumanShell.Command.new(:cmd_cat, ["file.txt"], pipes: [grep_cmd])
       %TrumanShell.Command{
-        name: :cat,
+        name: :cmd_cat,
         args: ["file.txt"],
-        pipes: [%TrumanShell.Command{name: :grep, args: ["pattern"], pipes: [], redirects: []}],
+        pipes: [%TrumanShell.Command{name: :cmd_grep, args: ["pattern"], pipes: [], redirects: []}],
         redirects: []
       }
 
   ## With Redirects
 
-      iex> TrumanShell.Command.new(:echo, ["hello"], redirects: [{:stdout, "out.txt"}])
+      iex> TrumanShell.Command.new(:cmd_echo, ["hello"], redirects: [{:stdout, "out.txt"}])
       %TrumanShell.Command{
-        name: :echo,
+        name: :cmd_echo,
         args: ["hello"],
         pipes: [],
         redirects: [{:stdout, "out.txt"}]
@@ -126,10 +130,10 @@ defmodule TrumanShell.Command do
 
   Commands are plain structs, so you can pattern match on them:
 
-      iex> cmd = TrumanShell.Command.new(:ls, ["-la", "/tmp"])
+      iex> cmd = TrumanShell.Command.new(:cmd_ls, ["-la", "/tmp"])
       iex> %TrumanShell.Command{name: name, args: [flag | paths]} = cmd
       iex> name
-      :ls
+      :cmd_ls
       iex> flag
       "-la"
       iex> paths
@@ -164,7 +168,7 @@ defmodule TrumanShell.Command do
   ## Examples
 
       iex> TrumanShell.Command.parse_name("ls")
-      :ls
+      :cmd_ls
 
       iex> TrumanShell.Command.parse_name("kubectl")
       {:unknown, "kubectl"}
@@ -180,7 +184,7 @@ defmodule TrumanShell.Command do
 
   ## Examples
 
-      iex> TrumanShell.Command.known?(%TrumanShell.Command{name: :ls})
+      iex> TrumanShell.Command.known?(%TrumanShell.Command{name: :cmd_ls})
       true
 
       iex> TrumanShell.Command.known?(%TrumanShell.Command{name: {:unknown, "kubectl"}})
