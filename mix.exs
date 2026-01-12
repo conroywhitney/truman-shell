@@ -4,7 +4,7 @@ defmodule TrumanShell.MixProject do
   def project do
     [
       app: :truman_shell,
-      version: "0.2.0",
+      version: "0.3.1",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
