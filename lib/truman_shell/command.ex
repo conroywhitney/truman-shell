@@ -45,6 +45,36 @@ defmodule TrumanShell.Command do
   # Command name is either a known atom or {:unknown, "string"} for unrecognized commands
   @type command_name :: atom() | {:unknown, String.t()}
 
+  # Authoritative allowlist of known commands (prevents atom DoS)
+  # See: https://erlang.org/doc/efficiency_guide/commoncaveats.html#atoms
+  @known_commands %{
+    # Navigation
+    "cd" => :cd,
+    "pwd" => :pwd,
+    # Read operations
+    "ls" => :ls,
+    "cat" => :cat,
+    "head" => :head,
+    "tail" => :tail,
+    # Search operations
+    "grep" => :grep,
+    "find" => :find,
+    "wc" => :wc,
+    # Write operations
+    "mkdir" => :mkdir,
+    "touch" => :touch,
+    "rm" => :rm,
+    "mv" => :mv,
+    "cp" => :cp,
+    "echo" => :echo,
+    "date" => :date,
+    # Utility
+    "which" => :which,
+    "type" => :type,
+    "true" => true,
+    "false" => false
+  }
+
   @type t :: %__MODULE__{
           name: command_name(),
           args: [String.t()],
@@ -123,6 +153,26 @@ defmodule TrumanShell.Command do
       pipes: Keyword.get(opts, :pipes, []),
       redirects: Keyword.get(opts, :redirects, [])
     }
+  end
+
+  @doc """
+  Parse a command name string into a safe command_name type.
+
+  Known commands return atoms, unknown return `{:unknown, name}` tuples.
+  This prevents atom table exhaustion from untrusted input.
+
+  ## Examples
+
+      iex> TrumanShell.Command.parse_name("ls")
+      :ls
+
+      iex> TrumanShell.Command.parse_name("kubectl")
+      {:unknown, "kubectl"}
+
+  """
+  @spec parse_name(String.t()) :: command_name()
+  def parse_name(name) when is_binary(name) do
+    Map.get(@known_commands, name, {:unknown, name})
   end
 
   @doc """

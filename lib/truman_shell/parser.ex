@@ -32,37 +32,6 @@ defmodule TrumanShell.Parser do
 
   alias TrumanShell.{Command, Tokenizer}
 
-  # Allowlist of known commands to prevent atom table exhaustion (DoS).
-  # Unknown commands return {:unknown, "name"} instead of creating new atoms.
-  # See: https://erlang.org/doc/efficiency_guide/commoncaveats.html#atoms
-  @known_commands %{
-    # Navigation
-    "cd" => :cd,
-    "pwd" => :pwd,
-    # Read operations
-    "ls" => :ls,
-    "cat" => :cat,
-    "head" => :head,
-    "tail" => :tail,
-    # Search operations
-    "grep" => :grep,
-    "find" => :find,
-    "wc" => :wc,
-    # Write operations
-    "mkdir" => :mkdir,
-    "touch" => :touch,
-    "rm" => :rm,
-    "mv" => :mv,
-    "cp" => :cp,
-    "echo" => :echo,
-    "date" => :date,
-    # Utility
-    "which" => :which,
-    "type" => :type,
-    "true" => true,
-    "false" => false
-  }
-
   @doc """
   Parse a shell command string into a Command struct.
 
@@ -147,12 +116,8 @@ defmodule TrumanShell.Parser do
     {:error, "Unexpected token type at start of command: #{type}"}
   end
 
-  # Parse command name safely using allowlist.
-  # Known commands return atoms, unknown return {:unknown, "name"}.
-  # This prevents atom table exhaustion from untrusted input.
-  defp parse_command_name(name) do
-    Map.get(@known_commands, name, {:unknown, name})
-  end
+  # Delegate to Command module (single source of truth for allowlist)
+  defp parse_command_name(name), do: Command.parse_name(name)
 
   # Parse arguments and extract redirects
   defp parse_args_and_redirects(tokens) do
