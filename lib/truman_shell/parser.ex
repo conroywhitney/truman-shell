@@ -32,14 +32,6 @@ defmodule TrumanShell.Parser do
 
   alias TrumanShell.{Command, Tokenizer}
 
-  # Commands we know about (for atom conversion safety)
-  @known_commands ~w(
-    cd pwd ls cat head tail
-    grep find wc
-    mkdir touch rm mv cp echo date
-    which type
-  )a
-
   @doc """
   Parse a shell command string into a Command struct.
 
@@ -110,14 +102,9 @@ defmodule TrumanShell.Parser do
   end
 
   defp parse_single_command([{:word, cmd_name} | rest]) do
-    case parse_command_name(cmd_name) do
-      {:ok, name} ->
-        {args, redirects} = parse_args_and_redirects(rest)
-        {:ok, Command.new(name, args, redirects: redirects)}
-
-      {:error, _} = error ->
-        error
-    end
+    name = parse_command_name(cmd_name)
+    {args, redirects} = parse_args_and_redirects(rest)
+    {:ok, Command.new(name, args, redirects: redirects)}
   end
 
   defp parse_single_command([{:glob, pattern} | _rest]) do
@@ -129,17 +116,10 @@ defmodule TrumanShell.Parser do
     {:error, "Unexpected token type at start of command: #{type}"}
   end
 
-  # Parse command name to atom (safely)
+  # Parse command name to atom
+  # Unknown commands are allowed - executor will return "command not found"
   defp parse_command_name(name) do
-    atom = String.to_atom(name)
-
-    if atom in @known_commands do
-      {:ok, atom}
-    else
-      # Unknown command - still allow it but as an atom
-      # In execution phase, this will return "command not found"
-      {:ok, atom}
-    end
+    String.to_atom(name)
   end
 
   # Parse arguments and extract redirects

@@ -249,17 +249,28 @@ defmodule TrumanShell.ParserTest do
 
   describe "pipes (v0.7)" do
     test "cat to head" do
-      assert {:ok, %Command{name: :cat, args: ["file.txt"], pipes: [%Command{name: :head, args: ["-5"]}]}} =
+      assert {:ok,
+              %Command{
+                name: :cat,
+                args: ["file.txt"],
+                pipes: [%Command{name: :head, args: ["-5"]}]
+              }} =
                Parser.parse("cat file.txt | head -5")
     end
 
     test "cat to grep" do
-      assert {:ok, %Command{name: :cat, args: ["file.txt"], pipes: [%Command{name: :grep, args: ["pattern"]}]}} =
+      assert {:ok,
+              %Command{
+                name: :cat,
+                args: ["file.txt"],
+                pipes: [%Command{name: :grep, args: ["pattern"]}]
+              }} =
                Parser.parse("cat file.txt | grep pattern")
     end
 
     test "cat to wc" do
-      assert {:ok, %Command{name: :cat, args: ["file.txt"], pipes: [%Command{name: :wc, args: ["-l"]}]}} =
+      assert {:ok,
+              %Command{name: :cat, args: ["file.txt"], pipes: [%Command{name: :wc, args: ["-l"]}]}} =
                Parser.parse("cat file.txt | wc -l")
     end
 
