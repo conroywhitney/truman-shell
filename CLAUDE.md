@@ -70,9 +70,27 @@ Key files:
 ## Commands
 
 ```bash
-mix test              # Run 84 tests
+mix test              # Run 103 tests (84 unit + 19 doctests)
 mix deps.get          # Fetch dependencies
+mix format            # Format code
 ```
+
+## Testing Philosophy
+
+### Doctests = Living Documentation
+Doctests serve dual purposes:
+1. **Documentation** — Users see real, working examples in the docs
+2. **Regression tests** — If the API changes, doctests fail immediately
+
+### Test Private Functions Through Public API
+- Elixir culture: if it's private (`defp`), it's an implementation detail
+- If a private function needs its own tests, it should be its own module
+- The CSV fixtures test private functions through `TrumanShell.parse/1`
+
+### Test Coverage
+- **Unit tests** (84): Derived from real Claude Code session analysis (CSV fixtures)
+- **Doctests** (19): Executable documentation for public API
+- **Total**: 103 tests
 
 ## For v0.3: Use /openspec:proposal
 
