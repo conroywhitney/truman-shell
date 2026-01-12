@@ -34,7 +34,7 @@ v0.2 delivered the parser — we can turn `"ls -la"` into `%Command{name: :cmd_l
 
 1. `TrumanShell.execute("ls")` returns `{:ok, "file1.txt\nfile2.txt\n..."}`
 2. Agent in IExReAct can run `ls` and receive realistic output
-3. Unknown commands return `{:error, "command not found: xyz"}`
+3. Unknown commands return `{:error, "bash: xyz: command not found\n"}`
 4. Tests pass with TDD approach (red-green-refactor)
 
 ## Related

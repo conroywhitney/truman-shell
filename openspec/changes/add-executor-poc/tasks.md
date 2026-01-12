@@ -3,41 +3,41 @@
 ## Implementation Checklist
 
 ### Phase 1: Executor Foundation
-- [ ] Create `lib/truman_shell/executor.ex` module stub
-- [ ] Write failing test: `Executor.run/1` returns `{:ok, output}` for valid command
-- [ ] Implement `run/1` with basic dispatch
-- [ ] Write failing test: unknown commands return `{:error, "command not found"}`
-- [ ] Implement unknown command handler
+- [x] Create `lib/truman_shell/executor.ex` module stub
+- [x] Write failing test: `Executor.run/1` returns `{:ok, output}` for valid command
+- [x] Implement `run/1` with basic dispatch
+- [x] Write failing test: unknown commands return `{:error, "command not found"}`
+- [x] Implement unknown command handler
 
 ### Phase 2: ls Handler
-- [ ] Write failing test: `ls` on current directory returns file listing
-- [ ] Implement `handle(:cmd_ls, [])` — list current directory
-- [ ] Write failing test: `ls` on specific path returns that directory's contents
-- [ ] Implement `handle(:cmd_ls, [path])` — list specific directory
-- [ ] Write failing test: `ls` on non-existent path returns error
-- [ ] Implement error case for missing paths
+- [x] Write failing test: `ls` on current directory returns file listing
+- [x] Implement `handle(:cmd_ls, [])` — list current directory
+- [x] Write failing test: `ls` on specific path returns that directory's contents
+- [x] Implement `handle(:cmd_ls, [path])` — list specific directory
+- [x] Write failing test: `ls` on non-existent path returns error
+- [x] Implement error case for missing paths
 
 ### Phase 3: Depth Limits
-- [ ] Write failing test: command with >10 pipes returns error
-- [ ] Implement `validate_depth/1` check in `run/1`
-- [ ] Add configuration option for max depth (default 10)
+- [x] Write failing test: command with >10 pipes returns error
+- [x] Implement `validate_depth/1` check in `run/1`
+- [x] Add configuration option for max depth (default 10)
 
 ### Phase 4: Public API
-- [ ] Write failing test: `TrumanShell.execute/1` parses and runs
-- [ ] Implement `execute/1` in main module
-- [ ] Add doctests for `execute/1`
-- [ ] Update module documentation
+- [x] Write failing test: `TrumanShell.execute/1` parses and runs
+- [x] Implement `execute/1` in main module
+- [x] Add doctests for `execute/1`
+- [x] Update module documentation
 
 ### Phase 5: Integration Verification
-- [ ] Verify IExReAct can call `TrumanShell.execute/1`
-- [ ] Test in IEx: agent sends command, receives output
-- [ ] Document integration point in README or CLAUDE.md
+- [x] Verify IExReAct can call `TrumanShell.execute/1`
+- [x] Test in IEx: agent sends command, receives output
+- [x] Document integration point in README or CLAUDE.md
 
 ### Validation
-- [ ] All tests pass (`mix test`)
-- [ ] Code formatted (`mix format`)
-- [ ] Static analysis clean (`mix credo`)
-- [ ] Commit and push
+- [x] All tests pass (`mix test`)
+- [x] Code formatted (`mix format`)
+- [x] Static analysis clean (`mix credo`)
+- [x] Commit and push
 
 ## Dependencies
 

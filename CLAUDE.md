@@ -68,7 +68,7 @@ Agent sends: "grep -r TODO . | head -5"
 
 ## Related Projects
 
-- **IExReAct** (`/Users/conroywhitney/code/IExReAct`) — The agent loop that will consume Truman Shell
+- **IExReAct** (`../IExReAct`) — The agent loop that will consume Truman Shell
   - Added as path dep: `{:truman_shell, path: "../truman-shell"}`
 
 ## Key Files

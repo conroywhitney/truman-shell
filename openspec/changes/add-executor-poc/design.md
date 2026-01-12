@@ -22,13 +22,13 @@ The Executor is the bridge between parsed commands and actual execution. It rout
 ├─────────────────────────────────────────────────────────┤
 │  run/1                                                   │
 │  ├── validate_depth/1  (enforce max pipe depth)         │
-│  ├── dispatch/1        (route to handler)               │
-│  └── format_output/1   (ensure shell-like output)       │
+│  ├── execute/1        (dispatch to handlers)               │
+│  └── validate_ls_args/1 (arg validation)       │
 ├─────────────────────────────────────────────────────────┤
 │  Handlers (pattern matched on command name)              │
-│  ├── handle(:cmd_ls, args)    → list files              │
-│  ├── handle({:unknown, name}) → "command not found"     │
-│  └── handle(_, _)             → fallback error          │
+│  ├── execute(%Command{name: :cmd_ls})    → list files              │
+│  ├── execute(%Command{name: {:unknown}}) → "command not found"     │
+│  └── handle_ls/1                    → list files          │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -52,8 +52,8 @@ The Executor is the bridge between parsed commands and actual execution. It rout
 **Choice**: Use function head pattern matching for command dispatch.
 
 ```elixir
-defp handle(%Command{name: :cmd_ls, args: args}), do: # ...
-defp handle(%Command{name: {:unknown, name}}), do: # ...
+defp execute(%Command{name: :cmd_ls, args: args}), do: # ...
+defp execute(%Command{name: {:unknown, name}}), do: # ...
 ```
 
 **Rationale**:
