@@ -40,7 +40,11 @@ defmodule TrumanShell.Executor do
     end
   end
 
-  # Validate ls arguments
+  defp execute(%Command{name: {:unknown, name}}) do
+    {:error, "bash: #{name}: command not found\n"}
+  end
+
+  # Argument validation helpers
   defp validate_ls_args(args) do
     {flags, paths} = Enum.split_with(args, &String.starts_with?(&1, "-"))
 
@@ -57,10 +61,6 @@ defmodule TrumanShell.Executor do
       true ->
         :ok
     end
-  end
-
-  defp execute(%Command{name: {:unknown, name}}) do
-    {:error, "bash: #{name}: command not found\n"}
   end
 
   # Depth validation
