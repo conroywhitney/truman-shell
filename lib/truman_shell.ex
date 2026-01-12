@@ -30,6 +30,66 @@ defmodule TrumanShell do
   Parse a shell command string into a structured Command.
 
   Returns `{:ok, command}` on success or `{:error, reason}` on failure.
+
+  ## Simple Commands
+
+      iex> TrumanShell.parse("pwd")
+      {:ok, %TrumanShell.Command{name: :pwd, args: []}}
+
+      iex> TrumanShell.parse("ls -la /tmp")
+      {:ok, %TrumanShell.Command{name: :ls, args: ["-la", "/tmp"]}}
+
+      iex> TrumanShell.parse("cd ~")
+      {:ok, %TrumanShell.Command{name: :cd, args: ["~"]}}
+
+  ## Pipes
+
+      iex> {:ok, cmd} = TrumanShell.parse("cat file.txt | grep pattern")
+      iex> cmd.name
+      :cat
+      iex> cmd.args
+      ["file.txt"]
+      iex> length(cmd.pipes)
+      1
+      iex> hd(cmd.pipes).name
+      :grep
+
+      iex> {:ok, cmd} = TrumanShell.parse("ls | grep foo | head -5")
+      iex> length(cmd.pipes)
+      2
+
+  ## Redirects
+
+      iex> {:ok, cmd} = TrumanShell.parse("echo hello > output.txt")
+      iex> cmd.redirects
+      [{:stdout, "output.txt"}]
+
+      iex> {:ok, cmd} = TrumanShell.parse("echo more >> log.txt")
+      iex> cmd.redirects
+      [{:stdout_append, "log.txt"}]
+
+      iex> {:ok, cmd} = TrumanShell.parse("make 2> errors.log")
+      iex> cmd.redirects
+      [{:stderr, "errors.log"}]
+
+  ## Quoted Strings
+
+      iex> {:ok, cmd} = TrumanShell.parse("echo \\"hello world\\"")
+      iex> cmd.args
+      ["hello world"]
+
+      iex> {:ok, cmd} = TrumanShell.parse("grep 'pattern with spaces' file.txt")
+      iex> cmd.args
+      ["pattern with spaces", "file.txt"]
+
+  ## Error Cases
+
+      iex> TrumanShell.parse("")
+      {:error, "Empty command"}
+
+      iex> TrumanShell.parse("   ")
+      {:error, "Empty command"}
+
   """
   defdelegate parse(input), to: Parser
 end

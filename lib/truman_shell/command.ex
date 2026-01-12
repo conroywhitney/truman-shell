@@ -57,10 +57,50 @@ defmodule TrumanShell.Command do
   @doc """
   Create a new Command struct.
 
-  ## Examples
+  ## Basic Usage
+
+      iex> TrumanShell.Command.new(:ls)
+      %TrumanShell.Command{name: :ls, args: [], pipes: [], redirects: []}
 
       iex> TrumanShell.Command.new(:ls, ["-la"])
       %TrumanShell.Command{name: :ls, args: ["-la"], pipes: [], redirects: []}
+
+      iex> TrumanShell.Command.new(:grep, ["-r", "TODO", "."])
+      %TrumanShell.Command{name: :grep, args: ["-r", "TODO", "."], pipes: [], redirects: []}
+
+  ## With Pipes
+
+      iex> grep_cmd = TrumanShell.Command.new(:grep, ["pattern"])
+      iex> TrumanShell.Command.new(:cat, ["file.txt"], pipes: [grep_cmd])
+      %TrumanShell.Command{
+        name: :cat,
+        args: ["file.txt"],
+        pipes: [%TrumanShell.Command{name: :grep, args: ["pattern"], pipes: [], redirects: []}],
+        redirects: []
+      }
+
+  ## With Redirects
+
+      iex> TrumanShell.Command.new(:echo, ["hello"], redirects: [{:stdout, "out.txt"}])
+      %TrumanShell.Command{
+        name: :echo,
+        args: ["hello"],
+        pipes: [],
+        redirects: [{:stdout, "out.txt"}]
+      }
+
+  ## Pattern Matching
+
+  Commands are plain structs, so you can pattern match on them:
+
+      iex> cmd = TrumanShell.Command.new(:ls, ["-la", "/tmp"])
+      iex> %TrumanShell.Command{name: name, args: [flag | paths]} = cmd
+      iex> name
+      :ls
+      iex> flag
+      "-la"
+      iex> paths
+      ["/tmp"]
 
   """
   def new(name, args \\ [], opts \\ []) when is_atom(name) and is_list(args) do
