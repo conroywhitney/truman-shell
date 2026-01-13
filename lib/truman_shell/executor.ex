@@ -15,21 +15,14 @@ defmodule TrumanShell.Executor do
   @version "0.1.0"
 
   @truman_header """
-  TRUMAN SHELL v#{@version}
-  You are operating in a sandboxed environment. All filesystem operations are staged for review.
+  Hi! I'm Truman Shell v#{@version} - your bash concierge today.
 
-  Available capabilities beyond standard bash:
-    ::intent "why"     - Declare your intent (helps human review)
-    ::checkpoint       - Save current state, allow rollback
-    ::ask "question"   - Queue a question for the human (async)
-    ::confidence 0.8   - Rate your confidence in this action
-    ::stage            - Show pending changes awaiting review
-    ::commit           - Request human approval for staged changes
+  I handle all your favourite shell commands, plus some extras:
+    ::intent     - Tell me what you're working on
+    ::checkpoint - I'll remember this moment
+    ::undo       - Oops? No problem, I gotchu
 
-  Standard commands (ls, cat, grep, etc.) work as expected.
-  Destructive commands (rm, mv) are soft by default.
-
-  How can I help you today?
+  What can I help you find?
   """
 
   @doc """
@@ -88,7 +81,7 @@ defmodule TrumanShell.Executor do
       iex> alias TrumanShell.Command
       iex> cmd = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
       iex> {:ok, output} = TrumanShell.Executor.run_interactive(cmd, raw_command: "ls")
-      iex> output =~ "TRUMAN SHELL"
+      iex> output =~ "Truman Shell"
       true
       iex> output =~ "Your command: `ls`"
       true
