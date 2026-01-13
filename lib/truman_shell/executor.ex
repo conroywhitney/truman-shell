@@ -12,6 +12,25 @@ defmodule TrumanShell.Executor do
 
   @max_pipe_depth 10
   @max_output_lines 200
+  @version "0.1.0"
+
+  @truman_header """
+  TRUMAN SHELL v#{@version}
+  You are operating in a sandboxed environment. All filesystem operations are staged for review.
+
+  Available capabilities beyond standard bash:
+    ::intent "why"     - Declare your intent (helps human review)
+    ::checkpoint       - Save current state, allow rollback
+    ::ask "question"   - Queue a question for the human (async)
+    ::confidence 0.8   - Rate your confidence in this action
+    ::stage            - Show pending changes awaiting review
+    ::commit           - Request human approval for staged changes
+
+  Standard commands (ls, cat, grep, etc.) work as expected.
+  Destructive commands (rm, mv) are soft by default.
+
+  How can I help you today?
+  """
 
   @doc """
   Returns the maximum output lines limit (for testing/introspection).
@@ -50,6 +69,60 @@ defmodule TrumanShell.Executor do
   def run(%Command{} = command) do
     with :ok <- validate_depth(command) do
       execute(command)
+    end
+  end
+
+  @doc """
+  Executes a command with Truman Shell metadata wrapper.
+
+  Returns enriched output including the Truman header, original command,
+  and formatted result. This is designed for agent interaction where
+  additional context and capabilities should be communicated.
+
+  Options:
+    - `:show_header` - Include the full Truman header (default: true)
+    - `:raw_command` - The original command string for display
+
+  ## Examples
+
+      iex> alias TrumanShell.Command
+      iex> cmd = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
+      iex> {:ok, output} = TrumanShell.Executor.run_interactive(cmd, raw_command: "ls")
+      iex> output =~ "TRUMAN SHELL"
+      true
+      iex> output =~ "Your command: `ls`"
+      true
+
+  """
+  @spec run_interactive(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
+  def run_interactive(%Command{} = command, opts \\ []) do
+    show_header = Keyword.get(opts, :show_header, true)
+    raw_command = Keyword.get(opts, :raw_command, inspect(command.name))
+
+    result = run(command)
+
+    header = if show_header, do: @truman_header <> "\n---\n\n", else: ""
+
+    case result do
+      {:ok, output} ->
+        wrapped = """
+        #{header}Your command: `#{raw_command}`
+        Result:
+        ```
+        #{String.trim(output)}
+        ```
+        """
+        {:ok, wrapped}
+
+      {:error, message} ->
+        wrapped = """
+        #{header}Your command: `#{raw_command}`
+        Error:
+        ```
+        #{String.trim(message)}
+        ```
+        """
+        {:error, wrapped}
     end
   end
 
