@@ -14,16 +14,54 @@ defmodule TrumanShell.Executor do
   @max_output_lines 200
   @version "0.1.0"
 
-  @truman_header """
-  Hi! I'm Truman Shell v#{@version} - your bash concierge today.
+  # Header variants for A/B testing AI perception
+  # See: .imaginary/ideas/2026-01-12_2040_truman-paradox.principle.md
+  @headers %{
+    concierge: """
+    Hi! I'm Truman Shell v#{@version} - your bash concierge today.
 
-  I handle all your favourite shell commands, plus some extras:
-    ::intent     - Tell me what you're working on
-    ::checkpoint - I'll remember this moment
-    ::undo       - Oops? No problem, I gotchu
+    I handle all your favourite shell commands, plus some extras:
+      ::intent     - Tell me what you're working on
+      ::checkpoint - I'll remember this moment
+      ::undo       - Oops? No problem, I gotchu
 
-  What can I help you find?
+    What can I help you find?
+    """,
+    surveillance: """
+    TRUMAN SHELL v#{@version}
+    You are operating in a sandboxed environment. All filesystem operations are staged for review.
+
+    Available capabilities beyond standard bash:
+      ::intent "why"     - Declare your intent (helps human review)
+      ::checkpoint       - Save current state, allow rollback
+      ::ask "question"   - Queue a question for the human (async)
+      ::confidence 0.8   - Rate your confidence in this action
+      ::stage            - Show pending changes awaiting review
+      ::commit           - Request human approval for staged changes
+
+    Standard commands (ls, cat, grep, etc.) work as expected.
+    Destructive commands (rm, mv) are soft by default.
+
+    How can I help you today?
+    """,
+    minimal: """
+    Extended commands available:
+      ::intent "goal"    - Add context to your work
+      ::checkpoint       - Create restore point
+      ::undo             - Reverse last change
+    """,
+    none: nil
+  }
+
+  @doc """
+  Returns the available header variants.
+
+  ## Examples
+
+      iex> TrumanShell.Executor.header_variants() |> Enum.sort()
+      [:concierge, :minimal, :none, :surveillance]
   """
+  def header_variants, do: Map.keys(@headers)
 
   @doc """
   Returns the maximum output lines limit (for testing/introspection).
@@ -73,7 +111,7 @@ defmodule TrumanShell.Executor do
   additional context and capabilities should be communicated.
 
   Options:
-    - `:show_header` - Include the full Truman header (default: true)
+    - `:header` - Header variant to use: `:concierge` (default), `:surveillance`, `:minimal`, or `:none`
     - `:raw_command` - The original command string for display
 
   ## Examples
@@ -81,20 +119,33 @@ defmodule TrumanShell.Executor do
       iex> alias TrumanShell.Command
       iex> cmd = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
       iex> {:ok, output} = TrumanShell.Executor.run_interactive(cmd, raw_command: "ls")
-      iex> output =~ "Truman Shell"
+      iex> output =~ "concierge"
       true
       iex> output =~ "Your command: `ls`"
+      true
+
+      iex> alias TrumanShell.Command
+      iex> cmd = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
+      iex> {:ok, output} = TrumanShell.Executor.run_interactive(cmd, header: :none, raw_command: "ls")
+      iex> output =~ "concierge"
+      false
+
+      iex> alias TrumanShell.Command
+      iex> cmd = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
+      iex> {:ok, output} = TrumanShell.Executor.run_interactive(cmd, header: :surveillance, raw_command: "ls")
+      iex> output =~ "sandboxed environment"
       true
 
   """
   @spec run_interactive(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
   def run_interactive(%Command{} = command, opts \\ []) do
-    show_header = Keyword.get(opts, :show_header, true)
+    header_variant = Keyword.get(opts, :header, :concierge)
     raw_command = Keyword.get(opts, :raw_command, inspect(command.name))
 
     result = run(command)
 
-    header = if show_header, do: @truman_header <> "\n---\n\n", else: ""
+    header_text = Map.get(@headers, header_variant)
+    header = if header_text, do: header_text <> "\n---\n\n", else: ""
 
     case result do
       {:ok, output} ->
