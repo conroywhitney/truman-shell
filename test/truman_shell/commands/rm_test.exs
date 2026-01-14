@@ -140,10 +140,12 @@ defmodule TrumanShell.Commands.RmTest do
       assert Enum.all?(trash_files, &String.ends_with?(&1, "_file.txt"))
 
       # All prefixes should be unique
-      prefixes = Enum.map(trash_files, fn name ->
-        [prefix | _] = String.split(name, "_file.txt")
-        prefix
-      end)
+      prefixes =
+        Enum.map(trash_files, fn name ->
+          [prefix | _] = String.split(name, "_file.txt")
+          prefix
+        end)
+
       assert length(Enum.uniq(prefixes)) == 5
     end
   end
