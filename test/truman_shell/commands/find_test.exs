@@ -54,5 +54,68 @@ defmodule TrumanShell.Commands.FindTest do
 
       assert msg =~ "missing argument"
     end
+
+    test "find -type f finds only files" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-type-f-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.mkdir_p!(Path.join(tmp_dir, "subdir"))
+        File.write!(Path.join(tmp_dir, "file.txt"), "")
+        File.write!(Path.join([tmp_dir, "subdir", "nested.txt"]), "")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Find.handle([".", "-type", "f"], context)
+
+        assert output =~ "file.txt"
+        assert output =~ "nested.txt"
+        refute output =~ "subdir\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "find -type d finds only directories" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-type-d-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.mkdir_p!(Path.join(tmp_dir, "subdir"))
+        File.mkdir_p!(Path.join([tmp_dir, "subdir", "nested"]))
+        File.write!(Path.join(tmp_dir, "file.txt"), "")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Find.handle([".", "-type", "d"], context)
+
+        assert output =~ "subdir"
+        assert output =~ "nested"
+        refute output =~ "file.txt"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "find -maxdepth limits search depth" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-maxdepth-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.mkdir_p!(Path.join([tmp_dir, "a", "b", "c"]))
+        File.write!(Path.join(tmp_dir, "root.txt"), "")
+        File.write!(Path.join([tmp_dir, "a", "level1.txt"]), "")
+        File.write!(Path.join([tmp_dir, "a", "b", "level2.txt"]), "")
+        File.write!(Path.join([tmp_dir, "a", "b", "c", "level3.txt"]), "")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Find.handle([".", "-maxdepth", "2", "-name", "*.txt"], context)
+
+        assert output =~ "root.txt"
+        assert output =~ "level1.txt"
+        refute output =~ "level2.txt"
+        refute output =~ "level3.txt"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end
