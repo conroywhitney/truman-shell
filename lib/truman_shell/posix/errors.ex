@@ -1,4 +1,4 @@
-defmodule TrumanShell.PosixErrors do
+defmodule TrumanShell.Posix.Errors do
   @moduledoc """
   Shared POSIX error to bash-like message conversion.
 
@@ -10,10 +10,10 @@ defmodule TrumanShell.PosixErrors do
 
   ## Examples
 
-      iex> TrumanShell.PosixErrors.to_message(:enoent)
+      iex> TrumanShell.Posix.Errors.to_message(:enoent)
       "No such file or directory"
 
-      iex> TrumanShell.PosixErrors.to_message(:eisdir)
+      iex> TrumanShell.Posix.Errors.to_message(:eisdir)
       "Is a directory"
 
   """

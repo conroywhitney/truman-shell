@@ -11,7 +11,7 @@ defmodule TrumanShell.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
-  alias TrumanShell.PosixErrors
+  alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
   @max_pipe_depth 10
@@ -155,7 +155,7 @@ defmodule TrumanShell.Executor do
   defp do_write_file(safe_path, output, write_opts, original_path) do
     case File.write(safe_path, output, write_opts) do
       :ok -> :ok
-      {:error, reason} -> {:error, "bash: #{original_path}: #{PosixErrors.to_message(reason)}\n"}
+      {:error, reason} -> {:error, "bash: #{original_path}: #{Errors.to_message(reason)}\n"}
     end
   end
 

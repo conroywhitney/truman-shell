@@ -7,7 +7,7 @@ defmodule TrumanShell.Commands.Mv do
 
   @behaviour TrumanShell.Commands.Behaviour
 
-  alias TrumanShell.PosixErrors
+  alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
   @doc """
@@ -38,7 +38,7 @@ defmodule TrumanShell.Commands.Mv do
          true <- File.exists?(src_safe) do
       case File.rename(src_safe, dst_safe) do
         :ok -> {:ok, ""}
-        {:error, reason} -> {:error, "mv: #{src}: #{PosixErrors.to_message(reason)}\n"}
+        {:error, reason} -> {:error, "mv: #{src}: #{Errors.to_message(reason)}\n"}
       end
     else
       {:error, :outside_sandbox} ->
