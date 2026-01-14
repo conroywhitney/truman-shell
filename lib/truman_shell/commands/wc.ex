@@ -7,10 +7,21 @@ defmodule TrumanShell.Commands.Wc do
 
   alias TrumanShell.Commands.FileIO
 
+  @default_opts %{
+    lines: false,
+    words: false,
+    chars: false
+  }
+
   @doc """
   Counts lines, words, and characters in files.
 
-  Output format matches classic wc: lines words chars filename
+  Supported flags:
+  - `-l` - Show only line count
+  - `-w` - Show only word count
+  - `-c` - Show only byte/character count
+
+  Without flags, shows all counts. Flags can be combined.
 
   ## Examples
 
@@ -25,15 +36,52 @@ defmodule TrumanShell.Commands.Wc do
 
   """
   @impl true
-  def handle([], _context) do
-    {:error, "wc: missing file operand\n"}
+  def handle(args, context) do
+    case parse_args(args) do
+      {:ok, opts, paths} when paths != [] ->
+        count_files(opts, paths, context)
+
+      {:ok, _opts, []} ->
+        {:error, "wc: missing file operand\n"}
+
+      {:error, msg} ->
+        {:error, msg}
+    end
   end
 
-  def handle(paths, context) do
-    count_files(paths, context)
+  defp parse_args(args) do
+    parse_args(args, @default_opts, [])
   end
 
-  defp count_files(paths, context) do
+  defp parse_args([], opts, paths) do
+    # If no specific flags, show all
+    opts =
+      if !opts.lines && !opts.words && !opts.chars do
+        %{opts | lines: true, words: true, chars: true}
+      else
+        opts
+      end
+
+    {:ok, opts, Enum.reverse(paths)}
+  end
+
+  defp parse_args(["-l" | rest], opts, paths) do
+    parse_args(rest, %{opts | lines: true}, paths)
+  end
+
+  defp parse_args(["-w" | rest], opts, paths) do
+    parse_args(rest, %{opts | words: true}, paths)
+  end
+
+  defp parse_args(["-c" | rest], opts, paths) do
+    parse_args(rest, %{opts | chars: true}, paths)
+  end
+
+  defp parse_args([path | rest], opts, paths) do
+    parse_args(rest, opts, [path | paths])
+  end
+
+  defp count_files(opts, paths, context) do
     results =
       Enum.map(paths, fn path ->
         case count_file(path, context) do
@@ -42,13 +90,12 @@ defmodule TrumanShell.Commands.Wc do
         end
       end)
 
-    # Check for any errors
     case Enum.find(results, fn {status, _, _} -> status == :error end) do
       {:error, _path, msg} ->
         {:error, FileIO.format_error("wc", msg)}
 
       nil ->
-        output = format_output(results)
+        output = format_output(results, opts)
         {:ok, output}
     end
   end
@@ -80,31 +127,39 @@ defmodule TrumanShell.Commands.Wc do
     |> length()
   end
 
-  defp format_output(results) do
+  defp format_output(results, opts) do
     lines =
-      Enum.map(results, fn {:ok, path, {lines, words, chars}} ->
-        format_line(lines, words, chars, path)
+      Enum.map(results, fn {:ok, path, counts} ->
+        format_line(counts, path, opts)
       end)
 
     output = Enum.join(lines, "\n")
 
-    # Add total line if multiple files
     if length(results) > 1 do
       {total_lines, total_words, total_chars} =
         Enum.reduce(results, {0, 0, 0}, fn {:ok, _, {l, w, c}}, {al, aw, ac} ->
           {al + l, aw + w, ac + c}
         end)
 
-      output <> "\n" <> format_line(total_lines, total_words, total_chars, "total") <> "\n"
+      output <> "\n" <> format_line({total_lines, total_words, total_chars}, "total", opts) <> "\n"
     else
       output <> "\n"
     end
   end
 
-  defp format_line(lines, words, chars, name) do
-    # Right-align numbers in 8-character columns (like real wc)
-    "#{pad(lines)} #{pad(words)} #{pad(chars)} #{name}"
+  defp format_line({lines, words, chars}, name, opts) do
+    parts =
+      []
+      |> maybe_add(opts.lines, lines)
+      |> maybe_add(opts.words, words)
+      |> maybe_add(opts.chars, chars)
+      |> Enum.reverse()
+
+    Enum.join(parts, " ") <> " #{name}"
   end
+
+  defp maybe_add(list, true, value), do: [pad(value) | list]
+  defp maybe_add(list, false, _value), do: list
 
   defp pad(num), do: String.pad_leading(Integer.to_string(num), 8)
 end

@@ -76,5 +76,60 @@ defmodule TrumanShell.Commands.WcTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "wc -l shows only line count" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-l-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "line1\nline2\nline3\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Wc.handle(["-l", "test.txt"], context)
+
+        # Should show only line count and filename
+        assert output =~ "3"
+        assert output =~ "test.txt"
+        # Should not show word or char counts
+        refute output =~ ~r/\s+\d+\s+\d+\s+\d+\s/
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "wc -w shows only word count" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-w-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "one two three four five\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Wc.handle(["-w", "test.txt"], context)
+
+        assert output =~ "5"
+        assert output =~ "test.txt"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "wc -c shows only byte count" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-c-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        content = "hello\n"
+        File.write!(Path.join(tmp_dir, "test.txt"), content)
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Wc.handle(["-c", "test.txt"], context)
+
+        assert output =~ "6"
+        assert output =~ "test.txt"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end
