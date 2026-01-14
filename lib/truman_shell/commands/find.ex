@@ -155,22 +155,15 @@ defmodule TrumanShell.Commands.Find do
   defp format_output([], _base_path, _original_path), do: "\n"
 
   defp format_output(files, base_path, original_path) do
-    output =
-      Enum.map_join(files, "\n", fn file ->
-        # Handle the start point (when file == base_path)
-        if file == base_path do
-          original_path
-        else
-          relative = Path.relative_to(file, base_path)
-
-          if original_path == "." do
-            "./#{relative}"
-          else
-            Path.join(original_path, relative)
-          end
-        end
-      end)
-
+    output = Enum.map_join(files, "\n", &format_entry(&1, base_path, original_path))
     output <> "\n"
+  end
+
+  # Start point is always displayed as-is
+  defp format_entry(file, base_path, original_path) when file == base_path, do: original_path
+
+  defp format_entry(file, base_path, original_path) do
+    relative = Path.relative_to(file, base_path)
+    if original_path == ".", do: "./#{relative}", else: Path.join(original_path, relative)
   end
 end
