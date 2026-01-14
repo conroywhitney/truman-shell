@@ -35,16 +35,26 @@ defmodule TrumanShell.SanitizerTest do
       assert {:error, :outside_sandbox} = result
     end
 
-    test "confines absolute path within sandbox" do
-      # Elixir's Path.join strips leading slashes, so /etc/passwd
-      # becomes etc/passwd within the sandbox - this is secure behavior
+    test "rejects absolute path outside sandbox" do
+      # Absolute paths outside sandbox are rejected (AIITL transparency)
+      # This is more honest than silently confining /etc -> sandbox/etc
       sandbox = "/tmp/truman-test"
       path = "/etc/passwd"
 
       result = Sanitizer.validate_path(path, sandbox)
 
-      # Path is confined, not escaped
-      assert {:ok, "/tmp/truman-test/etc/passwd"} = result
+      # Path is rejected, not confined
+      assert {:error, :outside_sandbox} = result
+    end
+
+    test "allows absolute path within sandbox" do
+      # Absolute paths that are already within sandbox should work
+      sandbox = "/tmp/truman-test"
+      path = "/tmp/truman-test/subdir/file.txt"
+
+      result = Sanitizer.validate_path(path, sandbox)
+
+      assert {:ok, "/tmp/truman-test/subdir/file.txt"} = result
     end
 
     test "allows current directory (.)" do

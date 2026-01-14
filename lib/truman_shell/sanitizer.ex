@@ -20,18 +20,22 @@ defmodule TrumanShell.Sanitizer do
   def validate_path(path, sandbox_root) do
     sandbox_expanded = Path.expand(sandbox_root)
 
-    # TODO: Revisit - should absolute paths be confined or rejected?
-    # Current: /etc/passwd -> sandbox/etc/passwd (confined)
-    # Alternative: /etc/passwd -> :error (rejected)
-    # See: GPT review feedback on Path.safe_relative/2
-    rel_path = Path.relative(path)
+    # Reject absolute paths outside sandbox (AIITL transparency principle)
+    # Instead of silently confining /etc -> sandbox/etc, we reject entirely.
+    # This is more honest - the AI learns sandbox boundaries explicitly.
+    if String.starts_with?(path, "/") and not String.starts_with?(path, sandbox_expanded) do
+      {:error, :outside_sandbox}
+    else
+      # For relative paths (or absolute within sandbox), validate normally
+      rel_path = Path.relative_to(path, sandbox_expanded)
 
-    case Path.safe_relative(rel_path, sandbox_expanded) do
-      {:ok, safe_rel} ->
-        {:ok, Path.expand(safe_rel, sandbox_expanded)}
+      case Path.safe_relative(rel_path, sandbox_expanded) do
+        {:ok, safe_rel} ->
+          {:ok, Path.expand(safe_rel, sandbox_expanded)}
 
-      :error ->
-        {:error, :outside_sandbox}
+        :error ->
+          {:error, :outside_sandbox}
+      end
     end
   end
 end

@@ -140,12 +140,9 @@ defmodule TrumanShell.ExecutorTest do
       end
 
       try do
-        # Change to tmp_dir so sandbox allows access
-        original_cwd = File.cwd!()
-        File.cd!(tmp_dir)
-
+        # Use explicit sandbox_root instead of File.cd! (async-safe)
         command = %Command{name: :cmd_ls, args: ["."], pipes: [], redirects: []}
-        {:ok, output} = Executor.run(command)
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
 
         # Should show truncation message
         assert output =~ "... (50 more entries, 250 total)"
@@ -154,8 +151,6 @@ defmodule TrumanShell.ExecutorTest do
         lines = String.split(output, "\n", trim: true)
         # 200 files + 1 truncation message
         assert length(lines) == 201
-
-        File.cd!(original_cwd)
       after
         # Cleanup
         File.rm_rf!(tmp_dir)

@@ -13,24 +13,29 @@ defmodule TrumanShell.Executor do
   @max_pipe_depth 10
   @max_output_lines 200
 
-  @doc """
-  Returns the maximum output lines limit (for testing/introspection).
-
-  ## Examples
-
-      iex> TrumanShell.Executor.max_output_lines()
-      200
-  """
+  @doc false
+  # Internal constant for testing/introspection
   def max_output_lines, do: @max_output_lines
 
-  # Default sandbox is current working directory
-  # Can be overridden via run/2 options in the future
-  defp sandbox_root, do: File.cwd!()
+  # Sandbox root - set via run/2 opts or defaults to File.cwd!()
+  defp sandbox_root do
+    Process.get(:truman_sandbox_root, File.cwd!())
+  end
+
+  defp set_sandbox_root(path) do
+    Process.put(:truman_sandbox_root, path)
+  end
 
   @doc """
   Executes a parsed command and returns the output.
 
   Returns `{:ok, output}` on success or `{:error, message}` on failure.
+
+  ## Options
+
+    * `:sandbox_root` - Root directory for sandbox confinement.
+      Defaults to `File.cwd!()`. All file operations are restricted
+      to this directory and its subdirectories.
 
   ## Examples
 
@@ -46,8 +51,15 @@ defmodule TrumanShell.Executor do
       {:error, "bash: fake: command not found\\n"}
 
   """
-  @spec run(Command.t()) :: {:ok, String.t()} | {:error, String.t()}
-  def run(%Command{} = command) do
+  @spec run(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
+  def run(command, opts \\ [])
+
+  def run(%Command{} = command, opts) do
+    # Set sandbox root from opts or use default
+    if root = Keyword.get(opts, :sandbox_root) do
+      set_sandbox_root(Path.expand(root))
+    end
+
     with :ok <- validate_depth(command) do
       execute(command)
     end

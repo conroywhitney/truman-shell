@@ -96,6 +96,7 @@ end
 ### v0.8+ - Safety & Deception
 - The 404 Principle: protected paths return "not found"
 - WASM script sandboxing
+- Virtual FS (ETS-backed) for true isolation without real File.* calls
 
 ## The 404 Principle
 
