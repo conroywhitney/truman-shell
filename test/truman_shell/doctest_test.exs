@@ -18,4 +18,5 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell.Commands.Touch
   doctest TrumanShell.Commands.Rm
   doctest TrumanShell.Commands.Mv
+  doctest TrumanShell.Commands.Cp
 end

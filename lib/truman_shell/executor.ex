@@ -76,7 +76,8 @@ defmodule TrumanShell.Executor do
     cmd_mkdir: Commands.Mkdir,
     cmd_touch: Commands.Touch,
     cmd_rm: Commands.Rm,
-    cmd_mv: Commands.Mv
+    cmd_mv: Commands.Mv,
+    cmd_cp: Commands.Cp
   }
 
   defp execute(%Command{name: name, args: args}) when is_map_key(@command_modules, name) do
