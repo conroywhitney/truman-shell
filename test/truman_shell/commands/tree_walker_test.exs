@@ -218,11 +218,12 @@ defmodule TrumanShell.Commands.TreeWalkerTest do
       try do
         # Create a directory structure deeper than the limit (105 levels)
         # This would cause stack overflow without protection
-        deep_path = Enum.reduce(1..105, tmp_dir, fn i, acc ->
-          path = Path.join(acc, "level#{i}")
-          File.mkdir_p!(path)
-          path
-        end)
+        deep_path =
+          Enum.reduce(1..105, tmp_dir, fn i, acc ->
+            path = Path.join(acc, "level#{i}")
+            File.mkdir_p!(path)
+            path
+          end)
 
         # Add a file at the deepest level
         File.write!(Path.join(deep_path, "deep_file.txt"), "content")
