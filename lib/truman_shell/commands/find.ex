@@ -107,28 +107,36 @@ defmodule TrumanShell.Commands.Find do
   end
 
   # Walk tree with depth tracking
+  # Uses File.ls/1 (non-bang) to gracefully handle permission denied errors
   defp walk_tree(dir, opts, current_depth) do
     # Check maxdepth before recursing
     if opts.maxdepth && current_depth >= opts.maxdepth do
       []
     else
-      dir
-      |> File.ls!()
-      |> Enum.flat_map(fn entry ->
-        full_path = Path.join(dir, entry)
-        is_dir = File.dir?(full_path)
+      case File.ls(dir) do
+        {:ok, entries} ->
+          Enum.flat_map(entries, &process_entry(&1, dir, opts, current_depth))
 
-        cond do
-          is_dir ->
-            [{full_path, :dir} | walk_tree(full_path, opts, current_depth + 1)]
+        # Permission denied or other errors - skip this directory gracefully
+        {:error, _reason} ->
+          []
+      end
+    end
+  end
 
-          File.regular?(full_path) ->
-            [{full_path, :file}]
+  # Process a single directory entry, returning list of {path, type} tuples
+  defp process_entry(entry, dir, opts, current_depth) do
+    full_path = Path.join(dir, entry)
 
-          true ->
-            []
-        end
-      end)
+    cond do
+      File.dir?(full_path) ->
+        [{full_path, :dir} | walk_tree(full_path, opts, current_depth + 1)]
+
+      File.regular?(full_path) ->
+        [{full_path, :file}]
+
+      true ->
+        []
     end
   end
 
