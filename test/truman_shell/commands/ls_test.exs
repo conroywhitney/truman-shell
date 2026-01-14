@@ -70,7 +70,9 @@ defmodule TrumanShell.Commands.LsTest do
     end
 
     test "truncates output for large directories" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-ls-truncation-#{:rand.uniform(100_000)}")
+      tmp_dir =
+        Path.join(System.tmp_dir!(), "truman-test-ls-truncation-#{:rand.uniform(100_000)}")
+
       File.mkdir_p!(tmp_dir)
 
       # Create 250 files (exceeds 200 line limit)
