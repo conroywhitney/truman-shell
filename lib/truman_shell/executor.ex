@@ -62,6 +62,7 @@ defmodule TrumanShell.Executor do
     cmd_cd: Commands.Cd,
     cmd_cp: Commands.Cp,
     cmd_echo: Commands.Echo,
+    cmd_grep: Commands.Grep,
     cmd_head: Commands.Head,
     cmd_ls: Commands.Ls,
     cmd_mkdir: Commands.Mkdir,
