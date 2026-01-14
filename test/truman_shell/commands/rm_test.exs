@@ -117,5 +117,34 @@ defmodule TrumanShell.Commands.RmTest do
 
       assert {:error, "rm: /etc/passwd: No such file or directory\n"} = result
     end
+
+    test "rapid successive rm calls create unique trash entries", %{
+      context: context,
+      sandbox: sandbox,
+      trash_dir: trash_dir
+    } do
+      # Create multiple files with same basename
+      for i <- 1..5 do
+        file_path = Path.join(sandbox, "file.txt")
+        File.write!(file_path, "content #{i}")
+
+        result = Rm.handle(["file.txt"], context)
+        assert {:ok, ""} = result
+      end
+
+      # All 5 files should be in trash with unique names
+      trash_files = File.ls!(trash_dir)
+      assert length(trash_files) == 5
+
+      # All should end with _file.txt
+      assert Enum.all?(trash_files, &String.ends_with?(&1, "_file.txt"))
+
+      # All prefixes should be unique
+      prefixes = Enum.map(trash_files, fn name ->
+        [prefix | _] = String.split(name, "_file.txt")
+        prefix
+      end)
+      assert length(Enum.uniq(prefixes)) == 5
+    end
   end
 end

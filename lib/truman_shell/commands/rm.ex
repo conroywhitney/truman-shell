@@ -97,10 +97,11 @@ defmodule TrumanShell.Commands.Rm do
     # Ensure .trash exists
     File.mkdir_p(trash_dir)
 
-    # Generate timestamp-prefixed name
-    timestamp = DateTime.to_unix(DateTime.utc_now())
+    # Generate unique-prefixed name to avoid collisions
+    # System.unique_integer guarantees uniqueness even for rapid successive calls
+    unique_id = System.unique_integer([:positive, :monotonic])
     basename = Path.basename(file_name)
-    trash_name = "#{timestamp}_#{basename}"
+    trash_name = "#{unique_id}_#{basename}"
     trash_path = Path.join(trash_dir, trash_name)
 
     case File.rename(safe_path, trash_path) do
