@@ -50,5 +50,16 @@ defmodule TrumanShell.Commands.TouchTest do
 
       assert {:error, "touch: /etc/hacked.txt: No such file or directory\n"} = result
     end
+
+    test "touch through file (not directory) returns ENOTDIR error", %{context: context, sandbox: sandbox} do
+      # Create a regular file
+      File.write!(Path.join(sandbox, "afile.txt"), "content")
+
+      # Try to touch a path where parent is a file, not a directory
+      # File.touch will fail with :enotdir
+      result = Touch.handle(["afile.txt/impossible.txt"], context)
+
+      assert {:error, "touch: afile.txt/impossible.txt: Not a directory\n"} = result
+    end
   end
 end

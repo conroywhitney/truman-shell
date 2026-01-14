@@ -7,6 +7,7 @@ defmodule TrumanShell.Commands.Touch do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.PosixErrors
   alias TrumanShell.Sanitizer
 
   @doc """
@@ -32,7 +33,7 @@ defmodule TrumanShell.Commands.Touch do
       {:ok, safe_path} ->
         case File.touch(safe_path) do
           :ok -> {:ok, ""}
-          {:error, _} -> {:error, "touch: #{file_name}: No such file or directory\n"}
+          {:error, reason} -> {:error, "touch: #{file_name}: #{PosixErrors.to_message(reason)}\n"}
         end
 
       {:error, :outside_sandbox} ->
