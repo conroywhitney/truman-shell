@@ -8,28 +8,35 @@
 
 ## Implementation Checklist
 
-### Phase 1: Infrastructure
-- [ ] 1.1 Add sandbox state tracking (current directory)
-- [ ] 1.2 Implement redirect handling infrastructure
-- [ ] 1.3 Create `.trash` directory support for soft deletes
-- [ ] 1.4 Add output formatting utilities
+### Phase 1: Infrastructure ✅ (partial)
+- [x] 1.1 Add sandbox state tracking (current directory via Process dictionary)
+- [ ] 1.2 Implement redirect handling infrastructure → **moved to Phase 4**
+- [ ] 1.3 Create `.trash` directory support for soft deletes → **needed for Phase 5**
+- [x] 1.4 Add output formatting utilities (`Commands.Helpers.format_error/2`)
 
-### Phase 2: Navigation Commands
-- [ ] 2.1 Write failing test: `pwd` returns current sandbox path
-- [ ] 2.2 Implement `cmd_pwd` handler
-- [ ] 2.3 Write failing test: `cd subdir` changes working directory
-- [ ] 2.4 Implement `cmd_cd` handler with path validation
-- [ ] 2.5 Write failing test: `cd ..` works within sandbox bounds
-- [ ] 2.6 Write failing test: `cd /etc` blocked (404 principle)
+**Emergent Architecture: Command Pattern**
+- Created `TrumanShell.Commands.Behaviour` with `@callback handle(args, context)`
+- Created `TrumanShell.Commands.Helpers` for shared utilities (`read_file/2`, `format_error/2`)
+- Executor uses `@command_modules` map for dispatch (~120 lines, down from ~340)
+- Side effects return tagged tuples: `{:ok, output, set_cwd: path}`
 
-### Phase 3: File Reading Commands
-- [ ] 3.1 Write failing test: `cat file.txt` returns file contents
-- [ ] 3.2 Implement `cmd_cat` handler with multi-file support
-- [ ] 3.3 Write failing test: `head -n 5 file.txt` returns first 5 lines
-- [ ] 3.4 Implement `cmd_head` handler with `-n` flag
-- [ ] 3.5 Write failing test: `tail -n 5 file.txt` returns last 5 lines
-- [ ] 3.6 Implement `cmd_tail` handler with `-n` flag
-- [ ] 3.7 Write failing test: `cat missing.txt` returns "No such file"
+### Phase 2: Navigation Commands ✅
+- [x] 2.1 Write failing test: `pwd` returns current sandbox path
+- [x] 2.2 Implement `cmd_pwd` handler → `Commands.Pwd`
+- [x] 2.3 Write failing test: `cd subdir` changes working directory
+- [x] 2.4 Implement `cmd_cd` handler with path validation → `Commands.Cd`
+- [x] 2.5 Write failing test: `cd ..` works within sandbox bounds
+- [x] 2.6 Write failing test: `cd /etc` blocked (404 principle)
+
+### Phase 3: File Reading Commands ✅
+- [x] 3.1 Write failing test: `cat file.txt` returns file contents
+- [x] 3.2 Implement `cmd_cat` handler with multi-file support → `Commands.Cat`
+- [x] 3.3 Write failing test: `head -n 5 file.txt` returns first 5 lines
+- [x] 3.4 Implement `cmd_head` handler with `-n` flag → `Commands.Head`
+- [x] 3.5 Write failing test: `tail -n 5 file.txt` returns last 5 lines
+- [x] 3.6 Implement `cmd_tail` handler with `-n` flag → `Commands.Tail`
+- [x] 3.7 Write failing test: `cat missing.txt` returns "No such file"
+- [x] 3.8 Integer validation: `head -n foobar` returns error (not crash)
 
 ### Phase 4: Echo and Redirects
 - [ ] 4.1 Write failing test: `echo hello` returns "hello\n"
@@ -96,3 +103,12 @@
 - Use Sanitizer.validate_path/2 for all path operations
 - rm MUST use soft delete (move to .trash, not File.rm!)
 - Output should match real bash closely for agent believability
+
+### Pattern for New Commands (established Phase 3)
+```
+1. Create lib/truman_shell/commands/<name>.ex with handle/2
+2. Add :cmd_<name> => Commands.<Name> to @command_modules in executor.ex
+3. Create test/truman_shell/commands/<name>_test.exs
+4. Add dispatch smoke test to executor_test.exs
+5. Add doctest to doctest_test.exs
+```
