@@ -267,6 +267,21 @@ defmodule TrumanShell.ExecutorTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "returns error for missing file" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-missing-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        command = %Command{name: :cmd_cat, args: ["missing.txt"], pipes: [], redirects: []}
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:error, msg} = result
+        assert msg == "cat: missing.txt: No such file or directory\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 
   describe "head handler" do
