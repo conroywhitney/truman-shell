@@ -38,14 +38,19 @@
 - [x] 3.7 Write failing test: `cat missing.txt` returns "No such file"
 - [x] 3.8 Integer validation: `head -n foobar` returns error (not crash)
 
-### Phase 4: Echo and Redirects
-- [ ] 4.1 Write failing test: `echo hello` returns "hello\n"
-- [ ] 4.2 Implement `cmd_echo` handler
-- [ ] 4.3 Write failing test: `echo hello > file.txt` creates file
-- [ ] 4.4 Implement stdout redirect (`>`) in executor
-- [ ] 4.5 Write failing test: `echo more >> file.txt` appends
-- [ ] 4.6 Implement append redirect (`>>`)
-- [ ] 4.7 Write failing test: redirect to path outside sandbox blocked
+### Phase 4: Echo and Redirects ✅
+- [x] 4.1 Write failing test: `echo hello` returns "hello\n"
+- [x] 4.2 Implement `cmd_echo` handler → `Commands.Echo`
+- [x] 4.3 Write failing test: `echo hello > file.txt` creates file
+- [x] 4.4 Implement stdout redirect (`>`) in executor
+- [x] 4.5 Write failing test: `echo more >> file.txt` appends
+- [x] 4.6 Implement append redirect (`>>`)
+- [x] 4.7 Write failing test: redirect to path outside sandbox blocked (404 principle)
+
+**Redirect Architecture:**
+- `apply_redirects/2` processes redirects after command execution
+- `write_redirect/4` handles both `>` and `>>` with two-stage path validation
+- Original path validated first (catches `/etc/passwd`), then resolved path
 
 ### Phase 5: File Writing Commands
 - [ ] 5.1 Write failing test: `mkdir newdir` creates directory
