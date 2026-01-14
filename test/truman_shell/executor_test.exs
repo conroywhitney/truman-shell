@@ -194,6 +194,45 @@ defmodule TrumanShell.ExecutorTest do
       expected = Path.join(File.cwd!(), "lib") <> "\n"
       assert output == expected
     end
+
+    test "cd .. navigates up within sandbox" do
+      sandbox_root = File.cwd!()
+
+      # First cd into lib/truman_shell
+      cd_deep = %Command{name: :cmd_cd, args: ["lib/truman_shell"], pipes: [], redirects: []}
+      assert {:ok, ""} = Executor.run(cd_deep)
+
+      # cd .. should go back to lib
+      cd_up = %Command{name: :cmd_cd, args: [".."], pipes: [], redirects: []}
+      assert {:ok, ""} = Executor.run(cd_up)
+
+      pwd_cmd = %Command{name: :cmd_pwd, args: [], pipes: [], redirects: []}
+      {:ok, output} = Executor.run(pwd_cmd)
+      assert output == Path.join(sandbox_root, "lib") <> "\n"
+    end
+
+    test "cd .. at sandbox root stays at root" do
+      # Try to cd .. from root - should fail, not escape
+      cd_up = %Command{name: :cmd_cd, args: [".."], pipes: [], redirects: []}
+
+      # This should fail - can't go above sandbox (404 principle)
+      assert {:error, msg} = Executor.run(cd_up)
+      assert msg =~ "No such file or directory"
+    end
+
+    test "cd /etc blocked with 404 principle" do
+      # SECURITY: Absolute paths outside sandbox should appear as "not found"
+      # NOT "permission denied" - no information leakage
+      cd_etc = %Command{name: :cmd_cd, args: ["/etc"], pipes: [], redirects: []}
+
+      result = Executor.run(cd_etc)
+
+      # Must fail with "No such file or directory", not "permission denied"
+      assert {:error, msg} = result
+      assert msg =~ "No such file or directory"
+      refute msg =~ "permission"
+      refute msg =~ "Permission"
+    end
   end
 
   describe "TrumanShell.execute/1 public API" do
