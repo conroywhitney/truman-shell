@@ -11,7 +11,7 @@ defmodule TrumanShell.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
-  alias TrumanShell.PosixErrors
+  alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
   @max_pipe_depth 10
@@ -62,6 +62,8 @@ defmodule TrumanShell.Executor do
     cmd_cd: Commands.Cd,
     cmd_cp: Commands.Cp,
     cmd_echo: Commands.Echo,
+    cmd_find: Commands.Find,
+    cmd_grep: Commands.Grep,
     cmd_head: Commands.Head,
     cmd_ls: Commands.Ls,
     cmd_mkdir: Commands.Mkdir,
@@ -69,7 +71,8 @@ defmodule TrumanShell.Executor do
     cmd_pwd: Commands.Pwd,
     cmd_rm: Commands.Rm,
     cmd_tail: Commands.Tail,
-    cmd_touch: Commands.Touch
+    cmd_touch: Commands.Touch,
+    cmd_wc: Commands.Wc
   }
 
   defp execute(%Command{name: name, args: args}) when is_map_key(@command_modules, name) do
@@ -152,7 +155,7 @@ defmodule TrumanShell.Executor do
   defp do_write_file(safe_path, output, write_opts, original_path) do
     case File.write(safe_path, output, write_opts) do
       :ok -> :ok
-      {:error, reason} -> {:error, "bash: #{original_path}: #{PosixErrors.to_message(reason)}\n"}
+      {:error, reason} -> {:error, "bash: #{original_path}: #{Errors.to_message(reason)}\n"}
     end
   end
 

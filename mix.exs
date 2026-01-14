@@ -4,12 +4,13 @@ defmodule TrumanShell.MixProject do
   def project do
     [
       app: :truman_shell,
-      version: "0.3.2",
+      version: "0.4.2",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: "A simulated shell environment for AI agents",
-      package: package()
+      package: package(),
+      dialyzer: dialyzer()
     ]
   end
 
@@ -23,9 +24,19 @@ defmodule TrumanShell.MixProject do
     [
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:credo_naming, "~> 2.1", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
       {:styler, "~> 1.10", only: [:dev, :test], runtime: false},
       {:tallarium_credo, "~> 0.1", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_core_path: "priv/plts/core.plt",
+      plt_local_path: "priv/plts/project.plt",
+      plt_add_apps: [:mix],
+      flags: [:error_handling, :underspecs]
     ]
   end
 

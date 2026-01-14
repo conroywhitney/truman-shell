@@ -6,6 +6,10 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell.Command
   doctest TrumanShell.Executor
 
+  # Shared utilities
+  doctest TrumanShell.Commands.FileIO
+  doctest TrumanShell.Commands.TreeWalker
+
   # Command handlers
   doctest TrumanShell.Commands.Pwd
   doctest TrumanShell.Commands.Ls
@@ -14,9 +18,12 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell.Commands.Head
   doctest TrumanShell.Commands.Tail
   doctest TrumanShell.Commands.Echo
+  doctest TrumanShell.Commands.Find
+  doctest TrumanShell.Commands.Grep
   doctest TrumanShell.Commands.Mkdir
   doctest TrumanShell.Commands.Touch
   doctest TrumanShell.Commands.Rm
   doctest TrumanShell.Commands.Mv
   doctest TrumanShell.Commands.Cp
+  doctest TrumanShell.Commands.Wc
 end

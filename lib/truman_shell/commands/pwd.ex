@@ -5,6 +5,8 @@ defmodule TrumanShell.Commands.Pwd do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
+
   @doc """
   Returns the current working directory with a trailing newline.
 
@@ -19,6 +21,7 @@ defmodule TrumanShell.Commands.Pwd do
       {:ok, "/home/user\\n"}
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(_args, context) do
     {:ok, context.current_dir <> "\n"}

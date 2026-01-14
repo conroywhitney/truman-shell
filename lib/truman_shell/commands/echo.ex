@@ -23,6 +23,9 @@ defmodule TrumanShell.Commands.Echo do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
+
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(["-n" | rest], _context) do
     output = Enum.join(rest, " ")

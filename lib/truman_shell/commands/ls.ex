@@ -5,6 +5,7 @@ defmodule TrumanShell.Commands.Ls do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Sanitizer
 
   @max_output_lines 200
@@ -30,6 +31,7 @@ defmodule TrumanShell.Commands.Ls do
       {:error, "ls: invalid option -- 'la'\\n"}
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(args, context) do
     with :ok <- validate_args(args) do

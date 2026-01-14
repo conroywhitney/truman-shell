@@ -7,7 +7,8 @@ defmodule TrumanShell.Commands.Cp do
 
   @behaviour TrumanShell.Commands.Behaviour
 
-  alias TrumanShell.PosixErrors
+  alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
   @doc """
@@ -25,6 +26,7 @@ defmodule TrumanShell.Commands.Cp do
       true
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(["-r", src, dst | _rest], context) do
     copy_file(src, dst, context, recursive: true)
@@ -74,7 +76,7 @@ defmodule TrumanShell.Commands.Cp do
   defp copy_regular_file(src_safe, dst_safe, src_name) do
     case File.copy(src_safe, dst_safe) do
       {:ok, _} -> {:ok, ""}
-      {:error, reason} -> {:error, "cp: #{src_name}: #{PosixErrors.to_message(reason)}\n"}
+      {:error, reason} -> {:error, "cp: #{src_name}: #{Errors.to_message(reason)}\n"}
     end
   end
 
@@ -82,7 +84,7 @@ defmodule TrumanShell.Commands.Cp do
     if opts[:recursive] do
       case File.cp_r(src_safe, dst_safe) do
         {:ok, _} -> {:ok, ""}
-        {:error, reason, _file} -> {:error, "cp: #{src_name}: #{PosixErrors.to_message(reason)}\n"}
+        {:error, reason, _file} -> {:error, "cp: #{src_name}: #{Errors.to_message(reason)}\n"}
       end
     else
       {:error, "cp: -r not specified; omitting directory '#{src_name}'\n"}

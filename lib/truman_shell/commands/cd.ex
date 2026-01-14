@@ -2,12 +2,18 @@ defmodule TrumanShell.Commands.Cd do
   @moduledoc """
   Handler for the `cd` command - change working directory.
 
+  Unlike most commands, `cd` returns `Behaviour.result_with_effects/0` because
+  it must communicate a side effect (updating the shell's working directory)
+  back to the executor. See `TrumanShell.Commands.Behaviour` for the effect
+  handling pattern documentation.
+
   Returns `{:ok, "", set_cwd: path}` on success, which the executor
-  uses to update the current working directory state.
+  interprets and applies to update shell state.
   """
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Sanitizer
 
   @doc """
@@ -32,6 +38,7 @@ defmodule TrumanShell.Commands.Cd do
       {:error, "bash: cd: /etc: No such file or directory\\n"}
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result_with_effects()
   @impl true
   def handle(args, context) do
     path = List.first(args) || "."
@@ -62,9 +69,6 @@ defmodule TrumanShell.Commands.Cd do
         else
           {:error, "bash: cd: #{path}: No such file or directory\n"}
         end
-
-      {:error, _} ->
-        {:error, "bash: cd: #{path}: No such file or directory\n"}
     end
   end
 end

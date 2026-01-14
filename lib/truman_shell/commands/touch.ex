@@ -7,7 +7,8 @@ defmodule TrumanShell.Commands.Touch do
 
   @behaviour TrumanShell.Commands.Behaviour
 
-  alias TrumanShell.PosixErrors
+  alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
   @doc """
@@ -24,6 +25,7 @@ defmodule TrumanShell.Commands.Touch do
       true
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle([file_name | _rest], context) do
     target = Path.expand(file_name, context.current_dir)
@@ -33,7 +35,7 @@ defmodule TrumanShell.Commands.Touch do
       {:ok, safe_path} ->
         case File.touch(safe_path) do
           :ok -> {:ok, ""}
-          {:error, reason} -> {:error, "touch: #{file_name}: #{PosixErrors.to_message(reason)}\n"}
+          {:error, reason} -> {:error, "touch: #{file_name}: #{Errors.to_message(reason)}\n"}
         end
 
       {:error, :outside_sandbox} ->

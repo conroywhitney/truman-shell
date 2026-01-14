@@ -5,17 +5,34 @@ defmodule TrumanShell.Commands.FileIO do
 
   alias TrumanShell.Sanitizer
 
-  # Maximum file size in bytes (100KB) to prevent memory exhaustion
-  @max_file_size 100_000
+  # Maximum file size in bytes (10MB) to prevent memory exhaustion
+  # Large enough for most source files, small enough to prevent OOM attacks
+  @max_file_size 10_000_000
 
   @doc """
   Read a file with sandbox validation and size limit.
 
   Resolves the path relative to current_dir, validates it's within
-  the sandbox, and returns the file contents (max 100KB).
+  the sandbox, and returns the file contents (max 10MB).
 
   Uses `IO.binread/2` with a limit to prevent TOCTOU race conditions
   between size check and read. This is safer than `File.stat` + `File.read`.
+
+  ## Examples
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, content} = TrumanShell.Commands.FileIO.read_file("mix.exs", context)
+      iex> content =~ "defmodule TrumanShell.MixProject"
+      true
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.FileIO.read_file("nonexistent.txt", context)
+      {:error, "nonexistent.txt: No such file or directory"}
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.FileIO.read_file("/etc/passwd", context)
+      {:error, "/etc/passwd: No such file or directory"}
+
   """
   @spec read_file(String.t(), map()) :: {:ok, String.t()} | {:error, String.t()}
   def read_file(path, context) do
@@ -37,7 +54,7 @@ defmodule TrumanShell.Commands.FileIO do
         {:error, "#{path}: Is a directory"}
 
       {:error, :file_too_large} ->
-        {:error, "#{path}: File too large (max #{div(@max_file_size, 1000)}KB)"}
+        {:error, "#{path}: File too large (max #{div(@max_file_size, 1_000_000)}MB)"}
 
       {:error, _} ->
         {:error, "#{path}: No such file or directory"}
@@ -74,6 +91,15 @@ defmodule TrumanShell.Commands.FileIO do
 
   @doc """
   Format an error message with command prefix.
+
+  ## Examples
+
+      iex> TrumanShell.Commands.FileIO.format_error("cat", "file.txt: No such file")
+      "cat: file.txt: No such file\\n"
+
+      iex> TrumanShell.Commands.FileIO.format_error("head", "invalid number")
+      "head: invalid number\\n"
+
   """
   @spec format_error(String.t(), String.t()) :: String.t()
   def format_error(cmd, msg) do
@@ -89,6 +115,21 @@ defmodule TrumanShell.Commands.FileIO do
     - Just filename (defaults to 10 lines)
 
   Returns `{:ok, count, path}` or `{:error, message}`.
+
+  ## Examples
+
+      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-n", "5", "file.txt"])
+      {:ok, 5, "file.txt"}
+
+      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-20", "file.txt"])
+      {:ok, 20, "file.txt"}
+
+      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["file.txt"])
+      {:ok, 10, "file.txt"}
+
+      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-n", "abc", "file.txt"])
+      {:error, "invalid number of lines: 'abc'"}
+
   """
   @spec parse_line_count_args(list(String.t())) ::
           {:ok, pos_integer(), String.t()} | {:error, String.t()}
@@ -106,15 +147,9 @@ defmodule TrumanShell.Commands.FileIO do
     end
   end
 
-  def parse_line_count_args([path]) do
-    {:ok, 10, path}
-  end
+  def parse_line_count_args([path]), do: {:ok, 10, path}
+  def parse_line_count_args([]), do: {:ok, 10, "-"}
 
-  def parse_line_count_args([]) do
-    {:ok, 10, "-"}
-  end
-
-  # Parse a string as a positive integer
   defp parse_positive_int(str) do
     case Integer.parse(str) do
       {n, ""} when n > 0 -> {:ok, n}
