@@ -147,6 +147,80 @@ defmodule TrumanShell.ExecutorTest do
     end
   end
 
+  describe "redirects" do
+    test "stdout redirect (>) writes output to file" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-redirect-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        command = %Command{
+          name: :cmd_echo,
+          args: ["hello"],
+          pipes: [],
+          redirects: [stdout: "output.txt"]
+        }
+
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
+
+        # Output should be empty (went to file)
+        assert output == ""
+
+        # File should contain the command output
+        file_path = Path.join(tmp_dir, "output.txt")
+        assert File.exists?(file_path)
+        assert File.read!(file_path) == "hello\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "stdout append redirect (>>) appends to file" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-append-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        file_path = Path.join(tmp_dir, "output.txt")
+        File.write!(file_path, "first\n")
+
+        command = %Command{
+          name: :cmd_echo,
+          args: ["second"],
+          pipes: [],
+          redirects: [stdout_append: "output.txt"]
+        }
+
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert output == ""
+        assert File.read!(file_path) == "first\nsecond\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "redirect to path outside sandbox returns error (404 principle)" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-sandbox-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        command = %Command{
+          name: :cmd_echo,
+          args: ["sneaky"],
+          pipes: [],
+          redirects: [stdout: "/etc/passwd"]
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        # 404 principle: return "not found", don't reveal path exists
+        assert {:error, message} = result
+        assert message =~ "No such file or directory"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+  end
+
   describe "TrumanShell.execute/1 public API" do
     test "parses and executes a command string" do
       result = TrumanShell.execute("ls")

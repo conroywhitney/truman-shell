@@ -11,6 +11,7 @@ defmodule TrumanShell.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
+  alias TrumanShell.Sanitizer
 
   @max_pipe_depth 10
 
@@ -51,13 +52,15 @@ defmodule TrumanShell.Executor do
   @spec run(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
   def run(command, opts \\ [])
 
-  def run(%Command{} = command, opts) do
+  def run(%Command{redirects: redirects} = command, opts) do
     if root = Keyword.get(opts, :sandbox_root) do
       set_sandbox_root(Path.expand(root))
     end
 
-    with :ok <- validate_depth(command) do
-      execute(command)
+    with :ok <- validate_depth(command),
+         {:ok, output} <- execute(command),
+         {:ok, final_output} <- apply_redirects(output, redirects) do
+      {:ok, final_output}
     end
   end
 
@@ -117,6 +120,33 @@ defmodule TrumanShell.Executor do
       {:error, "pipe depth exceeded (max #{@max_pipe_depth})\n"}
     else
       :ok
+    end
+  end
+
+  # Redirect handling - apply redirects after command execution
+  defp apply_redirects(output, []), do: {:ok, output}
+
+  defp apply_redirects(output, [{:stdout, path} | rest]) do
+    write_redirect(output, path, [], rest)
+  end
+
+  defp apply_redirects(output, [{:stdout_append, path} | rest]) do
+    write_redirect(output, path, [:append], rest)
+  end
+
+  defp write_redirect(output, path, write_opts, rest) do
+    # Validate the original path first (catches absolute paths outside sandbox)
+    with {:ok, _} <- Sanitizer.validate_path(path, sandbox_root()) do
+      # Then resolve relative to current directory
+      target_path = Path.join(current_dir(), path)
+
+      with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()) do
+        File.write!(safe_path, output, write_opts)
+        apply_redirects("", rest)
+      end
+    else
+      {:error, :outside_sandbox} ->
+        {:error, "bash: #{path}: No such file or directory\n"}
     end
   end
 end
