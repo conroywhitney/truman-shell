@@ -52,17 +52,23 @@
 - `write_redirect/4` handles both `>` and `>>` with two-stage path validation
 - Original path validated first (catches `/etc/passwd`), then resolved path
 
-### Phase 5: File Writing Commands
-- [ ] 5.1 Write failing test: `mkdir newdir` creates directory
-- [ ] 5.2 Implement `cmd_mkdir` handler with `-p` flag
-- [ ] 5.3 Write failing test: `touch file.txt` creates empty file
-- [ ] 5.4 Implement `cmd_touch` handler
-- [ ] 5.5 Write failing test: `rm file.txt` moves to .trash
-- [ ] 5.6 Implement `cmd_rm` handler with soft delete
-- [ ] 5.7 Write failing test: `mv old.txt new.txt` renames file
-- [ ] 5.8 Implement `cmd_mv` handler
-- [ ] 5.9 Write failing test: `cp src.txt dst.txt` copies file
-- [ ] 5.10 Implement `cmd_cp` handler
+### Phase 5: File Writing Commands ✅
+- [x] 5.1 Write failing test: `mkdir newdir` creates directory
+- [x] 5.2 Implement `cmd_mkdir` handler with `-p` flag
+- [x] 5.3 Write failing test: `touch file.txt` creates empty file
+- [x] 5.4 Implement `cmd_touch` handler
+- [x] 5.5 Write failing test: `rm file.txt` moves to .trash
+- [x] 5.6 Implement `cmd_rm` handler with soft delete → **CRITICAL: Soft delete to `.trash/{timestamp}_{filename}`**
+- [x] 5.7 Write failing test: `mv old.txt new.txt` renames file
+- [x] 5.8 Implement `cmd_mv` handler
+- [x] 5.9 Write failing test: `cp src.txt dst.txt` copies file
+- [x] 5.10 Implement `cmd_cp` handler
+
+**Phase 5 Notes:**
+- All file writing commands follow TDD with comprehensive tests
+- `rm` uses soft delete - files moved to `.trash/` with timestamp prefix
+- All commands enforce sandbox boundaries (404 principle)
+- Test count: 162 → 185 tests (+23), 49 → 54 doctests (+5)
 
 ### Phase 6: Search Commands
 - [ ] 6.1 Write failing test: `grep pattern file.txt` finds matches
