@@ -121,6 +121,25 @@ Parser faithfully parses any valid syntax. Executor enforces:
 - Max command length
 - Allowed paths
 
+### Alphabetize map keys and aliases
+Keep map literals and alias lists alphabetically sorted for readability:
+```elixir
+# Good
+@commands %{
+  cmd_cat: Commands.Cat,
+  cmd_cd: Commands.Cd,
+  cmd_ls: Commands.Ls,
+}
+
+# Bad
+@commands %{
+  cmd_ls: Commands.Ls,
+  cmd_cat: Commands.Cat,  # Out of order
+  cmd_cd: Commands.Cd,
+}
+```
+Credo enforces alias ordering; map keys are by convention.
+
 ## Current Work: v0.4
 
 **Goal**: Complete executor with all 20 allowlisted commands

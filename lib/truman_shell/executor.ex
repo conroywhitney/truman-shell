@@ -63,20 +63,20 @@ defmodule TrumanShell.Executor do
     end
   end
 
-  # Command dispatch - maps command atoms to handler modules
+  # Command dispatch - maps command atoms to handler modules (alphabetized)
   @command_modules %{
-    cmd_ls: Commands.Ls,
-    cmd_pwd: Commands.Pwd,
-    cmd_cd: Commands.Cd,
     cmd_cat: Commands.Cat,
-    cmd_head: Commands.Head,
-    cmd_tail: Commands.Tail,
+    cmd_cd: Commands.Cd,
+    cmd_cp: Commands.Cp,
     cmd_echo: Commands.Echo,
+    cmd_head: Commands.Head,
+    cmd_ls: Commands.Ls,
     cmd_mkdir: Commands.Mkdir,
-    cmd_touch: Commands.Touch,
-    cmd_rm: Commands.Rm,
     cmd_mv: Commands.Mv,
-    cmd_cp: Commands.Cp
+    cmd_pwd: Commands.Pwd,
+    cmd_rm: Commands.Rm,
+    cmd_tail: Commands.Tail,
+    cmd_touch: Commands.Touch
   }
 
   defp execute(%Command{name: name, args: args}) when is_map_key(@command_modules, name) do
