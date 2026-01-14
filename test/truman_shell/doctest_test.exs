@@ -16,4 +16,5 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell.Commands.Echo
   doctest TrumanShell.Commands.Mkdir
   doctest TrumanShell.Commands.Touch
+  doctest TrumanShell.Commands.Rm
 end
