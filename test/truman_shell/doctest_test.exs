@@ -21,4 +21,5 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell.Commands.Rm
   doctest TrumanShell.Commands.Mv
   doctest TrumanShell.Commands.Cp
+  doctest TrumanShell.Commands.Wc
 end
