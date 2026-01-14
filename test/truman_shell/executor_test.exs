@@ -268,6 +268,28 @@ defmodule TrumanShell.ExecutorTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "redirect to nonexistent parent directory returns error (ENOENT)" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-enoent-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        command = %Command{
+          name: :cmd_echo,
+          args: ["test"],
+          pipes: [],
+          # Parent directory "nonexistent" doesn't exist
+          redirects: [stdout: "nonexistent/output.txt"]
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:error, message} = result
+        assert message =~ "No such file or directory"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 
   describe "TrumanShell.execute/1 public API" do
