@@ -43,8 +43,7 @@ defmodule TrumanShell.TokenizerTest do
     end
 
     test "stdout append" do
-      assert {:ok,
-              [{:word, "echo"}, {:word, "more"}, {:redirect, :stdout_append}, {:word, "out.txt"}]} =
+      assert {:ok, [{:word, "echo"}, {:word, "more"}, {:redirect, :stdout_append}, {:word, "out.txt"}]} =
                Tokenizer.tokenize("echo more >> out.txt")
     end
 
@@ -98,8 +97,8 @@ defmodule TrumanShell.TokenizerTest do
     end
 
     test "escaped quote in double quotes" do
-      {:ok, tokens} = Tokenizer.tokenize("echo \"say \\\"hello\\\"\"")
-      assert {:word, "say \"hello\""} in tokens
+      {:ok, tokens} = Tokenizer.tokenize(~s(echo "say \\"hello\\""))
+      assert {:word, ~s(say "hello")} in tokens
     end
 
     test "unterminated double quote returns error" do

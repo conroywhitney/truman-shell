@@ -4,7 +4,7 @@ defmodule TrumanShell.ExecutorTest do
   alias TrumanShell.Command
   alias TrumanShell.Executor
 
-  describe "run/1" do
+  describe "run/2" do
     test "executes a valid command and returns {:ok, output}" do
       command = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
 
@@ -22,64 +22,114 @@ defmodule TrumanShell.ExecutorTest do
       assert {:error, message} = result
       assert message == "bash: xyz: command not found\n"
     end
+
+    test "passes sandbox_root option to commands" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-sandbox-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+      File.write!(Path.join(tmp_dir, "test.txt"), "content")
+
+      try do
+        command = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert output =~ "test.txt"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "resets cwd when sandbox_root changes" do
+      # Create two sandboxes
+      sandbox1 = Path.join(System.tmp_dir!(), "truman-sandbox1-#{:rand.uniform(100_000)}")
+      sandbox2 = Path.join(System.tmp_dir!(), "truman-sandbox2-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox1)
+      File.mkdir_p!(sandbox2)
+      subdir1 = Path.join(sandbox1, "subdir")
+      File.mkdir_p!(subdir1)
+
+      try do
+        # cd into a subdirectory of sandbox1
+        cd_cmd = %Command{name: :cmd_cd, args: ["subdir"], pipes: [], redirects: []}
+        {:ok, ""} = Executor.run(cd_cmd, sandbox_root: sandbox1)
+
+        # Now switch to sandbox2 - CWD should reset to sandbox2 root, not keep old path
+        pwd_cmd = %Command{name: :cmd_pwd, args: [], pipes: [], redirects: []}
+        {:ok, output} = Executor.run(pwd_cmd, sandbox_root: sandbox2)
+
+        # CWD should be sandbox2, not sandbox1/subdir
+        assert String.trim(output) == sandbox2
+      after
+        File.rm_rf!(sandbox1)
+        File.rm_rf!(sandbox2)
+      end
+    end
   end
 
-  describe "ls handler" do
-    test "lists files in current directory" do
-      command = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
+  describe "command dispatch" do
+    # Smoke tests verifying each command is wired up correctly
+    # Detailed behavior tests are in test/truman_shell/commands/*_test.exs
 
-      {:ok, output} = Executor.run(command)
-
-      # Current directory should contain mix.exs (we're in project root)
-      assert output =~ "mix.exs"
-    end
-
-    test "rejects unsupported flags" do
-      command = %Command{name: :cmd_ls, args: ["-la"], pipes: [], redirects: []}
-
-      result = Executor.run(command)
-
-      assert {:error, message} = result
-      assert message =~ "invalid option"
-    end
-
-    test "rejects multiple path arguments" do
-      command = %Command{name: :cmd_ls, args: ["lib", "test"], pipes: [], redirects: []}
-
-      result = Executor.run(command)
-
-      assert {:error, message} = result
-      assert message =~ "too many arguments"
-    end
-
-    test "rejects access to system directories (404 principle)" do
-      # Trying to access /etc should appear as "not found"
-      # not "permission denied" - no information leakage
-      # SECURITY: This test MUST fail if /etc is accessible
-      command = %Command{name: :cmd_ls, args: ["/etc"], pipes: [], redirects: []}
-
-      result = Executor.run(command)
-
-      # Should NOT see real system files like passwd, hosts, etc
-      assert {:error, message} = result
-      assert message =~ "No such file or directory"
-    end
-
-    test "lists files in specified directory" do
+    test "dispatches :cmd_ls to Commands.Ls" do
       command = %Command{name: :cmd_ls, args: ["lib"], pipes: [], redirects: []}
 
       {:ok, output} = Executor.run(command)
 
-      assert output =~ "truman_shell.ex"
+      assert output =~ "truman_shell"
     end
 
-    test "returns error for non-existent directory" do
-      command = %Command{name: :cmd_ls, args: ["nonexistent_dir"], pipes: [], redirects: []}
+    test "dispatches :cmd_pwd to Commands.Pwd" do
+      command = %Command{name: :cmd_pwd, args: [], pipes: [], redirects: []}
 
-      result = Executor.run(command)
+      {:ok, output} = Executor.run(command)
 
-      assert {:error, message} = result
-      assert message == "ls: nonexistent_dir: No such file or directory\n"
+      assert output == File.cwd!() <> "\n"
+    end
+
+    test "dispatches :cmd_cd to Commands.Cd and applies set_cwd" do
+      # Reset state
+      Process.delete(:truman_cwd)
+
+      cd_cmd = %Command{name: :cmd_cd, args: ["lib"], pipes: [], redirects: []}
+      pwd_cmd = %Command{name: :cmd_pwd, args: [], pipes: [], redirects: []}
+
+      assert {:ok, ""} = Executor.run(cd_cmd)
+
+      # Verify state was updated
+      {:ok, output} = Executor.run(pwd_cmd)
+      assert output == Path.join(File.cwd!(), "lib") <> "\n"
+    end
+
+    test "dispatches :cmd_cat to Commands.Cat" do
+      context_dir = File.cwd!()
+      command = %Command{name: :cmd_cat, args: ["mix.exs"], pipes: [], redirects: []}
+
+      {:ok, output} = Executor.run(command, sandbox_root: context_dir)
+
+      assert output =~ "defmodule TrumanShell.MixProject"
+    end
+
+    test "dispatches :cmd_head to Commands.Head" do
+      command = %Command{name: :cmd_head, args: ["-n", "1", "mix.exs"], pipes: [], redirects: []}
+
+      {:ok, output} = Executor.run(command)
+
+      assert output == "defmodule TrumanShell.MixProject do\n"
+    end
+
+    test "dispatches :cmd_tail to Commands.Tail" do
+      command = %Command{name: :cmd_tail, args: ["-n", "1", "mix.exs"], pipes: [], redirects: []}
+
+      {:ok, output} = Executor.run(command)
+
+      assert output == "end\n"
+    end
+
+    test "dispatches :cmd_echo to Commands.Echo" do
+      command = %Command{name: :cmd_echo, args: ["hello", "world"], pipes: [], redirects: []}
+
+      {:ok, output} = Executor.run(command)
+
+      assert output == "hello world\n"
     end
   end
 
@@ -123,41 +173,152 @@ defmodule TrumanShell.ExecutorTest do
     end
   end
 
-  describe "output truncation" do
-    test "exposes max_output_lines configuration" do
-      # Default max is 200 lines to prevent DoS
-      assert TrumanShell.Executor.max_output_lines() == 200
-    end
-
-    test "truncates output and shows count for large directories" do
-      # Create a temp directory with many files to test truncation
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-truncation-#{:rand.uniform(100_000)}")
+  describe "redirects" do
+    test "stdout redirect (>) writes output to file" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-redirect-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
-      # Create 250 files (exceeds 200 line limit)
-      for i <- 1..250 do
-        File.write!(Path.join(tmp_dir, "file_#{String.pad_leading("#{i}", 3, "0")}.txt"), "")
+      try do
+        command = %Command{
+          name: :cmd_echo,
+          args: ["hello"],
+          pipes: [],
+          redirects: [stdout: "output.txt"]
+        }
+
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
+
+        # Output should be empty (went to file)
+        assert output == ""
+
+        # File should contain the command output
+        file_path = Path.join(tmp_dir, "output.txt")
+        assert File.exists?(file_path)
+        assert File.read!(file_path) == "hello\n"
+      after
+        File.rm_rf!(tmp_dir)
       end
+    end
+
+    test "stdout append redirect (>>) appends to file" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-append-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
 
       try do
-        # Change to tmp_dir so sandbox allows access
-        original_cwd = File.cwd!()
-        File.cd!(tmp_dir)
+        file_path = Path.join(tmp_dir, "output.txt")
+        File.write!(file_path, "first\n")
 
-        command = %Command{name: :cmd_ls, args: ["."], pipes: [], redirects: []}
-        {:ok, output} = Executor.run(command)
+        command = %Command{
+          name: :cmd_echo,
+          args: ["second"],
+          pipes: [],
+          redirects: [stdout_append: "output.txt"]
+        }
 
-        # Should show truncation message
-        assert output =~ "... (50 more entries, 250 total)"
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
 
-        # Should only have 200 file entries (plus truncation line)
-        lines = String.split(output, "\n", trim: true)
-        # 200 files + 1 truncation message
-        assert length(lines) == 201
-
-        File.cd!(original_cwd)
+        assert output == ""
+        assert File.read!(file_path) == "first\nsecond\n"
       after
-        # Cleanup
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "redirect to path outside sandbox returns error (404 principle)" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-sandbox-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        command = %Command{
+          name: :cmd_echo,
+          args: ["sneaky"],
+          pipes: [],
+          redirects: [stdout: "/etc/passwd"]
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        # 404 principle: return "not found", don't reveal path exists
+        assert {:error, message} = result
+        assert message =~ "No such file or directory"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "redirect to directory returns error (not crash)" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-eisdir-#{:rand.uniform(100_000)}")
+      subdir = Path.join(tmp_dir, "subdir")
+      File.mkdir_p!(subdir)
+
+      try do
+        command = %Command{
+          name: :cmd_echo,
+          args: ["test"],
+          pipes: [],
+          redirects: [stdout: "subdir"]
+        }
+
+        # Should return error, not crash
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:error, message} = result
+        assert message =~ "Is a directory"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "redirect to nonexistent parent directory returns error (ENOENT)" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-enoent-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        command = %Command{
+          name: :cmd_echo,
+          args: ["test"],
+          pipes: [],
+          # Parent directory "nonexistent" doesn't exist
+          redirects: [stdout: "nonexistent/output.txt"]
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:error, message} = result
+        assert message =~ "No such file or directory"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "multiple redirects: last file gets output, earlier files truncated (bash behavior)" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-multi-redir-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # echo hi > a.txt > b.txt
+        # Bash behavior: both files created, only LAST gets output
+        command = %Command{
+          name: :cmd_echo,
+          args: ["hello"],
+          pipes: [],
+          redirects: [stdout: "a.txt", stdout: "b.txt"]
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:ok, ""} = result
+
+        # Both files should exist
+        assert File.exists?(Path.join(tmp_dir, "a.txt"))
+        assert File.exists?(Path.join(tmp_dir, "b.txt"))
+
+        # First file should be empty (truncated by bash semantics)
+        assert File.read!(Path.join(tmp_dir, "a.txt")) == ""
+
+        # Last file should have the output
+        assert File.read!(Path.join(tmp_dir, "b.txt")) == "hello\n"
+      after
         File.rm_rf!(tmp_dir)
       end
     end
@@ -172,7 +333,6 @@ defmodule TrumanShell.ExecutorTest do
     end
 
     test "returns parse error for invalid syntax" do
-      # Empty command should fail at parse stage
       result = TrumanShell.execute("")
 
       assert {:error, _reason} = result

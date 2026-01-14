@@ -1,7 +1,8 @@
 defmodule TrumanShell.ParserTest do
   use ExUnit.Case, async: true
 
-  alias TrumanShell.{Parser, Command}
+  alias TrumanShell.Command
+  alias TrumanShell.Parser
 
   # ==========================================================================
   # TDD Fixtures from reification-labs/.imaginary/research/2026-01-11_shell-tdd-fixtures.csv

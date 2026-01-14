@@ -37,7 +37,8 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 ### Test-Driven Development (TDD)
 
-**Always follow Red-Green-Refactor:**
+> **IMPORTANT: Always follow Red-Green-Refactor!**
+> Use the `/tdd` skill to enter strict test-driven development mode.
 
 1. **Red** — Write a failing test that describes the desired behavior
 2. **Green** — Write the minimum code to make it pass

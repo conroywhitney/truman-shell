@@ -5,32 +5,27 @@ defmodule TrumanShell.Executor do
   All filesystem operations are confined to the sandbox root directory.
   Attempts to access paths outside the sandbox return "not found" errors
   (404 principle - no information leakage about protected paths).
+
+  Command handlers are implemented in `TrumanShell.Commands.*` modules.
   """
 
   alias TrumanShell.Command
+  alias TrumanShell.Commands
+  alias TrumanShell.PosixErrors
   alias TrumanShell.Sanitizer
 
   @max_pipe_depth 10
-  @max_output_lines 200
-
-  @doc """
-  Returns the maximum output lines limit (for testing/introspection).
-
-  ## Examples
-
-      iex> TrumanShell.Executor.max_output_lines()
-      200
-  """
-  def max_output_lines, do: @max_output_lines
-
-  # Default sandbox is current working directory
-  # Can be overridden via run/2 options in the future
-  defp sandbox_root, do: File.cwd!()
 
   @doc """
   Executes a parsed command and returns the output.
 
   Returns `{:ok, output}` on success or `{:error, message}` on failure.
+
+  ## Options
+
+    * `:sandbox_root` - Root directory for sandbox confinement.
+      Defaults to `File.cwd!()`. All file operations are restricted
+      to this directory and its subdirectories.
 
   ## Examples
 
@@ -46,18 +41,50 @@ defmodule TrumanShell.Executor do
       {:error, "bash: fake: command not found\\n"}
 
   """
-  @spec run(Command.t()) :: {:ok, String.t()} | {:error, String.t()}
-  def run(%Command{} = command) do
-    with :ok <- validate_depth(command) do
-      execute(command)
+  @spec run(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
+  def run(command, opts \\ [])
+
+  def run(%Command{redirects: redirects} = command, opts) do
+    if root = Keyword.get(opts, :sandbox_root) do
+      set_sandbox_root(Path.expand(root))
+    end
+
+    with :ok <- validate_depth(command),
+         {:ok, output} <- execute(command) do
+      apply_redirects(output, redirects)
     end
   end
 
-  # Dispatch to command handlers
-  defp execute(%Command{name: :cmd_ls, args: args}) do
-    with :ok <- validate_ls_args(args) do
-      path = List.first(args) || "."
-      handle_ls(path)
+  # styler:sort
+  # Command dispatch - maps command atoms to handler modules
+  @command_modules %{
+    cmd_cat: Commands.Cat,
+    cmd_cd: Commands.Cd,
+    cmd_cp: Commands.Cp,
+    cmd_echo: Commands.Echo,
+    cmd_head: Commands.Head,
+    cmd_ls: Commands.Ls,
+    cmd_mkdir: Commands.Mkdir,
+    cmd_mv: Commands.Mv,
+    cmd_pwd: Commands.Pwd,
+    cmd_rm: Commands.Rm,
+    cmd_tail: Commands.Tail,
+    cmd_touch: Commands.Touch
+  }
+
+  defp execute(%Command{name: name, args: args}) when is_map_key(@command_modules, name) do
+    module = @command_modules[name]
+    context = build_context()
+
+    case module.handle(args, context) do
+      # Handle side effects from commands like cd
+      {:ok, output, set_cwd: new_cwd} ->
+        set_current_dir(new_cwd)
+        {:ok, output}
+
+      # Normal success/error pass through
+      result ->
+        result
     end
   end
 
@@ -65,26 +92,15 @@ defmodule TrumanShell.Executor do
     {:error, "bash: #{name}: command not found\n"}
   end
 
-  # Argument validation helpers
-  defp validate_ls_args(args) do
-    {flags, paths} = Enum.split_with(args, &String.starts_with?(&1, "-"))
-
-    cond do
-      # Reject any flags (not supported yet)
-      flags != [] ->
-        flag = hd(flags)
-        {:error, "ls: invalid option -- '#{String.trim_leading(flag, "-")}'\n"}
-
-      # Reject multiple paths
-      length(paths) > 1 ->
-        {:error, "ls: too many arguments\n"}
-
-      true ->
-        :ok
-    end
+  # Context for command handlers
+  defp build_context do
+    %{
+      sandbox_root: sandbox_root(),
+      current_dir: current_dir()
+    }
   end
 
-  # Depth validation
+  # Depth validation for pipes
   defp validate_depth(%Command{pipes: pipes}) do
     depth = length(pipes) + 1
 
@@ -95,55 +111,69 @@ defmodule TrumanShell.Executor do
     end
   end
 
-  # Private handlers
+  # Redirect handling - apply redirects after command execution
+  defp apply_redirects(output, []), do: {:ok, output}
 
-  defp handle_ls(path) do
-    with {:ok, safe_path} <- Sanitizer.validate_path(path, sandbox_root()),
-         {:ok, entries} <- File.ls(safe_path) do
-      sorted = Enum.sort(entries)
-      total_count = length(sorted)
+  defp apply_redirects(output, [{:stdout, path} | rest]) do
+    write_redirect(output, path, [], rest)
+  end
 
-      {lines, truncated?} =
-        if total_count > @max_output_lines do
-          {Enum.take(sorted, @max_output_lines), true}
-        else
-          {sorted, false}
+  defp apply_redirects(output, [{:stdout_append, path} | rest]) do
+    write_redirect(output, path, [:append], rest)
+  end
+
+  defp write_redirect(output, path, write_opts, rest) do
+    # Bash behavior: for multiple redirects, only LAST one gets output
+    # Earlier redirects are truncated/created with empty content
+    {content_to_write, next_output} =
+      if rest == [] do
+        {output, ""}
+      else
+        {"", output}
+      end
+
+    # Validate the original path first (catches absolute paths outside sandbox)
+    case Sanitizer.validate_path(path, sandbox_root()) do
+      {:ok, _} ->
+        # Then resolve relative to current directory
+        target_path = Path.join(current_dir(), path)
+
+        with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()),
+             :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
+          apply_redirects(next_output, rest)
         end
 
-      output =
-        lines
-        |> Enum.map(&format_entry(safe_path, &1))
-        |> Enum.join("\n")
-
-      final_output =
-        if truncated? do
-          output <>
-            "\n... (#{total_count - @max_output_lines} more entries, #{total_count} total)\n"
-        else
-          output <> "\n"
-        end
-
-      {:ok, final_output}
-    else
       {:error, :outside_sandbox} ->
-        # 404 principle: don't reveal that path exists but is protected
-        {:error, "ls: #{path}: No such file or directory\n"}
-
-      {:error, :enoent} ->
-        {:error, "ls: #{path}: No such file or directory\n"}
-
-      {:error, _reason} ->
-        {:error, "ls: #{path}: No such file or directory\n"}
+        {:error, "bash: #{path}: No such file or directory\n"}
     end
   end
 
-  defp format_entry(base_path, name) do
-    full_path = Path.join(base_path, name)
-
-    if File.dir?(full_path) do
-      name <> "/"
-    else
-      name
+  # Wrap File.write to return bash-like errors instead of crashing
+  defp do_write_file(safe_path, output, write_opts, original_path) do
+    case File.write(safe_path, output, write_opts) do
+      :ok -> :ok
+      {:error, reason} -> {:error, "bash: #{original_path}: #{PosixErrors.to_message(reason)}\n"}
     end
+  end
+
+  # State management - sandbox root and current directory
+  # These are placed at the bottom as they are called by many functions above
+
+  defp set_current_dir(path) do
+    Process.put(:truman_cwd, path)
+  end
+
+  defp current_dir do
+    Process.get(:truman_cwd, sandbox_root())
+  end
+
+  defp set_sandbox_root(path) do
+    Process.put(:truman_sandbox_root, path)
+    # Reset CWD to new sandbox root to prevent state leakage across sessions
+    Process.put(:truman_cwd, path)
+  end
+
+  defp sandbox_root do
+    Process.get(:truman_sandbox_root, File.cwd!())
   end
 end

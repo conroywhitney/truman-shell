@@ -5,4 +5,18 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell
   doctest TrumanShell.Command
   doctest TrumanShell.Executor
+
+  # Command handlers
+  doctest TrumanShell.Commands.Pwd
+  doctest TrumanShell.Commands.Ls
+  doctest TrumanShell.Commands.Cd
+  doctest TrumanShell.Commands.Cat
+  doctest TrumanShell.Commands.Head
+  doctest TrumanShell.Commands.Tail
+  doctest TrumanShell.Commands.Echo
+  doctest TrumanShell.Commands.Mkdir
+  doctest TrumanShell.Commands.Touch
+  doctest TrumanShell.Commands.Rm
+  doctest TrumanShell.Commands.Mv
+  doctest TrumanShell.Commands.Cp
 end

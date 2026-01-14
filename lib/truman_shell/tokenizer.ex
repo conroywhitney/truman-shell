@@ -148,8 +148,7 @@ defmodule TrumanShell.Tokenizer do
   # Parse a word until we hit whitespace or special characters
   defp parse_word("", acc), do: {acc, ""}
 
-  defp parse_word(<<c, rest::binary>>, acc)
-       when c in [?\s, ?\t, ?|, ?>, ?<, ?;, ?&, ?", ?'] do
+  defp parse_word(<<c, rest::binary>>, acc) when c in [?\s, ?\t, ?|, ?>, ?<, ?;, ?&, ?", ?'] do
     {acc, <<c, rest::binary>>}
   end
 
