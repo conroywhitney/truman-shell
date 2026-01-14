@@ -96,7 +96,7 @@ defmodule TrumanShell.Commands.TreeWalkerTest do
 
         entries = TreeWalker.walk(tmp_dir, type: :file)
         paths = Enum.map(entries, fn {path, _} -> Path.basename(path) end)
-        types = Enum.map(entries, fn {_, type} -> type end) |> Enum.uniq()
+        types = entries |> Enum.map(fn {_, type} -> type end) |> Enum.uniq()
 
         # Should only have files
         assert "file1.txt" in paths
@@ -121,7 +121,7 @@ defmodule TrumanShell.Commands.TreeWalkerTest do
 
         entries = TreeWalker.walk(tmp_dir, type: :dir)
         paths = Enum.map(entries, fn {path, _} -> Path.basename(path) end)
-        types = Enum.map(entries, fn {_, type} -> type end) |> Enum.uniq()
+        types = entries |> Enum.map(fn {_, type} -> type end) |> Enum.uniq()
 
         # Should only have directories
         assert "subdir" in paths
