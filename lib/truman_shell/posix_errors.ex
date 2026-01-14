@@ -26,5 +26,6 @@ defmodule TrumanShell.PosixErrors do
   def to_message(:erofs), do: "Read-only file system"
   def to_message(:eexist), do: "File exists"
   def to_message(:exdev), do: "Invalid cross-device link"
-  def to_message(reason), do: "#{reason}"
+  # Catch-all: sanitize unknown errors to prevent info leakage
+  def to_message(_reason), do: "Operation not permitted"
 end

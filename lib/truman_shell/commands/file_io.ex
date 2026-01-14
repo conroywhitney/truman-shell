@@ -12,9 +12,10 @@ defmodule TrumanShell.Commands.FileIO do
   Read a file with sandbox validation and size limit.
 
   Resolves the path relative to current_dir, validates it's within
-  the sandbox, checks file size, and returns the file contents.
+  the sandbox, and returns the file contents (max 100KB).
 
-  Files larger than 100KB are rejected to prevent memory exhaustion.
+  Uses `IO.binread/2` with a limit to prevent TOCTOU race conditions
+  between size check and read. This is safer than `File.stat` + `File.read`.
   """
   @spec read_file(String.t(), map()) :: {:ok, String.t()} | {:error, String.t()}
   def read_file(path, context) do
@@ -23,8 +24,7 @@ defmodule TrumanShell.Commands.FileIO do
     target_rel = Path.relative_to(target, context.sandbox_root)
 
     with {:ok, safe_path} <- Sanitizer.validate_path(target_rel, context.sandbox_root),
-         :ok <- check_file_size(safe_path),
-         {:ok, contents} <- File.read(safe_path) do
+         {:ok, contents} <- read_with_limit(safe_path) do
       {:ok, contents}
     else
       {:error, :outside_sandbox} ->
@@ -44,14 +44,28 @@ defmodule TrumanShell.Commands.FileIO do
     end
   end
 
-  # Check if file size is within limit to prevent memory exhaustion
-  defp check_file_size(path) do
-    case File.stat(path) do
-      {:ok, %{size: size}} when size > @max_file_size ->
-        {:error, :file_too_large}
+  # Read file with size limit using IO.binread to prevent TOCTOU race
+  # Opens file and reads up to limit+1 bytes in one operation
+  defp read_with_limit(path) do
+    case File.open(path, [:read, :binary]) do
+      {:ok, file} ->
+        try do
+          case IO.binread(file, @max_file_size + 1) do
+            :eof ->
+              {:ok, ""}
 
-      {:ok, _} ->
-        :ok
+            {:error, reason} ->
+              {:error, reason}
+
+            data when byte_size(data) > @max_file_size ->
+              {:error, :file_too_large}
+
+            data ->
+              {:ok, data}
+          end
+        after
+          File.close(file)
+        end
 
       {:error, reason} ->
         {:error, reason}

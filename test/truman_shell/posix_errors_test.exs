@@ -36,9 +36,11 @@ defmodule TrumanShell.PosixErrorsTest do
       assert PosixErrors.to_message(:exdev) == "Invalid cross-device link"
     end
 
-    test "converts unknown errors to string representation" do
-      assert PosixErrors.to_message(:unknown_error) == "unknown_error"
-      assert PosixErrors.to_message(:eloop) == "eloop"
+    test "converts unknown errors to generic message (prevents info leakage)" do
+      # Unknown errors should NOT stringify the atom - could leak implementation details
+      assert PosixErrors.to_message(:unknown_error) == "Operation not permitted"
+      assert PosixErrors.to_message(:eloop) == "Operation not permitted"
+      assert PosixErrors.to_message(:some_internal_error) == "Operation not permitted"
     end
   end
 end

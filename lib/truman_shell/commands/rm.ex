@@ -3,10 +3,17 @@ defmodule TrumanShell.Commands.Rm do
   Handler for the `rm` command - SOFT DELETE files to .trash.
 
   **CRITICAL**: This command NEVER actually deletes files!
-  Instead, it moves them to `.trash/{timestamp}_{filename}` for auditability.
+  Instead, it moves them to `.trash/{unique_id}_{filename}` for auditability.
 
   This is the key difference from real bash - in Truman Shell,
   all operations are reversible for debugging and safety.
+
+  ## TODO: Trash Cleanup (v0.5+)
+
+  Currently `.trash/` is unbounded. Consider implementing:
+  - Max item count (e.g., keep last 1000 files)
+  - Age-based cleanup (e.g., delete after 24 hours)
+  - Size quota (e.g., max 100MB trash)
   """
 
   @behaviour TrumanShell.Commands.Behaviour
