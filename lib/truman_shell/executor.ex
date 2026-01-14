@@ -156,6 +156,7 @@ defmodule TrumanShell.Executor do
         #{String.trim(output)}
         ```
         """
+
         {:ok, wrapped}
 
       {:error, message} ->
@@ -166,6 +167,7 @@ defmodule TrumanShell.Executor do
         #{String.trim(message)}
         ```
         """
+
         {:error, wrapped}
     end
   end
