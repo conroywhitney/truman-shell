@@ -7,6 +7,28 @@ defmodule TrumanShell.Commands.Head do
 
   alias TrumanShell.Commands.Helpers
 
+  @doc """
+  Returns the first n lines of a file (default: 10).
+
+  Supports `-n NUM` and `-NUM` flag formats.
+
+  ## Examples
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, output} = TrumanShell.Commands.Head.handle(["-n", "1", "mix.exs"], context)
+      iex> output
+      "defmodule TrumanShell.MixProject do\\n"
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, output} = TrumanShell.Commands.Head.handle(["-2", "mix.exs"], context)
+      iex> output =~ "defmodule TrumanShell.MixProject"
+      true
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.Head.handle(["nonexistent.txt"], context)
+      {:error, "head: nonexistent.txt: No such file or directory\\n"}
+
+  """
   @impl true
   def handle(args, context) do
     {n, path} = parse_args(args)

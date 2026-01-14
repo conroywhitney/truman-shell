@@ -9,6 +9,27 @@ defmodule TrumanShell.Commands.Ls do
 
   @max_output_lines 200
 
+  @doc """
+  Lists directory contents, sorted alphabetically.
+
+  Directories are suffixed with `/`. Output is truncated at 200 lines.
+
+  ## Examples
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, output} = TrumanShell.Commands.Ls.handle(["lib"], context)
+      iex> output =~ "truman_shell/"
+      true
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.Ls.handle(["nonexistent"], context)
+      {:error, "ls: nonexistent: No such file or directory\\n"}
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.Ls.handle(["-la"], context)
+      {:error, "ls: invalid option -- 'la'\\n"}
+
+  """
   @impl true
   def handle(args, context) do
     with :ok <- validate_args(args) do

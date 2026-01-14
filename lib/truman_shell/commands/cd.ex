@@ -10,6 +10,28 @@ defmodule TrumanShell.Commands.Cd do
 
   alias TrumanShell.Sanitizer
 
+  @doc """
+  Changes the current working directory within the sandbox.
+
+  Returns `{:ok, "", set_cwd: new_path}` on success. The executor
+  applies the `set_cwd` side effect to update state.
+
+  ## Examples
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, "", set_cwd: new_dir} = TrumanShell.Commands.Cd.handle(["lib"], context)
+      iex> String.ends_with?(new_dir, "/lib")
+      true
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.Cd.handle(["nonexistent"], context)
+      {:error, "bash: cd: nonexistent: No such file or directory\\n"}
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.Cd.handle(["/etc"], context)
+      {:error, "bash: cd: /etc: No such file or directory\\n"}
+
+  """
   @impl true
   def handle(args, context) do
     path = List.first(args) || "."

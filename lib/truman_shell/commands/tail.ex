@@ -7,6 +7,28 @@ defmodule TrumanShell.Commands.Tail do
 
   alias TrumanShell.Commands.Helpers
 
+  @doc """
+  Returns the last n lines of a file (default: 10).
+
+  Supports `-n NUM` and `-NUM` flag formats.
+
+  ## Examples
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, output} = TrumanShell.Commands.Tail.handle(["-n", "1", "mix.exs"], context)
+      iex> output
+      "end\\n"
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, output} = TrumanShell.Commands.Tail.handle(["-2", "mix.exs"], context)
+      iex> output =~ "end"
+      true
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.Tail.handle(["nonexistent.txt"], context)
+      {:error, "tail: nonexistent.txt: No such file or directory\\n"}
+
+  """
   @impl true
   def handle(args, context) do
     {n, path} = parse_args(args)

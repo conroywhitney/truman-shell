@@ -7,6 +7,23 @@ defmodule TrumanShell.Commands.Cat do
 
   alias TrumanShell.Commands.Helpers
 
+  @doc """
+  Concatenates and displays file contents.
+
+  Multiple files are concatenated in order. Stops on first error.
+
+  ## Examples
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, output} = TrumanShell.Commands.Cat.handle(["mix.exs"], context)
+      iex> output =~ "defmodule TrumanShell.MixProject"
+      true
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.Cat.handle(["nonexistent.txt"], context)
+      {:error, "cat: nonexistent.txt: No such file or directory\\n"}
+
+  """
   @impl true
   def handle(paths, context) do
     Enum.reduce_while(paths, {:ok, ""}, fn path, {:ok, acc} ->
