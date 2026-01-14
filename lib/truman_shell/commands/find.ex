@@ -5,6 +5,7 @@ defmodule TrumanShell.Commands.Find do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.TreeWalker
   alias TrumanShell.Sanitizer
 
   @default_opts %{
@@ -93,10 +94,7 @@ defmodule TrumanShell.Commands.Find do
     case Sanitizer.validate_path(path, context.sandbox_root) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
-          entries = walk_tree(safe_path, opts, 0)
-          filtered = apply_filters(entries, opts)
-          output = format_output(filtered, safe_path, path)
-          {:ok, output}
+          do_find(safe_path, path, opts)
         else
           {:error, "find: #{path}: Not a directory\n"}
         end
@@ -106,39 +104,16 @@ defmodule TrumanShell.Commands.Find do
     end
   end
 
-  # Walk tree with depth tracking
-  # Uses File.ls/1 (non-bang) to gracefully handle permission denied errors
-  defp walk_tree(dir, opts, current_depth) do
-    # Check maxdepth before recursing
-    if opts.maxdepth && current_depth >= opts.maxdepth do
-      []
-    else
-      case File.ls(dir) do
-        {:ok, entries} ->
-          Enum.flat_map(entries, &process_entry(&1, dir, opts, current_depth))
-
-        # Permission denied or other errors - skip this directory gracefully
-        {:error, _reason} ->
-          []
-      end
-    end
+  defp do_find(safe_path, original_path, opts) do
+    walker_opts = build_walker_opts(opts)
+    entries = TreeWalker.walk(safe_path, walker_opts)
+    filtered = apply_filters(entries, opts)
+    output = format_output(filtered, safe_path, original_path)
+    {:ok, output}
   end
 
-  # Process a single directory entry, returning list of {path, type} tuples
-  defp process_entry(entry, dir, opts, current_depth) do
-    full_path = Path.join(dir, entry)
-
-    cond do
-      File.dir?(full_path) ->
-        [{full_path, :dir} | walk_tree(full_path, opts, current_depth + 1)]
-
-      File.regular?(full_path) ->
-        [{full_path, :file}]
-
-      true ->
-        []
-    end
-  end
+  defp build_walker_opts(%{maxdepth: nil}), do: []
+  defp build_walker_opts(%{maxdepth: depth}), do: [maxdepth: depth]
 
   defp apply_filters(entries, opts) do
     entries

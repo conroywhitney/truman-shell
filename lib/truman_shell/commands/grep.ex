@@ -6,6 +6,7 @@ defmodule TrumanShell.Commands.Grep do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.FileIO
+  alias TrumanShell.Commands.TreeWalker
   alias TrumanShell.Sanitizer
 
   @default_opts %{
@@ -133,7 +134,7 @@ defmodule TrumanShell.Commands.Grep do
     case Sanitizer.validate_path(path, context.sandbox_root) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
-          files = find_all_files(safe_path)
+          files = collect_files(safe_path)
           search_files_with_prefix(opts, pattern, files, safe_path, path, context)
         else
           search_files(opts, pattern, [path], context, _show_filename = true)
@@ -144,19 +145,12 @@ defmodule TrumanShell.Commands.Grep do
     end
   end
 
-  # Find all regular files recursively
-  defp find_all_files(dir) do
+  # Collect all regular files recursively using TreeWalker
+  defp collect_files(dir) do
     dir
-    |> File.ls!()
-    |> Enum.flat_map(fn entry ->
-      full_path = Path.join(dir, entry)
-
-      cond do
-        File.dir?(full_path) -> find_all_files(full_path)
-        File.regular?(full_path) -> [full_path]
-        true -> []
-      end
-    end)
+    |> TreeWalker.walk()
+    |> Enum.filter(fn {_path, type} -> type == :file end)
+    |> Enum.map(fn {path, _type} -> path end)
     |> Enum.sort()
   end
 
