@@ -122,23 +122,18 @@ Parser faithfully parses any valid syntax. Executor enforces:
 - Allowed paths
 
 ### Alphabetize map keys and aliases
-Keep map literals and alias lists alphabetically sorted for readability:
+**Styler** (formatter plugin) auto-sorts aliases, imports, and requires on `mix format`.
+
+For maps, add `# styler:sort` above the assignment:
 ```elixir
-# Good
+# styler:sort
 @commands %{
   cmd_cat: Commands.Cat,
   cmd_cd: Commands.Cd,
   cmd_ls: Commands.Ls,
 }
-
-# Bad
-@commands %{
-  cmd_ls: Commands.Ls,
-  cmd_cat: Commands.Cat,  # Out of order
-  cmd_cd: Commands.Cd,
-}
 ```
-Credo enforces alias ordering; map keys are by convention.
+Run `mix format` and Styler keeps it sorted automatically.
 
 ## Current Work: v0.4
 
