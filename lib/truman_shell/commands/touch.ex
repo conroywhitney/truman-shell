@@ -15,6 +15,7 @@ defmodule TrumanShell.Commands.Touch do
   ## Examples
 
       iex> sandbox = Path.join(System.tmp_dir!(), "touch_doctest_#{System.unique_integer([:positive])}")
+      iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
       iex> context = %{sandbox_root: sandbox, current_dir: sandbox}
       iex> {:ok, ""} = TrumanShell.Commands.Touch.handle(["testfile.txt"], context)
