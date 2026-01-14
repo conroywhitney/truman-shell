@@ -67,9 +67,6 @@ defmodule TrumanShell.Commands.Cd do
         else
           {:error, "bash: cd: #{path}: No such file or directory\n"}
         end
-
-      {:error, _} ->
-        {:error, "bash: cd: #{path}: No such file or directory\n"}
     end
   end
 end

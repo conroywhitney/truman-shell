@@ -45,9 +45,6 @@ defmodule TrumanShell.Commands.Wc do
 
       {:ok, _opts, []} ->
         {:error, "wc: missing file operand\n"}
-
-      {:error, msg} ->
-        {:error, msg}
     end
   end
 
