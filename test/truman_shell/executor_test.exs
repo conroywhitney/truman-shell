@@ -230,6 +230,26 @@ defmodule TrumanShell.ExecutorTest do
     end
   end
 
+  describe "cat handler" do
+    test "returns file contents" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create a test file
+        test_file = Path.join(tmp_dir, "hello.txt")
+        File.write!(test_file, "Hello, World!\n")
+
+        command = %Command{name: :cmd_cat, args: ["hello.txt"], pipes: [], redirects: []}
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert output == "Hello, World!\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+  end
+
   describe "TrumanShell.execute/1 public API" do
     test "parses and executes a command string" do
       result = TrumanShell.execute("ls")

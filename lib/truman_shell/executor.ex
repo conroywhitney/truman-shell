@@ -82,6 +82,11 @@ defmodule TrumanShell.Executor do
     handle_cd(path)
   end
 
+  defp execute(%Command{name: :cmd_cat, args: args}) do
+    path = List.first(args)
+    handle_cat(path)
+  end
+
   defp execute(%Command{name: {:unknown, name}}) do
     {:error, "bash: #{name}: command not found\n"}
   end
@@ -94,6 +99,30 @@ defmodule TrumanShell.Executor do
 
   defp set_current_dir(path) do
     Process.put(:truman_cwd, path)
+  end
+
+  # cat handler - displays file contents
+  defp handle_cat(path) do
+    # Resolve path relative to current working directory
+    target = Path.expand(path, current_dir())
+    target_rel = Path.relative_to(target, sandbox_root())
+
+    with {:ok, safe_path} <- Sanitizer.validate_path(target_rel, sandbox_root()),
+         {:ok, contents} <- File.read(safe_path) do
+      {:ok, contents}
+    else
+      {:error, :outside_sandbox} ->
+        {:error, "cat: #{path}: No such file or directory\n"}
+
+      {:error, :enoent} ->
+        {:error, "cat: #{path}: No such file or directory\n"}
+
+      {:error, :eisdir} ->
+        {:error, "cat: #{path}: Is a directory\n"}
+
+      {:error, _} ->
+        {:error, "cat: #{path}: No such file or directory\n"}
+    end
   end
 
   # cd handler - changes current directory within sandbox
