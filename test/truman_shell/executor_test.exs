@@ -290,6 +290,38 @@ defmodule TrumanShell.ExecutorTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "multiple redirects: last file gets output, earlier files truncated (bash behavior)" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-multi-redir-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # echo hi > a.txt > b.txt
+        # Bash behavior: both files created, only LAST gets output
+        command = %Command{
+          name: :cmd_echo,
+          args: ["hello"],
+          pipes: [],
+          redirects: [stdout: "a.txt", stdout: "b.txt"]
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:ok, ""} = result
+
+        # Both files should exist
+        assert File.exists?(Path.join(tmp_dir, "a.txt"))
+        assert File.exists?(Path.join(tmp_dir, "b.txt"))
+
+        # First file should be empty (truncated by bash semantics)
+        assert File.read!(Path.join(tmp_dir, "a.txt")) == ""
+
+        # Last file should have the output
+        assert File.read!(Path.join(tmp_dir, "b.txt")) == "hello\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 
   describe "TrumanShell.execute/1 public API" do

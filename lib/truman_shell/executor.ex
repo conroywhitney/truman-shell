@@ -123,6 +123,15 @@ defmodule TrumanShell.Executor do
   end
 
   defp write_redirect(output, path, write_opts, rest) do
+    # Bash behavior: for multiple redirects, only LAST one gets output
+    # Earlier redirects are truncated/created with empty content
+    {content_to_write, next_output} =
+      if rest == [] do
+        {output, ""}
+      else
+        {"", output}
+      end
+
     # Validate the original path first (catches absolute paths outside sandbox)
     case Sanitizer.validate_path(path, sandbox_root()) do
       {:ok, _} ->
@@ -130,8 +139,8 @@ defmodule TrumanShell.Executor do
         target_path = Path.join(current_dir(), path)
 
         with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()),
-             :ok <- do_write_file(safe_path, output, write_opts, path) do
-          apply_redirects("", rest)
+             :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
+          apply_redirects(next_output, rest)
         end
 
       {:error, :outside_sandbox} ->
