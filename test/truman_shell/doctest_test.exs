@@ -13,4 +13,5 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell.Commands.Cat
   doctest TrumanShell.Commands.Head
   doctest TrumanShell.Commands.Tail
+  doctest TrumanShell.Commands.Echo
 end

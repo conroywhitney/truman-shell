@@ -97,6 +97,14 @@ defmodule TrumanShell.ExecutorTest do
 
       assert output == "end\n"
     end
+
+    test "dispatches :cmd_echo to Commands.Echo" do
+      command = %Command{name: :cmd_echo, args: ["hello", "world"], pipes: [], redirects: []}
+
+      {:ok, output} = Executor.run(command)
+
+      assert output == "hello world\n"
+    end
   end
 
   describe "depth limits" do
