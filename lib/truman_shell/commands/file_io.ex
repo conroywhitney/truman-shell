@@ -65,4 +65,46 @@ defmodule TrumanShell.Commands.FileIO do
   def format_error(cmd, msg) do
     "#{cmd}: #{msg}\n"
   end
+
+  @doc """
+  Parse line count arguments for head/tail commands.
+
+  Supports formats:
+    - `-n NUM` (e.g., `-n 5`)
+    - `-NUM` (e.g., `-5`)
+    - Just filename (defaults to 10 lines)
+
+  Returns `{:ok, count, path}` or `{:error, message}`.
+  """
+  @spec parse_line_count_args(list(String.t())) ::
+          {:ok, pos_integer(), String.t()} | {:error, String.t()}
+  def parse_line_count_args(["-n", n_str | rest]) do
+    case parse_positive_int(n_str) do
+      {:ok, n} -> {:ok, n, List.first(rest) || "-"}
+      :error -> {:error, "invalid number of lines: '#{n_str}'"}
+    end
+  end
+
+  def parse_line_count_args(["-" <> n_str | rest]) when n_str != "" do
+    case parse_positive_int(n_str) do
+      {:ok, n} -> {:ok, n, List.first(rest) || "-"}
+      :error -> {:error, "invalid number of lines: '-#{n_str}'"}
+    end
+  end
+
+  def parse_line_count_args([path]) do
+    {:ok, 10, path}
+  end
+
+  def parse_line_count_args([]) do
+    {:ok, 10, "-"}
+  end
+
+  # Parse a string as a positive integer
+  defp parse_positive_int(str) do
+    case Integer.parse(str) do
+      {n, ""} when n > 0 -> {:ok, n}
+      _ -> :error
+    end
+  end
 end

@@ -31,7 +31,7 @@ defmodule TrumanShell.Commands.Head do
   """
   @impl true
   def handle(args, context) do
-    case parse_args(args) do
+    case FileIO.parse_line_count_args(args) do
       {:ok, n, path} ->
         case FileIO.read_file(path, context) do
           {:ok, contents} ->
@@ -45,36 +45,6 @@ defmodule TrumanShell.Commands.Head do
 
       {:error, msg} ->
         {:error, FileIO.format_error("head", msg)}
-    end
-  end
-
-  # Parse head arguments: -n NUM or -NUM or just file
-  defp parse_args(["-n", n_str | rest]) do
-    case parse_int(n_str) do
-      {:ok, n} -> {:ok, n, List.first(rest) || "-"}
-      :error -> {:error, "invalid number of lines: '#{n_str}'"}
-    end
-  end
-
-  defp parse_args(["-" <> n_str | rest]) when n_str != "" do
-    case parse_int(n_str) do
-      {:ok, n} -> {:ok, n, List.first(rest) || "-"}
-      :error -> {:error, "invalid number of lines: '-#{n_str}'"}
-    end
-  end
-
-  defp parse_args([path]) do
-    {:ok, 10, path}
-  end
-
-  defp parse_args([]) do
-    {:ok, 10, "-"}
-  end
-
-  defp parse_int(str) do
-    case Integer.parse(str) do
-      {n, ""} when n > 0 -> {:ok, n}
-      _ -> :error
     end
   end
 end
