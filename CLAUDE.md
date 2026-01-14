@@ -40,11 +40,8 @@ Agent sends: "grep -r TODO . | head -5"
 |---------|--------|-------------|
 | v0.1 | ✅ Done | Pattern mining (3,330 commands from Claude sessions) |
 | v0.2 | ✅ Merged | Minimal parser (tokenizer + parser + 120 tests) — PR #1 merged 2026-01-12 |
-| v0.3 | 🎯 Active | Proof of concept loop (integrate with IExReAct, implement `ls` executor) |
-| v0.4 | Planned | Read operations (ls, cat, head, tail, pwd, cd) |
-| v0.5 | Planned | Search operations (grep, find, wc) |
-| v0.6 | Planned | Write operations (mkdir, touch, rm, mv, cp, echo) |
-| v0.7 | Planned | Piping & composition |
+| v0.3 | ✅ Merged | Proof of concept loop (integrate with IExReAct, implement `ls` executor) — PR #2 merged 2026-01-12 |
+| v0.4 | 🎯 Active | Executor commands (read, write, search, navigation, piping) — see `openspec/changes/add-executor-commands/` |
 | v0.8 | Planned | Safety (404 principle, permissions) |
 | v0.9 | Planned | WASM script sandboxing |
 
@@ -94,9 +91,8 @@ Doctests serve dual purposes:
 - The CSV fixtures test private functions through `TrumanShell.parse/1`
 
 ### Test Coverage
-- **Unit tests** (96): Derived from real Claude Code session analysis (CSV fixtures)
-- **Doctests** (24): Executable documentation for public API
-- **Total**: 120 tests
+- **Unit tests**: Derived from real Claude Code session analysis (CSV fixtures)
+- **Doctests**: Executable documentation for public API
 
 ## Design Decisions
 
@@ -125,18 +121,20 @@ Parser faithfully parses any valid syntax. Executor enforces:
 - Max command length
 - Allowed paths
 
-## Current Work: v0.3
+## Current Work: v0.4
 
-**Goal**: One working command end-to-end: `ls`
+**Goal**: Complete executor with all 20 allowlisted commands
 
 ```
-Agent (IExReAct) sends: "ls -la"
+Agent (IExReAct) sends: "cat file.txt | grep pattern | head -5"
       ↓
-TrumanShell.parse/1 → %Command{name: :cmd_ls, args: ["-la"]}
+TrumanShell.parse/1 → %Command{} with pipes
       ↓
-Executor.run/1 → Actually list files (sandboxed)
+Executor.run/1 → Execute pipeline in sandbox
       ↓
-Agent receives: "total 64\ndrwxr-xr-x  5 user..."
+Agent receives: First 5 matching lines
 ```
 
-**See**: `AGENT.md` for development workflow and best practices.
+**See**:
+- `openspec/changes/add-executor-commands/` for full spec and tasks
+- `AGENTS.md` for development workflow and best practices
