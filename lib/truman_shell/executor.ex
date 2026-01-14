@@ -128,8 +128,8 @@ defmodule TrumanShell.Executor do
         # Then resolve relative to current directory
         target_path = Path.join(current_dir(), path)
 
-        with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()) do
-          File.write!(safe_path, output, write_opts)
+        with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()),
+             :ok <- do_write_file(safe_path, output, write_opts, path) do
           apply_redirects("", rest)
         end
 
@@ -137,6 +137,22 @@ defmodule TrumanShell.Executor do
         {:error, "bash: #{path}: No such file or directory\n"}
     end
   end
+
+  # Wrap File.write to return bash-like errors instead of crashing
+  defp do_write_file(safe_path, output, write_opts, original_path) do
+    case File.write(safe_path, output, write_opts) do
+      :ok -> :ok
+      {:error, reason} -> {:error, "bash: #{original_path}: #{posix_to_message(reason)}\n"}
+    end
+  end
+
+  # Convert POSIX error atoms to bash-like error messages
+  defp posix_to_message(:eisdir), do: "Is a directory"
+  defp posix_to_message(:enoent), do: "No such file or directory"
+  defp posix_to_message(:eacces), do: "Permission denied"
+  defp posix_to_message(:enospc), do: "No space left on device"
+  defp posix_to_message(:erofs), do: "Read-only file system"
+  defp posix_to_message(reason), do: "#{reason}"
 
   # State management - sandbox root and current directory
   # These are placed at the bottom as they are called by many functions above

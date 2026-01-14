@@ -219,6 +219,29 @@ defmodule TrumanShell.ExecutorTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "redirect to directory returns error (not crash)" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-eisdir-#{:rand.uniform(100_000)}")
+      subdir = Path.join(tmp_dir, "subdir")
+      File.mkdir_p!(subdir)
+
+      try do
+        command = %Command{
+          name: :cmd_echo,
+          args: ["test"],
+          pipes: [],
+          redirects: [stdout: "subdir"]
+        }
+
+        # Should return error, not crash
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:error, message} = result
+        assert message =~ "Is a directory"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 
   describe "TrumanShell.execute/1 public API" do
