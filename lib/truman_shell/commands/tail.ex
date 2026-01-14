@@ -31,13 +31,17 @@ defmodule TrumanShell.Commands.Tail do
   """
   @impl true
   def handle(args, context) do
-    {n, path} = parse_args(args)
+    case parse_args(args) do
+      {:ok, n, path} ->
+        case Helpers.read_file(path, context) do
+          {:ok, contents} ->
+            lines = String.split(contents, "\n", trim: true)
+            result = lines |> Enum.take(-n) |> Enum.join("\n")
+            {:ok, if(result == "", do: "", else: result <> "\n")}
 
-    case Helpers.read_file(path, context) do
-      {:ok, contents} ->
-        lines = String.split(contents, "\n", trim: true)
-        result = lines |> Enum.take(-n) |> Enum.join("\n")
-        {:ok, if(result == "", do: "", else: result <> "\n")}
+          {:error, msg} ->
+            {:error, Helpers.format_error("tail", msg)}
+        end
 
       {:error, msg} ->
         {:error, Helpers.format_error("tail", msg)}
@@ -46,22 +50,31 @@ defmodule TrumanShell.Commands.Tail do
 
   # Parse tail arguments: -n NUM or -NUM or just file
   defp parse_args(["-n", n_str | rest]) do
-    n = String.to_integer(n_str)
-    path = List.first(rest) || "-"
-    {n, path}
+    case parse_int(n_str) do
+      {:ok, n} -> {:ok, n, List.first(rest) || "-"}
+      :error -> {:error, "invalid number of lines: '#{n_str}'"}
+    end
   end
 
   defp parse_args(["-" <> n_str | rest]) when n_str != "" do
-    n = String.to_integer(n_str)
-    path = List.first(rest) || "-"
-    {n, path}
+    case parse_int(n_str) do
+      {:ok, n} -> {:ok, n, List.first(rest) || "-"}
+      :error -> {:error, "invalid number of lines: '-#{n_str}'"}
+    end
   end
 
   defp parse_args([path]) do
-    {10, path}
+    {:ok, 10, path}
   end
 
   defp parse_args([]) do
-    {10, "-"}
+    {:ok, 10, "-"}
+  end
+
+  defp parse_int(str) do
+    case Integer.parse(str) do
+      {n, ""} when n > 0 -> {:ok, n}
+      _ -> :error
+    end
   end
 end

@@ -67,5 +67,23 @@ defmodule TrumanShell.Commands.HeadTest do
       assert {:error, msg} = result
       assert msg =~ "No such file or directory"
     end
+
+    test "returns error for invalid -n value" do
+      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+
+      result = Head.handle(["-n", "foobar", "mix.exs"], context)
+
+      assert {:error, msg} = result
+      assert msg =~ "invalid number of lines"
+    end
+
+    test "returns error for negative -n value" do
+      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+
+      result = Head.handle(["-n", "-5", "mix.exs"], context)
+
+      assert {:error, msg} = result
+      assert msg =~ "invalid number of lines"
+    end
   end
 end
