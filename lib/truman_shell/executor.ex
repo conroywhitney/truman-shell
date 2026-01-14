@@ -167,6 +167,8 @@ defmodule TrumanShell.Executor do
 
   defp set_sandbox_root(path) do
     Process.put(:truman_sandbox_root, path)
+    # Reset CWD to new sandbox root to prevent state leakage across sessions
+    Process.put(:truman_cwd, path)
   end
 
   defp sandbox_root do

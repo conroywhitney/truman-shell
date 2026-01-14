@@ -37,6 +37,32 @@ defmodule TrumanShell.ExecutorTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "resets cwd when sandbox_root changes" do
+      # Create two sandboxes
+      sandbox1 = Path.join(System.tmp_dir!(), "truman-sandbox1-#{:rand.uniform(100_000)}")
+      sandbox2 = Path.join(System.tmp_dir!(), "truman-sandbox2-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox1)
+      File.mkdir_p!(sandbox2)
+      subdir1 = Path.join(sandbox1, "subdir")
+      File.mkdir_p!(subdir1)
+
+      try do
+        # cd into a subdirectory of sandbox1
+        cd_cmd = %Command{name: :cmd_cd, args: ["subdir"], pipes: [], redirects: []}
+        {:ok, ""} = Executor.run(cd_cmd, sandbox_root: sandbox1)
+
+        # Now switch to sandbox2 - CWD should reset to sandbox2 root, not keep old path
+        pwd_cmd = %Command{name: :cmd_pwd, args: [], pipes: [], redirects: []}
+        {:ok, output} = Executor.run(pwd_cmd, sandbox_root: sandbox2)
+
+        # CWD should be sandbox2, not sandbox1/subdir
+        assert String.trim(output) == sandbox2
+      after
+        File.rm_rf!(sandbox1)
+        File.rm_rf!(sandbox2)
+      end
+    end
   end
 
   describe "command dispatch" do
