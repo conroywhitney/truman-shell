@@ -13,9 +13,8 @@ defmodule TrumanShell.Executor do
   @max_pipe_depth 10
   @max_output_lines 200
 
-  @doc false
-  # Internal constant for testing/introspection
-  def max_output_lines, do: @max_output_lines
+  # Internal constant - tested via behavior (truncation test)
+  defp max_output_lines, do: @max_output_lines
 
   # Sandbox root - set via run/2 opts or defaults to File.cwd!()
   defp sandbox_root do

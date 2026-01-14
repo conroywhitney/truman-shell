@@ -124,11 +124,6 @@ defmodule TrumanShell.ExecutorTest do
   end
 
   describe "output truncation" do
-    test "exposes max_output_lines configuration" do
-      # Default max is 200 lines to prevent DoS
-      assert TrumanShell.Executor.max_output_lines() == 200
-    end
-
     test "truncates output and shows count for large directories" do
       # Create a temp directory with many files to test truncation
       tmp_dir = Path.join(System.tmp_dir!(), "truman-test-truncation-#{:rand.uniform(100_000)}")
