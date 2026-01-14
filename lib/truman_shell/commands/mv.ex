@@ -7,6 +7,7 @@ defmodule TrumanShell.Commands.Mv do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
@@ -25,6 +26,7 @@ defmodule TrumanShell.Commands.Mv do
       true
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle([src, dst | _rest], context) do
     src_target = Path.expand(src, context.current_dir)

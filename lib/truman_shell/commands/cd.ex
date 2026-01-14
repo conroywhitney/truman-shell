@@ -8,7 +8,11 @@ defmodule TrumanShell.Commands.Cd do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Sanitizer
+
+  # cd returns extended result with side-effect directive
+  @type cd_result :: {:ok, String.t(), [{:set_cwd, String.t()}]} | {:error, String.t()}
 
   @doc """
   Changes the current working directory within the sandbox.
@@ -32,6 +36,7 @@ defmodule TrumanShell.Commands.Cd do
       {:error, "bash: cd: /etc: No such file or directory\\n"}
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: cd_result()
   @impl true
   def handle(args, context) do
     path = List.first(args) || "."

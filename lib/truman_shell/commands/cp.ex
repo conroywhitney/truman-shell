@@ -7,6 +7,7 @@ defmodule TrumanShell.Commands.Cp do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
@@ -25,6 +26,7 @@ defmodule TrumanShell.Commands.Cp do
       true
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(["-r", src, dst | _rest], context) do
     copy_file(src, dst, context, recursive: true)

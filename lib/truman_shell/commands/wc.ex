@@ -5,6 +5,7 @@ defmodule TrumanShell.Commands.Wc do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Commands.FileIO
 
   @default_opts %{
@@ -35,6 +36,7 @@ defmodule TrumanShell.Commands.Wc do
       {:error, "wc: nonexistent.txt: No such file or directory\\n"}
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(args, context) do
     case parse_args(args) do

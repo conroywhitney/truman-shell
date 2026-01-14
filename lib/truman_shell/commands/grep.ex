@@ -5,6 +5,7 @@ defmodule TrumanShell.Commands.Grep do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Commands.FileIO
   alias TrumanShell.Commands.TreeWalker
   alias TrumanShell.Sanitizer
@@ -42,6 +43,7 @@ defmodule TrumanShell.Commands.Grep do
       {:error, "grep: nonexistent.txt: No such file or directory\\n"}
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(args, context) do
     case parse_args(args) do

@@ -16,6 +16,22 @@ defmodule TrumanShell.Commands.FileIO do
 
   Uses `IO.binread/2` with a limit to prevent TOCTOU race conditions
   between size check and read. This is safer than `File.stat` + `File.read`.
+
+  ## Examples
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> {:ok, content} = TrumanShell.Commands.FileIO.read_file("mix.exs", context)
+      iex> content =~ "defmodule TrumanShell.MixProject"
+      true
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.FileIO.read_file("nonexistent.txt", context)
+      {:error, "nonexistent.txt: No such file or directory"}
+
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Commands.FileIO.read_file("/etc/passwd", context)
+      {:error, "/etc/passwd: No such file or directory"}
+
   """
   @spec read_file(String.t(), map()) :: {:ok, String.t()} | {:error, String.t()}
   def read_file(path, context) do
@@ -74,6 +90,15 @@ defmodule TrumanShell.Commands.FileIO do
 
   @doc """
   Format an error message with command prefix.
+
+  ## Examples
+
+      iex> TrumanShell.Commands.FileIO.format_error("cat", "file.txt: No such file")
+      "cat: file.txt: No such file\\n"
+
+      iex> TrumanShell.Commands.FileIO.format_error("head", "invalid number")
+      "head: invalid number\\n"
+
   """
   @spec format_error(String.t(), String.t()) :: String.t()
   def format_error(cmd, msg) do
@@ -89,6 +114,21 @@ defmodule TrumanShell.Commands.FileIO do
     - Just filename (defaults to 10 lines)
 
   Returns `{:ok, count, path}` or `{:error, message}`.
+
+  ## Examples
+
+      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-n", "5", "file.txt"])
+      {:ok, 5, "file.txt"}
+
+      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-20", "file.txt"])
+      {:ok, 20, "file.txt"}
+
+      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["file.txt"])
+      {:ok, 10, "file.txt"}
+
+      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-n", "abc", "file.txt"])
+      {:error, "invalid number of lines: 'abc'"}
+
   """
   @spec parse_line_count_args(list(String.t())) ::
           {:ok, pos_integer(), String.t()} | {:error, String.t()}

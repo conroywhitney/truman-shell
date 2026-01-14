@@ -5,6 +5,7 @@ defmodule TrumanShell.Commands.Cat do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Commands.FileIO
 
   @doc """
@@ -24,6 +25,7 @@ defmodule TrumanShell.Commands.Cat do
       {:error, "cat: nonexistent.txt: No such file or directory\\n"}
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(paths, context) do
     Enum.reduce_while(paths, {:ok, ""}, fn path, {:ok, acc} ->

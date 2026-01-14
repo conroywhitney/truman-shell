@@ -5,6 +5,7 @@ defmodule TrumanShell.Commands.Head do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Commands.FileIO
 
   @doc """
@@ -29,6 +30,7 @@ defmodule TrumanShell.Commands.Head do
       {:error, "head: nonexistent.txt: No such file or directory\\n"}
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(args, context) do
     case FileIO.parse_line_count_args(args) do

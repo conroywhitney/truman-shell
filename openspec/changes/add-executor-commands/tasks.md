@@ -70,15 +70,22 @@
 - All commands enforce sandbox boundaries (404 principle)
 - Test count: 162 → 185 tests (+23), 49 → 54 doctests (+5)
 
-### Phase 6: Search Commands
-- [ ] 6.1 Write failing test: `grep pattern file.txt` finds matches
-- [ ] 6.2 Implement `cmd_grep` handler with basic pattern matching
-- [ ] 6.3 Write failing test: `grep -r pattern dir/` recursive search
-- [ ] 6.4 Implement recursive grep with `-r` flag
-- [ ] 6.5 Write failing test: `find . -name "*.ex"` finds files
-- [ ] 6.6 Implement `cmd_find` handler with `-name` support
-- [ ] 6.7 Write failing test: `wc file.txt` returns line/word/char counts
-- [ ] 6.8 Implement `cmd_wc` handler
+### Phase 6: Search Commands ✅
+- [x] 6.1 Write failing test: `grep pattern file.txt` finds matches
+- [x] 6.2 Implement `cmd_grep` handler with basic pattern matching
+- [x] 6.3 Write failing test: `grep -r pattern dir/` recursive search
+- [x] 6.4 Implement recursive grep with `-r` flag
+- [x] 6.5 Write failing test: `find . -name "*.ex"` finds files
+- [x] 6.6 Implement `cmd_find` handler with `-name` support
+- [x] 6.7 Write failing test: `wc file.txt` returns line/word/char counts
+- [x] 6.8 Implement `cmd_wc` handler
+
+**Phase 6 Notes:**
+- All search commands implemented with TDD (27 tests)
+- `grep` supports 7 flags: `-r`, `-n`, `-i`, `-v`, `-A`, `-B`, `-C`
+- `find` supports `-name`, `-type`, `-maxdepth`
+- `wc` supports `-l`, `-w`, `-c` flags
+- All commands enforce sandbox boundaries (404 principle)
 
 ### Phase 7: Piping
 - [ ] 7.1 Write failing test: `cat file.txt | head -5` returns first 5 lines

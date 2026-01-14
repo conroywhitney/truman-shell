@@ -6,6 +6,10 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell.Command
   doctest TrumanShell.Executor
 
+  # Shared utilities
+  doctest TrumanShell.Commands.FileIO
+  doctest TrumanShell.Commands.TreeWalker
+
   # Command handlers
   doctest TrumanShell.Commands.Pwd
   doctest TrumanShell.Commands.Ls

@@ -7,6 +7,7 @@ defmodule TrumanShell.Commands.Mkdir do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Sanitizer
 
   @doc """
@@ -23,6 +24,7 @@ defmodule TrumanShell.Commands.Mkdir do
       true
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(["-p", dir_name | _rest], context) do
     create_directory(dir_name, context, parents: true)

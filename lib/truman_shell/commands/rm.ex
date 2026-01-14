@@ -18,6 +18,7 @@ defmodule TrumanShell.Commands.Rm do
 
   @behaviour TrumanShell.Commands.Behaviour
 
+  alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Sanitizer
 
   @doc """
@@ -36,6 +37,7 @@ defmodule TrumanShell.Commands.Rm do
       false
 
   """
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle(["-f" | rest], context) do
     # -f flag: don't error on missing files
