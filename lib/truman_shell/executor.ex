@@ -83,8 +83,7 @@ defmodule TrumanShell.Executor do
   end
 
   defp execute(%Command{name: :cmd_cat, args: args}) do
-    path = List.first(args)
-    handle_cat(path)
+    handle_cat(args)
   end
 
   defp execute(%Command{name: {:unknown, name}}) do
@@ -101,8 +100,21 @@ defmodule TrumanShell.Executor do
     Process.put(:truman_cwd, path)
   end
 
-  # cat handler - displays file contents
-  defp handle_cat(path) do
+  # cat handler - displays file contents (supports multiple files)
+  defp handle_cat(paths) do
+    results =
+      Enum.reduce_while(paths, {:ok, ""}, fn path, {:ok, acc} ->
+        case read_file(path) do
+          {:ok, contents} -> {:cont, {:ok, acc <> contents}}
+          {:error, msg} -> {:halt, {:error, msg}}
+        end
+      end)
+
+    results
+  end
+
+  # Read a single file with sandbox validation
+  defp read_file(path) do
     # Resolve path relative to current working directory
     target = Path.expand(path, current_dir())
     target_rel = Path.relative_to(target, sandbox_root())

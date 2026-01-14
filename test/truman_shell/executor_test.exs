@@ -248,6 +248,25 @@ defmodule TrumanShell.ExecutorTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "concatenates multiple files" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-multi-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create two test files
+        File.write!(Path.join(tmp_dir, "a.txt"), "AAA\n")
+        File.write!(Path.join(tmp_dir, "b.txt"), "BBB\n")
+
+        command = %Command{name: :cmd_cat, args: ["a.txt", "b.txt"], pipes: [], redirects: []}
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
+
+        # cat concatenates files in order
+        assert output == "AAA\nBBB\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 
   describe "TrumanShell.execute/1 public API" do
