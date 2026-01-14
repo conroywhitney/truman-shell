@@ -65,6 +65,11 @@ defmodule TrumanShell.Executor do
     {:ok, current_dir() <> "\n"}
   end
 
+  defp execute(%Command{name: :cmd_cd, args: args}) do
+    path = List.first(args) || "."
+    handle_cd(path)
+  end
+
   defp execute(%Command{name: {:unknown, name}}) do
     {:error, "bash: #{name}: command not found\n"}
   end
@@ -73,6 +78,34 @@ defmodule TrumanShell.Executor do
   # Will be modified by cd command
   defp current_dir do
     Process.get(:truman_cwd, sandbox_root())
+  end
+
+  defp set_current_dir(path) do
+    Process.put(:truman_cwd, path)
+  end
+
+  # cd handler - changes current directory within sandbox
+  defp handle_cd(path) do
+    # Compute target path relative to current working directory
+    # Then make it relative to sandbox for validation
+    target_abs = Path.expand(path, current_dir())
+    target_rel = Path.relative_to(target_abs, sandbox_root())
+
+    with {:ok, safe_path} <- Sanitizer.validate_path(target_rel, sandbox_root()),
+         true <- File.dir?(safe_path) do
+      set_current_dir(safe_path)
+      {:ok, ""}
+    else
+      {:error, :outside_sandbox} ->
+        # 404 principle: don't reveal path exists but is protected
+        {:error, "bash: cd: #{path}: No such file or directory\n"}
+
+      false ->
+        {:error, "bash: cd: #{path}: No such file or directory\n"}
+
+      {:error, _} ->
+        {:error, "bash: cd: #{path}: No such file or directory\n"}
+    end
   end
 
   # Argument validation helpers

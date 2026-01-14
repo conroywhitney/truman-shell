@@ -175,6 +175,27 @@ defmodule TrumanShell.ExecutorTest do
     end
   end
 
+  describe "cd handler" do
+    setup do
+      # Reset current directory state before each test
+      Process.delete(:truman_cwd)
+      :ok
+    end
+
+    test "changes working directory to subdirectory" do
+      cd_cmd = %Command{name: :cmd_cd, args: ["lib"], pipes: [], redirects: []}
+      pwd_cmd = %Command{name: :cmd_pwd, args: [], pipes: [], redirects: []}
+
+      # cd should succeed silently (empty output like real bash)
+      assert {:ok, ""} = Executor.run(cd_cmd)
+
+      # pwd should now return the new directory
+      {:ok, output} = Executor.run(pwd_cmd)
+      expected = Path.join(File.cwd!(), "lib") <> "\n"
+      assert output == expected
+    end
+  end
+
   describe "TrumanShell.execute/1 public API" do
     test "parses and executes a command string" do
       result = TrumanShell.execute("ls")
