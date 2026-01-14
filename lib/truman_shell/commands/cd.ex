@@ -45,15 +45,23 @@ defmodule TrumanShell.Commands.Cd do
     target_rel = Path.relative_to(target_abs, context.sandbox_root)
 
     with {:ok, safe_path} <- Sanitizer.validate_path(target_rel, context.sandbox_root),
-         true <- File.dir?(safe_path) do
+         {:dir, true} <- {:dir, File.dir?(safe_path)} do
       # Return success with the new cwd for executor to apply
       {:ok, "", set_cwd: safe_path}
     else
       {:error, :outside_sandbox} ->
+        # 404 principle: don't reveal anything about paths outside sandbox
         {:error, "bash: cd: #{path}: No such file or directory\n"}
 
-      false ->
-        {:error, "bash: cd: #{path}: No such file or directory\n"}
+      {:dir, false} ->
+        # Path is inside sandbox but not a directory - check if it's a file
+        full_path = Path.expand(target_rel, context.sandbox_root)
+
+        if File.regular?(full_path) do
+          {:error, "bash: cd: #{path}: Not a directory\n"}
+        else
+          {:error, "bash: cd: #{path}: No such file or directory\n"}
+        end
 
       {:error, _} ->
         {:error, "bash: cd: #{path}: No such file or directory\n"}

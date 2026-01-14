@@ -78,7 +78,7 @@ defmodule TrumanShell.Commands.CdTest do
       result = Cd.handle(["mix.exs"], context)
 
       assert {:error, msg} = result
-      assert msg =~ "No such file or directory"
+      assert msg =~ "Not a directory"
     end
   end
 end
