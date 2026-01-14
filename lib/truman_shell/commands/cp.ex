@@ -60,22 +60,31 @@ defmodule TrumanShell.Commands.Cp do
   defp do_copy(src_safe, dst_safe, src_name, opts) do
     cond do
       File.regular?(src_safe) ->
-        case File.copy(src_safe, dst_safe) do
-          {:ok, _} -> {:ok, ""}
-          {:error, _} -> {:error, "cp: #{src_name}: No such file or directory\n"}
-        end
-
-      File.dir?(src_safe) && opts[:recursive] ->
-        case File.cp_r(src_safe, dst_safe) do
-          {:ok, _} -> {:ok, ""}
-          {:error, _, _} -> {:error, "cp: #{src_name}: No such file or directory\n"}
-        end
+        copy_regular_file(src_safe, dst_safe, src_name)
 
       File.dir?(src_safe) ->
-        {:error, "cp: -r not specified; omitting directory '#{src_name}'\n"}
+        copy_directory(src_safe, dst_safe, src_name, opts)
 
       true ->
         {:error, "cp: #{src_name}: No such file or directory\n"}
+    end
+  end
+
+  defp copy_regular_file(src_safe, dst_safe, src_name) do
+    case File.copy(src_safe, dst_safe) do
+      {:ok, _} -> {:ok, ""}
+      {:error, _} -> {:error, "cp: #{src_name}: No such file or directory\n"}
+    end
+  end
+
+  defp copy_directory(src_safe, dst_safe, src_name, opts) do
+    if opts[:recursive] do
+      case File.cp_r(src_safe, dst_safe) do
+        {:ok, _} -> {:ok, ""}
+        {:error, _, _} -> {:error, "cp: #{src_name}: No such file or directory\n"}
+      end
+    else
+      {:error, "cp: -r not specified; omitting directory '#{src_name}'\n"}
     end
   end
 end

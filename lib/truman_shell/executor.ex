@@ -58,9 +58,8 @@ defmodule TrumanShell.Executor do
     end
 
     with :ok <- validate_depth(command),
-         {:ok, output} <- execute(command),
-         {:ok, final_output} <- apply_redirects(output, redirects) do
-      {:ok, final_output}
+         {:ok, output} <- execute(command) do
+      apply_redirects(output, redirects)
     end
   end
 
@@ -141,15 +140,16 @@ defmodule TrumanShell.Executor do
 
   defp write_redirect(output, path, write_opts, rest) do
     # Validate the original path first (catches absolute paths outside sandbox)
-    with {:ok, _} <- Sanitizer.validate_path(path, sandbox_root()) do
-      # Then resolve relative to current directory
-      target_path = Path.join(current_dir(), path)
+    case Sanitizer.validate_path(path, sandbox_root()) do
+      {:ok, _} ->
+        # Then resolve relative to current directory
+        target_path = Path.join(current_dir(), path)
 
-      with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()) do
-        File.write!(safe_path, output, write_opts)
-        apply_redirects("", rest)
-      end
-    else
+        with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()) do
+          File.write!(safe_path, output, write_opts)
+          apply_redirects("", rest)
+        end
+
       {:error, :outside_sandbox} ->
         {:error, "bash: #{path}: No such file or directory\n"}
     end

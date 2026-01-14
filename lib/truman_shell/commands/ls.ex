@@ -68,10 +68,7 @@ defmodule TrumanShell.Commands.Ls do
           {sorted, false}
         end
 
-      output =
-        lines
-        |> Enum.map(&format_entry(safe_path, &1))
-        |> Enum.join("\n")
+      output = Enum.map_join(lines, "\n", &format_entry(safe_path, &1))
 
       final_output =
         if truncated? do

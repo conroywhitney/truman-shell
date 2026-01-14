@@ -39,9 +39,8 @@ defmodule TrumanShell.Parser do
   """
   @spec parse(String.t()) :: {:ok, Command.t()} | {:error, String.t()}
   def parse(input) when is_binary(input) do
-    with {:ok, tokens} <- Tokenizer.tokenize(input),
-         {:ok, command} <- parse_tokens(tokens) do
-      {:ok, command}
+    with {:ok, tokens} <- Tokenizer.tokenize(input) do
+      parse_tokens(tokens)
     end
   end
 

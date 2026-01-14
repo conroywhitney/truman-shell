@@ -11,7 +11,7 @@ defmodule TrumanShell.Commands.HeadTest do
     File.mkdir_p!(tmp_dir)
 
     try do
-      content = Enum.map(1..n, &"Line #{&1}") |> Enum.join("\n")
+      content = Enum.map_join(1..n, "\n", &"Line #{&1}")
       File.write!(Path.join(tmp_dir, "lines.txt"), content <> "\n")
       context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
       fun.(context)
