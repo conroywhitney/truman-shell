@@ -90,6 +90,10 @@ defmodule TrumanShell.Executor do
     handle_head(args)
   end
 
+  defp execute(%Command{name: :cmd_tail, args: args}) do
+    handle_tail(args)
+  end
+
   defp execute(%Command{name: {:unknown, name}}) do
     {:error, "bash: #{name}: command not found\n"}
   end
@@ -140,6 +144,45 @@ defmodule TrumanShell.Executor do
   end
 
   defp parse_head_args([]) do
+    {10, "-"}  # Default: 10 lines from stdin
+  end
+
+  # tail handler - displays last n lines of a file
+  defp handle_tail(args) do
+    {n, path} = parse_tail_args(args)
+
+    case read_file(path) do
+      {:ok, contents} ->
+        lines = String.split(contents, "\n", trim: true)
+        # Take last n lines, rejoin with newlines
+        result = lines |> Enum.take(-n) |> Enum.join("\n")
+        # Add trailing newline if we had content
+        {:ok, if(result == "", do: "", else: result <> "\n")}
+
+      {:error, msg} ->
+        # Reformat error message from cat to tail
+        {:error, String.replace(msg, "cat:", "tail:")}
+    end
+  end
+
+  # Parse tail arguments: -n NUM or -NUM or just file
+  defp parse_tail_args(["-n", n_str | rest]) do
+    n = String.to_integer(n_str)
+    path = List.first(rest) || "-"
+    {n, path}
+  end
+
+  defp parse_tail_args(["-" <> n_str | rest]) when n_str != "" do
+    n = String.to_integer(n_str)
+    path = List.first(rest) || "-"
+    {n, path}
+  end
+
+  defp parse_tail_args([path]) do
+    {10, path}  # Default: 10 lines
+  end
+
+  defp parse_tail_args([]) do
     {10, "-"}  # Default: 10 lines from stdin
   end
 

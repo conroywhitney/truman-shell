@@ -289,6 +289,26 @@ defmodule TrumanShell.ExecutorTest do
     end
   end
 
+  describe "tail handler" do
+    test "returns last n lines with -n flag" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-tail-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create a file with 10 lines
+        content = Enum.map(1..10, &"Line #{&1}") |> Enum.join("\n")
+        File.write!(Path.join(tmp_dir, "lines.txt"), content <> "\n")
+
+        command = %Command{name: :cmd_tail, args: ["-n", "3", "lines.txt"], pipes: [], redirects: []}
+        {:ok, output} = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert output == "Line 8\nLine 9\nLine 10\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+  end
+
   describe "TrumanShell.execute/1 public API" do
     test "parses and executes a command string" do
       result = TrumanShell.execute("ls")
