@@ -63,6 +63,21 @@ defmodule TrumanShell.Commands.CpTest do
       assert {:error, "cp: nonexistent.txt: No such file or directory\n"} = result
     end
 
+    test "returns error when destination directory does not exist", %{
+      context: context,
+      sandbox: sandbox
+    } do
+      # Create source file
+      File.write!(Path.join(sandbox, "file.txt"), "content")
+
+      result = Cp.handle(["file.txt", "nonexistent_dir/file.txt"], context)
+
+      # Note: Error reports source file name (implementation choice, differs from bash)
+      assert {:error, "cp: file.txt: No such file or directory\n"} = result
+      # Source file should still exist
+      assert File.exists?(Path.join(sandbox, "file.txt"))
+    end
+
     test "blocks cp outside sandbox (404 principle)", %{context: context} do
       result = Cp.handle(["/etc/passwd", "stolen.txt"], context)
 

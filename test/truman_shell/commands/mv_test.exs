@@ -47,6 +47,21 @@ defmodule TrumanShell.Commands.MvTest do
       assert {:error, "mv: nonexistent.txt: No such file or directory\n"} = result
     end
 
+    test "returns error when destination directory does not exist", %{
+      context: context,
+      sandbox: sandbox
+    } do
+      # Create source file
+      File.write!(Path.join(sandbox, "file.txt"), "content")
+
+      result = Mv.handle(["file.txt", "nonexistent_dir/file.txt"], context)
+
+      # Note: Error reports source file name (implementation choice, differs from bash)
+      assert {:error, "mv: file.txt: No such file or directory\n"} = result
+      # Source file should still exist (move failed)
+      assert File.exists?(Path.join(sandbox, "file.txt"))
+    end
+
     test "blocks mv outside sandbox (404 principle)", %{context: context} do
       result = Mv.handle(["/etc/passwd", "stolen.txt"], context)
 

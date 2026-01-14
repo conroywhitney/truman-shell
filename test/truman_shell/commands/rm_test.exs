@@ -20,7 +20,11 @@ defmodule TrumanShell.Commands.RmTest do
       {:ok, context: context, sandbox: sandbox, trash_dir: trash_dir}
     end
 
-    test "soft deletes file to .trash", %{context: context, sandbox: sandbox, trash_dir: trash_dir} do
+    test "soft deletes file to .trash", %{
+      context: context,
+      sandbox: sandbox,
+      trash_dir: trash_dir
+    } do
       # Create a file to delete
       file_path = Path.join(sandbox, "deleteme.txt")
       File.write!(file_path, "original content")
@@ -64,7 +68,11 @@ defmodule TrumanShell.Commands.RmTest do
       assert File.dir?(dir_path)
     end
 
-    test "rm -r soft deletes directory", %{context: context, sandbox: sandbox, trash_dir: trash_dir} do
+    test "rm -r soft deletes directory", %{
+      context: context,
+      sandbox: sandbox,
+      trash_dir: trash_dir
+    } do
       # Create a directory with content
       dir_path = Path.join(sandbox, "mydir")
       File.mkdir!(dir_path)
@@ -80,6 +88,28 @@ defmodule TrumanShell.Commands.RmTest do
       assert length(trash_files) == 1
       [trash_dir_name] = trash_files
       assert String.ends_with?(trash_dir_name, "_mydir")
+    end
+
+    test "rm -rf combines force and recursive flags", %{
+      context: context,
+      sandbox: sandbox,
+      trash_dir: trash_dir
+    } do
+      # Create a directory with content
+      dir_path = Path.join(sandbox, "forcedir")
+      File.mkdir!(dir_path)
+      File.write!(Path.join(dir_path, "inner.txt"), "inner content")
+
+      result = Rm.handle(["-rf", "forcedir"], context)
+
+      assert {:ok, ""} = result
+      # Directory should no longer exist in original location
+      refute File.exists?(dir_path)
+      # Directory should exist in .trash
+      trash_files = File.ls!(trash_dir)
+      assert length(trash_files) == 1
+      [trash_dir_name] = trash_files
+      assert String.ends_with?(trash_dir_name, "_forcedir")
     end
 
     test "blocks rm outside sandbox (404 principle)", %{context: context} do

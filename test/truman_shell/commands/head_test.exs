@@ -37,6 +37,14 @@ defmodule TrumanShell.Commands.HeadTest do
       end)
     end
 
+    test "returns exactly one line with -1" do
+      with_lines_file(10, fn context ->
+        {:ok, output} = Head.handle(["-1", "lines.txt"], context)
+
+        assert output == "Line 1\n"
+      end)
+    end
+
     test "defaults to 10 lines when no -n specified" do
       with_lines_file(15, fn context ->
         {:ok, output} = Head.handle(["lines.txt"], context)
