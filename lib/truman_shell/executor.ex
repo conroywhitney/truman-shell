@@ -11,6 +11,7 @@ defmodule TrumanShell.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
+  alias TrumanShell.PosixErrors
   alias TrumanShell.Sanitizer
 
   @max_pipe_depth 10
@@ -142,17 +143,9 @@ defmodule TrumanShell.Executor do
   defp do_write_file(safe_path, output, write_opts, original_path) do
     case File.write(safe_path, output, write_opts) do
       :ok -> :ok
-      {:error, reason} -> {:error, "bash: #{original_path}: #{posix_to_message(reason)}\n"}
+      {:error, reason} -> {:error, "bash: #{original_path}: #{PosixErrors.to_message(reason)}\n"}
     end
   end
-
-  # Convert POSIX error atoms to bash-like error messages
-  defp posix_to_message(:eisdir), do: "Is a directory"
-  defp posix_to_message(:enoent), do: "No such file or directory"
-  defp posix_to_message(:eacces), do: "Permission denied"
-  defp posix_to_message(:enospc), do: "No space left on device"
-  defp posix_to_message(:erofs), do: "Read-only file system"
-  defp posix_to_message(reason), do: "#{reason}"
 
   # State management - sandbox root and current directory
   # These are placed at the bottom as they are called by many functions above
