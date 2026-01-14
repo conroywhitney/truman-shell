@@ -117,3 +117,18 @@
 4. Add dispatch smoke test to executor_test.exs
 5. Add doctest to doctest_test.exs
 ```
+
+### Intentional Design Decisions (vs real bash)
+
+| Feature | Bash Behavior | Truman Shell | Reason |
+|---------|---------------|--------------|--------|
+| `ls -l`, `-la` | Long format listing | Rejected | MVP - simple listing sufficient |
+| Glob patterns | Expanded by shell | Not implemented | Future enhancement |
+| `cd ~` | Expands to $HOME | Not implemented | Future enhancement |
+| `cd /etc` | Permission denied | "No such file" | 404 principle - no info leak |
+| `cd mix.exs` | "Not a directory" | "Not a directory" | OK for files inside sandbox |
+| Exit codes | Various (0, 1, 127...) | Only success/error | Simplified error model |
+
+**Key principle**: The 404 principle overrides bash compatibility for paths outside sandbox.
+- Inside sandbox: Match bash behavior
+- Outside sandbox: Always "No such file or directory"
