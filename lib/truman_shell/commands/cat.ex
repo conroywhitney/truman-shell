@@ -5,7 +5,7 @@ defmodule TrumanShell.Commands.Cat do
 
   @behaviour TrumanShell.Commands.Behaviour
 
-  alias TrumanShell.Commands.Helpers
+  alias TrumanShell.Commands.FileIO
 
   @doc """
   Concatenates and displays file contents.
@@ -27,12 +27,12 @@ defmodule TrumanShell.Commands.Cat do
   @impl true
   def handle(paths, context) do
     Enum.reduce_while(paths, {:ok, ""}, fn path, {:ok, acc} ->
-      case Helpers.read_file(path, context) do
+      case FileIO.read_file(path, context) do
         {:ok, contents} ->
           {:cont, {:ok, acc <> contents}}
 
         {:error, msg} ->
-          {:halt, {:error, Helpers.format_error("cat", msg)}}
+          {:halt, {:error, FileIO.format_error("cat", msg)}}
       end
     end)
   end

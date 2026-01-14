@@ -5,7 +5,7 @@ defmodule TrumanShell.Commands.Tail do
 
   @behaviour TrumanShell.Commands.Behaviour
 
-  alias TrumanShell.Commands.Helpers
+  alias TrumanShell.Commands.FileIO
 
   @doc """
   Returns the last n lines of a file (default: 10).
@@ -33,18 +33,18 @@ defmodule TrumanShell.Commands.Tail do
   def handle(args, context) do
     case parse_args(args) do
       {:ok, n, path} ->
-        case Helpers.read_file(path, context) do
+        case FileIO.read_file(path, context) do
           {:ok, contents} ->
             lines = String.split(contents, "\n", trim: true)
             result = lines |> Enum.take(-n) |> Enum.join("\n")
             {:ok, if(result == "", do: "", else: result <> "\n")}
 
           {:error, msg} ->
-            {:error, Helpers.format_error("tail", msg)}
+            {:error, FileIO.format_error("tail", msg)}
         end
 
       {:error, msg} ->
-        {:error, Helpers.format_error("tail", msg)}
+        {:error, FileIO.format_error("tail", msg)}
     end
   end
 

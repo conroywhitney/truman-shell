@@ -1,6 +1,6 @@
-defmodule TrumanShell.Commands.Helpers do
+defmodule TrumanShell.Commands.FileIO do
   @moduledoc """
-  Shared helper functions for command handlers.
+  Shared file I/O functions for command handlers.
   """
 
   alias TrumanShell.Sanitizer

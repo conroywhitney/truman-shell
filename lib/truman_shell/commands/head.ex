@@ -5,7 +5,7 @@ defmodule TrumanShell.Commands.Head do
 
   @behaviour TrumanShell.Commands.Behaviour
 
-  alias TrumanShell.Commands.Helpers
+  alias TrumanShell.Commands.FileIO
 
   @doc """
   Returns the first n lines of a file (default: 10).
@@ -33,18 +33,18 @@ defmodule TrumanShell.Commands.Head do
   def handle(args, context) do
     case parse_args(args) do
       {:ok, n, path} ->
-        case Helpers.read_file(path, context) do
+        case FileIO.read_file(path, context) do
           {:ok, contents} ->
             lines = String.split(contents, "\n")
             result = lines |> Enum.take(n) |> Enum.join("\n")
             {:ok, if(result == "", do: "", else: result <> "\n")}
 
           {:error, msg} ->
-            {:error, Helpers.format_error("head", msg)}
+            {:error, FileIO.format_error("head", msg)}
         end
 
       {:error, msg} ->
-        {:error, Helpers.format_error("head", msg)}
+        {:error, FileIO.format_error("head", msg)}
     end
   end
 

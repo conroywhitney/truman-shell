@@ -15,15 +15,6 @@ defmodule TrumanShell.Executor do
 
   @max_pipe_depth 10
 
-  # Sandbox root - set via run/2 opts or defaults to File.cwd!()
-  defp sandbox_root do
-    Process.get(:truman_sandbox_root, File.cwd!())
-  end
-
-  defp set_sandbox_root(path) do
-    Process.put(:truman_sandbox_root, path)
-  end
-
   @doc """
   Executes a parsed command and returns the output.
 
@@ -108,15 +99,6 @@ defmodule TrumanShell.Executor do
     }
   end
 
-  # Current working directory state
-  defp current_dir do
-    Process.get(:truman_cwd, sandbox_root())
-  end
-
-  defp set_current_dir(path) do
-    Process.put(:truman_cwd, path)
-  end
-
   # Depth validation for pipes
   defp validate_depth(%Command{pipes: pipes}) do
     depth = length(pipes) + 1
@@ -154,5 +136,24 @@ defmodule TrumanShell.Executor do
       {:error, :outside_sandbox} ->
         {:error, "bash: #{path}: No such file or directory\n"}
     end
+  end
+
+  # State management - sandbox root and current directory
+  # These are placed at the bottom as they are called by many functions above
+
+  defp set_current_dir(path) do
+    Process.put(:truman_cwd, path)
+  end
+
+  defp current_dir do
+    Process.get(:truman_cwd, sandbox_root())
+  end
+
+  defp set_sandbox_root(path) do
+    Process.put(:truman_sandbox_root, path)
+  end
+
+  defp sandbox_root do
+    Process.get(:truman_sandbox_root, File.cwd!())
   end
 end
