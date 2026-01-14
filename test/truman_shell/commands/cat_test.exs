@@ -81,5 +81,24 @@ defmodule TrumanShell.Commands.CatTest do
       assert {:error, msg} = result
       assert msg =~ "Is a directory"
     end
+
+    test "returns error for file exceeding size limit" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-size-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create a file larger than 100KB limit (102,400 bytes)
+        large_content = String.duplicate("x", 110_000)
+        File.write!(Path.join(tmp_dir, "huge.txt"), large_content)
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        result = Cat.handle(["huge.txt"], context)
+
+        assert {:error, msg} = result
+        assert msg =~ "File too large"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end
