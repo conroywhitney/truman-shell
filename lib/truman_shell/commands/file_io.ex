@@ -5,14 +5,15 @@ defmodule TrumanShell.Commands.FileIO do
 
   alias TrumanShell.Sanitizer
 
-  # Maximum file size in bytes (100KB) to prevent memory exhaustion
-  @max_file_size 100_000
+  # Maximum file size in bytes (10MB) to prevent memory exhaustion
+  # Large enough for most source files, small enough to prevent OOM attacks
+  @max_file_size 10_000_000
 
   @doc """
   Read a file with sandbox validation and size limit.
 
   Resolves the path relative to current_dir, validates it's within
-  the sandbox, and returns the file contents (max 100KB).
+  the sandbox, and returns the file contents (max 10MB).
 
   Uses `IO.binread/2` with a limit to prevent TOCTOU race conditions
   between size check and read. This is safer than `File.stat` + `File.read`.
@@ -53,7 +54,7 @@ defmodule TrumanShell.Commands.FileIO do
         {:error, "#{path}: Is a directory"}
 
       {:error, :file_too_large} ->
-        {:error, "#{path}: File too large (max #{div(@max_file_size, 1000)}KB)"}
+        {:error, "#{path}: File too large (max #{div(@max_file_size, 1_000_000)}MB)"}
 
       {:error, _} ->
         {:error, "#{path}: No such file or directory"}

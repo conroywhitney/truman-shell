@@ -131,5 +131,42 @@ defmodule TrumanShell.Commands.WcTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "wc -c counts BYTES not graphemes (Unicode correctness)" do
+      # 😄 is 4 UTF-8 bytes but 1 grapheme
+      # GNU wc -c counts bytes, so "😄\n" should be 5 bytes (4 + newline)
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-unicode-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        content = "😄\n"
+        File.write!(Path.join(tmp_dir, "emoji.txt"), content)
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Wc.handle(["-c", "emoji.txt"], context)
+
+        # Must be 5 bytes, NOT 2 graphemes
+        assert output =~ ~r/^\s*5\s+emoji\.txt/
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "wc on zero-length file returns 0 0 0" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-empty-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "empty.txt"), "")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Wc.handle(["empty.txt"], context)
+
+        # Should show 0 lines, 0 words, 0 chars
+        assert output =~ ~r/^\s*0\s+0\s+0\s+empty\.txt/
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end

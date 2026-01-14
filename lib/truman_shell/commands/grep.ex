@@ -89,21 +89,27 @@ defmodule TrumanShell.Commands.Grep do
 
   defp parse_args(["-A", n | rest], opts, pattern, paths) do
     case Integer.parse(n) do
-      {num, ""} -> parse_args(rest, %{opts | after_context: num}, pattern, paths)
-      _ -> {:error, "grep: invalid context length argument\n"}
+      {num, ""} when num >= 0 ->
+        parse_args(rest, %{opts | after_context: num}, pattern, paths)
+
+      _ ->
+        {:error, "grep: invalid context length argument\n"}
     end
   end
 
   defp parse_args(["-B", n | rest], opts, pattern, paths) do
     case Integer.parse(n) do
-      {num, ""} -> parse_args(rest, %{opts | before_context: num}, pattern, paths)
-      _ -> {:error, "grep: invalid context length argument\n"}
+      {num, ""} when num >= 0 ->
+        parse_args(rest, %{opts | before_context: num}, pattern, paths)
+
+      _ ->
+        {:error, "grep: invalid context length argument\n"}
     end
   end
 
   defp parse_args(["-C", n | rest], opts, pattern, paths) do
     case Integer.parse(n) do
-      {num, ""} ->
+      {num, ""} when num >= 0 ->
         parse_args(rest, %{opts | before_context: num, after_context: num}, pattern, paths)
 
       _ ->

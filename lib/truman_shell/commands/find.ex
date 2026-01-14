@@ -109,7 +109,12 @@ defmodule TrumanShell.Commands.Find do
   defp do_find(safe_path, original_path, opts) do
     walker_opts = build_walker_opts(opts)
     entries = TreeWalker.walk(safe_path, walker_opts)
-    filtered = apply_filters(entries, opts)
+
+    # GNU find always includes the start point - add it as first entry
+    start_entry = {safe_path, :dir}
+    all_entries = [start_entry | entries]
+
+    filtered = apply_filters(all_entries, opts)
     output = format_output(filtered, safe_path, original_path)
     {:ok, output}
   end
@@ -152,12 +157,17 @@ defmodule TrumanShell.Commands.Find do
   defp format_output(files, base_path, original_path) do
     output =
       Enum.map_join(files, "\n", fn file ->
-        relative = Path.relative_to(file, base_path)
-
-        if original_path == "." do
-          "./#{relative}"
+        # Handle the start point (when file == base_path)
+        if file == base_path do
+          original_path
         else
-          Path.join(original_path, relative)
+          relative = Path.relative_to(file, base_path)
+
+          if original_path == "." do
+            "./#{relative}"
+          else
+            Path.join(original_path, relative)
+          end
         end
       end)
 

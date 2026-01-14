@@ -117,5 +117,27 @@ defmodule TrumanShell.Commands.FindTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "find -maxdepth 0 returns only the starting directory" do
+      # GNU find with -maxdepth 0 only examines the start point itself
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-maxdepth0-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.mkdir_p!(Path.join(tmp_dir, "subdir"))
+        File.write!(Path.join(tmp_dir, "file.txt"), "")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Find.handle([".", "-maxdepth", "0"], context)
+
+        # With maxdepth 0, should only return "." (the start point)
+        # Should NOT descend into any children
+        assert output == ".\n"
+        refute output =~ "subdir"
+        refute output =~ "file.txt"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end

@@ -4,7 +4,23 @@ defmodule TrumanShell.Commands.TreeWalker do
 
   Used by `find` and `grep -r` commands to recursively traverse directories
   while handling permission errors gracefully.
+
+  ## Security
+
+  Uses `File.lstat/1` (not `File.stat/1`) to determine entry types. This is
+  critical for sandbox security: symlinks are detected and skipped rather than
+  followed, preventing directory traversal attacks via symlinks pointing outside
+  the sandbox.
+
+  ## Safety Limits
+
+  Hard maximum depth of 100 levels is enforced to prevent stack overflow on
+  maliciously deep directory structures. The `:maxdepth` option can set a lower
+  limit but cannot exceed this safety ceiling.
   """
+
+  # Hard maximum depth to prevent stack overflow
+  @max_depth_limit 100
 
   @type entry :: {String.t(), :file | :dir}
   @type option :: {:maxdepth, pos_integer()} | {:type, :file | :dir}
@@ -37,8 +53,12 @@ defmodule TrumanShell.Commands.TreeWalker do
   end
 
   defp do_walk(dir, maxdepth, type_filter, current_depth) do
-    # Check depth limit before descending
-    if maxdepth && current_depth >= maxdepth do
+    # Check depth limits before descending:
+    # - User's maxdepth option (if provided)
+    # - Hard safety limit to prevent stack overflow
+    effective_limit = if maxdepth, do: min(maxdepth, @max_depth_limit), else: @max_depth_limit
+
+    if current_depth >= effective_limit do
       []
     else
       case File.ls(dir) do
@@ -52,20 +72,31 @@ defmodule TrumanShell.Commands.TreeWalker do
     end
   end
 
+  # Uses lstat (not stat) to prevent symlink traversal attacks.
+  # File.dir?/File.regular? follow symlinks; lstat does not.
   defp process_entry(entry, dir, maxdepth, type_filter, current_depth) do
     full_path = Path.join(dir, entry)
 
-    cond do
-      File.dir?(full_path) ->
-        # Always recurse into directories, but only include in results if not filtered
+    case File.lstat(full_path) do
+      {:ok, %File.Stat{type: :directory}} ->
+        # Real directory - safe to recurse
         children = do_walk(full_path, maxdepth, type_filter, current_depth + 1)
         if include_type?(:dir, type_filter), do: [{full_path, :dir} | children], else: children
 
-      File.regular?(full_path) ->
+      {:ok, %File.Stat{type: :regular}} ->
+        # Real file
         if include_type?(:file, type_filter), do: [{full_path, :file}], else: []
 
-      true ->
-        # Symlinks, devices, etc. - skip
+      {:ok, %File.Stat{type: :symlink}} ->
+        # SECURITY: Skip symlinks entirely to prevent sandbox escape
+        []
+
+      {:ok, _other} ->
+        # Devices, sockets, etc. - skip
+        []
+
+      {:error, _reason} ->
+        # Permission denied, vanished file, etc. - skip gracefully
         []
     end
   end

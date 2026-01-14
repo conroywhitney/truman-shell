@@ -104,8 +104,9 @@ defmodule TrumanShell.Commands.Wc do
       {:ok, contents} ->
         lines = count_lines(contents)
         words = count_words(contents)
-        chars = String.length(contents)
-        {:ok, {lines, words, chars}}
+        # wc -c counts BYTES, not graphemes (matches GNU wc behavior)
+        bytes = byte_size(contents)
+        {:ok, {lines, words, bytes}}
 
       {:error, msg} ->
         {:error, msg}

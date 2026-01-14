@@ -232,5 +232,53 @@ defmodule TrumanShell.Commands.GrepTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "grep -A rejects negative context values" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-neg-A-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "content\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:error, msg} = Grep.handle(["-A", "-5", "pattern", "test.txt"], context)
+
+        assert msg == "grep: invalid context length argument\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "grep -B rejects negative context values" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-neg-B-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "content\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:error, msg} = Grep.handle(["-B", "-3", "pattern", "test.txt"], context)
+
+        assert msg == "grep: invalid context length argument\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "grep -C rejects negative context values" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-neg-C-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "content\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:error, msg} = Grep.handle(["-C", "-2", "pattern", "test.txt"], context)
+
+        assert msg == "grep: invalid context length argument\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end
