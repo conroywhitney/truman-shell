@@ -57,6 +57,17 @@ defmodule TrumanShell.SanitizerTest do
       assert {:ok, "/tmp/truman-test/subdir/file.txt"} = result
     end
 
+    test "rejects path with sandbox prefix but different directory" do
+      # Security: /tmp/truman-test2 should NOT pass for sandbox /tmp/truman-test
+      # This catches the string prefix bug where "truman-test2" starts with "truman-test"
+      sandbox = "/tmp/truman-test"
+      path = "/tmp/truman-test2/secret"
+
+      result = Sanitizer.validate_path(path, sandbox)
+
+      assert {:error, :outside_sandbox} = result
+    end
+
     test "allows current directory (.)" do
       sandbox = "/tmp/truman-test"
       path = "."

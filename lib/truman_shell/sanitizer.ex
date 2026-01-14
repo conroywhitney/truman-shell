@@ -23,7 +23,10 @@ defmodule TrumanShell.Sanitizer do
     # Reject absolute paths outside sandbox (AIITL transparency principle)
     # Instead of silently confining /etc -> sandbox/etc, we reject entirely.
     # This is more honest - the AI learns sandbox boundaries explicitly.
-    if String.starts_with?(path, "/") and not String.starts_with?(path, sandbox_expanded) do
+    #
+    # SECURITY: Must check directory boundary, not just string prefix!
+    # "/tmp/sandbox2" must NOT pass for sandbox "/tmp/sandbox"
+    if String.starts_with?(path, "/") and not path_within_sandbox?(path, sandbox_expanded) do
       {:error, :outside_sandbox}
     else
       # For relative paths (or absolute within sandbox), validate normally
@@ -37,5 +40,12 @@ defmodule TrumanShell.Sanitizer do
           {:error, :outside_sandbox}
       end
     end
+  end
+
+  # Check if path is within sandbox using proper directory boundary check.
+  # "/tmp/sandbox/file" is within "/tmp/sandbox"
+  # "/tmp/sandbox2/file" is NOT within "/tmp/sandbox" (different directory!)
+  defp path_within_sandbox?(path, sandbox) do
+    path == sandbox or String.starts_with?(path, sandbox <> "/")
   end
 end
