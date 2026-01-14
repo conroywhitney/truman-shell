@@ -3,7 +3,6 @@ defmodule TrumanShell.Commands.FileIO do
   Shared file I/O functions for command handlers.
   """
 
-  alias TrumanShell.Posix.Args
   alias TrumanShell.Sanitizer
 
   # Maximum file size in bytes (100KB) to prevent memory exhaustion
@@ -93,32 +92,27 @@ defmodule TrumanShell.Commands.FileIO do
   """
   @spec parse_line_count_args(list(String.t())) ::
           {:ok, pos_integer(), String.t()} | {:error, String.t()}
-  def parse_line_count_args(args) do
-    # Try -n NUM format first using shared utility
-    case Args.parse_int_flag(args, "-n") do
-      {:ok, n, rest} when n > 0 ->
-        {:ok, n, List.first(rest) || "-"}
-
-      {:ok, _n, _rest} ->
-        {:error, "invalid number of lines: must be positive"}
-
-      {:error, _msg} ->
-        {:error, "invalid number of lines"}
-
-      {:not_found, args} ->
-        # Fall back to -NUM shorthand or just path
-        parse_shorthand_or_path(args)
+  def parse_line_count_args(["-n", n_str | rest]) do
+    case parse_positive_int(n_str) do
+      {:ok, n} -> {:ok, n, List.first(rest) || "-"}
+      :error -> {:error, "invalid number of lines: '#{n_str}'"}
     end
   end
 
-  # Handle -NUM shorthand (e.g., -5) or just a path
-  defp parse_shorthand_or_path(["-" <> n_str | rest]) when n_str != "" do
-    case Integer.parse(n_str) do
-      {n, ""} when n > 0 -> {:ok, n, List.first(rest) || "-"}
-      _ -> {:error, "invalid number of lines: '-#{n_str}'"}
+  def parse_line_count_args(["-" <> n_str | rest]) when n_str != "" do
+    case parse_positive_int(n_str) do
+      {:ok, n} -> {:ok, n, List.first(rest) || "-"}
+      :error -> {:error, "invalid number of lines: '-#{n_str}'"}
     end
   end
 
-  defp parse_shorthand_or_path([path]), do: {:ok, 10, path}
-  defp parse_shorthand_or_path([]), do: {:ok, 10, "-"}
+  def parse_line_count_args([path]), do: {:ok, 10, path}
+  def parse_line_count_args([]), do: {:ok, 10, "-"}
+
+  defp parse_positive_int(str) do
+    case Integer.parse(str) do
+      {n, ""} when n > 0 -> {:ok, n}
+      _ -> :error
+    end
+  end
 end
