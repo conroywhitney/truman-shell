@@ -163,6 +163,18 @@ defmodule TrumanShell.ExecutorTest do
     end
   end
 
+  describe "pwd handler" do
+    test "returns current working directory" do
+      command = %Command{name: :cmd_pwd, args: [], pipes: [], redirects: []}
+
+      {:ok, output} = Executor.run(command)
+
+      # pwd should return the current directory with a trailing newline
+      expected = File.cwd!() <> "\n"
+      assert output == expected
+    end
+  end
+
   describe "TrumanShell.execute/1 public API" do
     test "parses and executes a command string" do
       result = TrumanShell.execute("ls")

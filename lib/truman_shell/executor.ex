@@ -61,8 +61,18 @@ defmodule TrumanShell.Executor do
     end
   end
 
+  defp execute(%Command{name: :cmd_pwd}) do
+    {:ok, current_dir() <> "\n"}
+  end
+
   defp execute(%Command{name: {:unknown, name}}) do
     {:error, "bash: #{name}: command not found\n"}
+  end
+
+  # Current working directory - defaults to sandbox root
+  # Will be modified by cd command
+  defp current_dir do
+    Process.get(:truman_cwd, sandbox_root())
   end
 
   # Argument validation helpers
