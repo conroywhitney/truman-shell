@@ -63,7 +63,8 @@ defmodule TrumanShell.Executor do
     end
   end
 
-  # Command dispatch - maps command atoms to handler modules (alphabetized)
+  # styler:sort
+  # Command dispatch - maps command atoms to handler modules
   @command_modules %{
     cmd_cat: Commands.Cat,
     cmd_cd: Commands.Cd,

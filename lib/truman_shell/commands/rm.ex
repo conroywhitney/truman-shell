@@ -98,7 +98,7 @@ defmodule TrumanShell.Commands.Rm do
     File.mkdir_p(trash_dir)
 
     # Generate timestamp-prefixed name
-    timestamp = DateTime.utc_now() |> DateTime.to_unix()
+    timestamp = DateTime.to_unix(DateTime.utc_now())
     basename = Path.basename(file_name)
     trash_name = "#{timestamp}_#{basename}"
     trash_path = Path.join(trash_dir, trash_name)

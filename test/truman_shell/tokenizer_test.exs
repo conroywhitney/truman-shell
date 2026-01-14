@@ -43,8 +43,7 @@ defmodule TrumanShell.TokenizerTest do
     end
 
     test "stdout append" do
-      assert {:ok,
-              [{:word, "echo"}, {:word, "more"}, {:redirect, :stdout_append}, {:word, "out.txt"}]} =
+      assert {:ok, [{:word, "echo"}, {:word, "more"}, {:redirect, :stdout_append}, {:word, "out.txt"}]} =
                Tokenizer.tokenize("echo more >> out.txt")
     end
 

@@ -21,8 +21,9 @@ defmodule TrumanShell.MixProject do
 
   defp deps do
     [
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:styler, "~> 1.10", only: [:dev, :test], runtime: false}
     ]
   end
 

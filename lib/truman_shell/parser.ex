@@ -30,7 +30,8 @@ defmodule TrumanShell.Parser do
 
   """
 
-  alias TrumanShell.{Command, Tokenizer}
+  alias TrumanShell.Command
+  alias TrumanShell.Tokenizer
 
   @doc """
   Parse a shell command string into a Command struct.
