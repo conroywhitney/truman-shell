@@ -84,5 +84,55 @@ defmodule TrumanShell.Commands.TreeWalkerTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "filters by type: :file to return only files" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-walker-type-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.mkdir_p!(Path.join([tmp_dir, "subdir", "nested"]))
+        File.write!(Path.join(tmp_dir, "file1.txt"), "")
+        File.write!(Path.join([tmp_dir, "subdir", "file2.txt"]), "")
+
+        entries = TreeWalker.walk(tmp_dir, type: :file)
+        paths = Enum.map(entries, fn {path, _} -> Path.basename(path) end)
+        types = Enum.map(entries, fn {_, type} -> type end) |> Enum.uniq()
+
+        # Should only have files
+        assert "file1.txt" in paths
+        assert "file2.txt" in paths
+        refute "subdir" in paths
+        refute "nested" in paths
+
+        # All entries should be :file type
+        assert types == [:file]
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "filters by type: :dir to return only directories" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-walker-type-dir-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.mkdir_p!(Path.join([tmp_dir, "subdir", "nested"]))
+        File.write!(Path.join(tmp_dir, "file1.txt"), "")
+
+        entries = TreeWalker.walk(tmp_dir, type: :dir)
+        paths = Enum.map(entries, fn {path, _} -> Path.basename(path) end)
+        types = Enum.map(entries, fn {_, type} -> type end) |> Enum.uniq()
+
+        # Should only have directories
+        assert "subdir" in paths
+        assert "nested" in paths
+        refute "file1.txt" in paths
+
+        # All entries should be :dir type
+        assert types == [:dir]
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end

@@ -148,8 +148,7 @@ defmodule TrumanShell.Commands.Grep do
   # Collect all regular files recursively using TreeWalker
   defp collect_files(dir) do
     dir
-    |> TreeWalker.walk()
-    |> Enum.filter(fn {_path, type} -> type == :file end)
+    |> TreeWalker.walk(type: :file)
     |> Enum.map(fn {path, _type} -> path end)
     |> Enum.sort()
   end

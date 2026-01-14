@@ -7,7 +7,7 @@ defmodule TrumanShell.Commands.TreeWalker do
   """
 
   @type entry :: {String.t(), :file | :dir}
-  @type option :: {:maxdepth, pos_integer()}
+  @type option :: {:maxdepth, pos_integer()} | {:type, :file | :dir}
 
   @doc """
   Walks a directory tree, returning a list of `{path, type}` tuples.
@@ -18,6 +18,7 @@ defmodule TrumanShell.Commands.TreeWalker do
   ## Options
 
   - `:maxdepth` - Maximum depth to traverse (1 = immediate children only)
+  - `:type` - Filter results by type (`:file` or `:dir`)
 
   Handles permission errors gracefully by skipping inaccessible directories.
 
@@ -31,17 +32,18 @@ defmodule TrumanShell.Commands.TreeWalker do
   @spec walk(String.t(), [option()]) :: [entry()]
   def walk(dir, opts \\ []) do
     maxdepth = Keyword.get(opts, :maxdepth)
-    do_walk(dir, maxdepth, 0)
+    type_filter = Keyword.get(opts, :type)
+    do_walk(dir, maxdepth, type_filter, 0)
   end
 
-  defp do_walk(dir, maxdepth, current_depth) do
+  defp do_walk(dir, maxdepth, type_filter, current_depth) do
     # Check depth limit before descending
     if maxdepth && current_depth >= maxdepth do
       []
     else
       case File.ls(dir) do
         {:ok, entries} ->
-          Enum.flat_map(entries, &process_entry(&1, dir, maxdepth, current_depth))
+          Enum.flat_map(entries, &process_entry(&1, dir, maxdepth, type_filter, current_depth))
 
         {:error, _reason} ->
           # Permission denied or other errors - skip gracefully
@@ -50,19 +52,25 @@ defmodule TrumanShell.Commands.TreeWalker do
     end
   end
 
-  defp process_entry(entry, dir, maxdepth, current_depth) do
+  defp process_entry(entry, dir, maxdepth, type_filter, current_depth) do
     full_path = Path.join(dir, entry)
 
     cond do
       File.dir?(full_path) ->
-        [{full_path, :dir} | do_walk(full_path, maxdepth, current_depth + 1)]
+        # Always recurse into directories, but only include in results if not filtered
+        children = do_walk(full_path, maxdepth, type_filter, current_depth + 1)
+        if include_type?(:dir, type_filter), do: [{full_path, :dir} | children], else: children
 
       File.regular?(full_path) ->
-        [{full_path, :file}]
+        if include_type?(:file, type_filter), do: [{full_path, :file}], else: []
 
       true ->
         # Symlinks, devices, etc. - skip
         []
     end
   end
+
+  defp include_type?(_type, nil), do: true
+  defp include_type?(type, type), do: true
+  defp include_type?(_type, _filter), do: false
 end
