@@ -136,5 +136,101 @@ defmodule TrumanShell.Commands.GrepTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "grep -n shows line numbers" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-n-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "foo\nbar\nfoo again\nbaz\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Grep.handle(["-n", "foo", "test.txt"], context)
+
+        assert output == "1:foo\n3:foo again\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "grep -i matches case insensitively" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-i-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "Hello\nhello\nHELLO\nworld\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Grep.handle(["-i", "hello", "test.txt"], context)
+
+        assert output == "Hello\nhello\nHELLO\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "grep -v inverts match" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-v-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "keep\nremove\nkeep too\nremove also\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Grep.handle(["-v", "remove", "test.txt"], context)
+
+        assert output == "keep\nkeep too\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "grep -A shows lines after match" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-A-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "before\nmatch\nafter1\nafter2\nafter3\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Grep.handle(["-A", "2", "match", "test.txt"], context)
+
+        assert output == "match\nafter1\nafter2\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "grep -B shows lines before match" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-B-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "before2\nbefore1\nmatch\nafter\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Grep.handle(["-B", "2", "match", "test.txt"], context)
+
+        assert output == "before2\nbefore1\nmatch\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "grep -C shows context both sides" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-C-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "test.txt"), "line1\nbefore\nmatch\nafter\nline5\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+
+        {:ok, output} = Grep.handle(["-C", "1", "match", "test.txt"], context)
+
+        assert output == "before\nmatch\nafter\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end

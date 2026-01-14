@@ -8,11 +8,26 @@ defmodule TrumanShell.Commands.Grep do
   alias TrumanShell.Commands.FileIO
   alias TrumanShell.Sanitizer
 
+  @default_opts %{
+    recursive: false,
+    line_numbers: false,
+    case_insensitive: false,
+    invert: false,
+    after_context: 0,
+    before_context: 0
+  }
+
   @doc """
   Searches for lines matching a pattern in files.
 
-  Returns lines containing the pattern, one per line.
-  With `-r`, searches directories recursively and prefixes matches with filename.
+  Supported flags:
+  - `-r` - Recursive search in directories
+  - `-n` - Show line numbers
+  - `-i` - Case insensitive matching
+  - `-v` - Invert match (show non-matching lines)
+  - `-A N` - Show N lines after each match
+  - `-B N` - Show N lines before each match
+  - `-C N` - Show N lines of context (before and after)
 
   ## Examples
 
@@ -27,31 +42,101 @@ defmodule TrumanShell.Commands.Grep do
 
   """
   @impl true
-  def handle(["-r", pattern, path], context) do
-    search_recursive(pattern, path, context)
-  end
+  def handle(args, context) do
+    case parse_args(args) do
+      {:ok, opts, pattern, paths} when paths != [] ->
+        do_search(opts, pattern, paths, context)
 
-  def handle([pattern | paths], context) when paths != [] do
-    case search_files(pattern, paths, context, _show_filename = length(paths) > 1) do
-      {:ok, matches} -> {:ok, matches}
-      {:error, msg} -> {:error, msg}
+      {:ok, _opts, _pattern, []} ->
+        {:error, "grep: missing pattern or file operand\n"}
+
+      {:error, msg} ->
+        {:error, msg}
     end
   end
 
-  def handle(_, _context) do
-    {:error, "grep: missing pattern or file operand\n"}
+  # Parse arguments into options, pattern, and paths
+  defp parse_args(args) do
+    parse_args(args, @default_opts, nil, [])
+  end
+
+  defp parse_args([], opts, pattern, paths) do
+    if pattern do
+      {:ok, opts, pattern, Enum.reverse(paths)}
+    else
+      {:error, "grep: missing pattern or file operand\n"}
+    end
+  end
+
+  defp parse_args(["-r" | rest], opts, pattern, paths) do
+    parse_args(rest, %{opts | recursive: true}, pattern, paths)
+  end
+
+  defp parse_args(["-n" | rest], opts, pattern, paths) do
+    parse_args(rest, %{opts | line_numbers: true}, pattern, paths)
+  end
+
+  defp parse_args(["-i" | rest], opts, pattern, paths) do
+    parse_args(rest, %{opts | case_insensitive: true}, pattern, paths)
+  end
+
+  defp parse_args(["-v" | rest], opts, pattern, paths) do
+    parse_args(rest, %{opts | invert: true}, pattern, paths)
+  end
+
+  defp parse_args(["-A", n | rest], opts, pattern, paths) do
+    case Integer.parse(n) do
+      {num, ""} -> parse_args(rest, %{opts | after_context: num}, pattern, paths)
+      _ -> {:error, "grep: invalid context length argument\n"}
+    end
+  end
+
+  defp parse_args(["-B", n | rest], opts, pattern, paths) do
+    case Integer.parse(n) do
+      {num, ""} -> parse_args(rest, %{opts | before_context: num}, pattern, paths)
+      _ -> {:error, "grep: invalid context length argument\n"}
+    end
+  end
+
+  defp parse_args(["-C", n | rest], opts, pattern, paths) do
+    case Integer.parse(n) do
+      {num, ""} ->
+        parse_args(rest, %{opts | before_context: num, after_context: num}, pattern, paths)
+
+      _ ->
+        {:error, "grep: invalid context length argument\n"}
+    end
+  end
+
+  defp parse_args([arg | rest], opts, nil, paths) do
+    # First non-flag argument is the pattern
+    parse_args(rest, opts, arg, paths)
+  end
+
+  defp parse_args([arg | rest], opts, pattern, paths) do
+    # Subsequent non-flag arguments are paths
+    parse_args(rest, opts, pattern, [arg | paths])
+  end
+
+  # Main search dispatcher
+  defp do_search(%{recursive: true} = opts, pattern, [path], context) do
+    search_recursive(opts, pattern, path, context)
+  end
+
+  defp do_search(opts, pattern, paths, context) do
+    show_filename = length(paths) > 1
+    search_files(opts, pattern, paths, context, show_filename)
   end
 
   # Recursive search in directory
-  defp search_recursive(pattern, path, context) do
+  defp search_recursive(opts, pattern, path, context) do
     case Sanitizer.validate_path(path, context.sandbox_root) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
           files = find_all_files(safe_path)
-          search_files_with_prefix(pattern, files, safe_path, path, context)
+          search_files_with_prefix(opts, pattern, files, safe_path, path, context)
         else
-          # Single file with -r just searches that file
-          search_files(pattern, [path], context, _show_filename = true)
+          search_files(opts, pattern, [path], context, _show_filename = true)
         end
 
       {:error, :outside_sandbox} ->
@@ -75,8 +160,8 @@ defmodule TrumanShell.Commands.Grep do
     |> Enum.sort()
   end
 
-  # Search files and prefix with relative path
-  defp search_files_with_prefix(pattern, files, base_path, original_path, context) do
+  # Search files and prefix with relative path (for -r)
+  defp search_files_with_prefix(opts, pattern, files, base_path, original_path, context) do
     results =
       Enum.map(files, fn file ->
         relative = Path.relative_to(file, base_path)
@@ -90,16 +175,9 @@ defmodule TrumanShell.Commands.Grep do
 
         case FileIO.read_file(file, context) do
           {:ok, contents} ->
-            matches =
-              contents
-              |> String.split("\n")
-              |> Enum.filter(&String.contains?(&1, pattern))
-              |> Enum.map_join(&"#{display_path}:#{&1}\n")
-
-            {:ok, matches}
+            {:ok, search_content(opts, pattern, contents, display_path, true)}
 
           {:error, _msg} ->
-            # Skip files that can't be read (e.g., binary files, permission issues)
             {:ok, ""}
         end
       end)
@@ -108,11 +186,12 @@ defmodule TrumanShell.Commands.Grep do
     {:ok, combined}
   end
 
-  defp search_files(pattern, paths, context, show_filename) do
+  defp search_files(opts, pattern, paths, context, show_filename) do
     Enum.reduce_while(paths, {:ok, ""}, fn path, {:ok, acc} ->
-      case search_file(pattern, path, context, show_filename) do
-        {:ok, matches} ->
-          {:cont, {:ok, acc <> matches}}
+      case FileIO.read_file(path, context) do
+        {:ok, contents} ->
+          result = search_content(opts, pattern, contents, path, show_filename)
+          {:cont, {:ok, acc <> result}}
 
         {:error, msg} ->
           {:halt, {:error, FileIO.format_error("grep", msg)}}
@@ -120,22 +199,66 @@ defmodule TrumanShell.Commands.Grep do
     end)
   end
 
-  defp search_file(pattern, path, context, show_filename) do
-    case FileIO.read_file(path, context) do
-      {:ok, contents} ->
-        matches =
-          contents
-          |> String.split("\n")
-          |> Enum.filter(&String.contains?(&1, pattern))
-          |> Enum.map_join(&format_match(&1, path, show_filename))
+  # Core search logic with all options
+  defp search_content(opts, pattern, contents, path, show_filename) do
+    lines = String.split(contents, "\n", trim: false)
+    # Remove trailing empty line from split
+    lines = if List.last(lines) == "", do: Enum.drop(lines, -1), else: lines
+    indexed_lines = Enum.with_index(lines, 1)
 
-        {:ok, matches}
+    # Find matching line indices
+    matching_indices =
+      indexed_lines
+      |> Enum.filter(fn {line, _idx} -> matches?(line, pattern, opts) end)
+      |> MapSet.new(fn {_line, idx} -> idx end)
 
-      {:error, msg} ->
-        {:error, msg}
-    end
+    # Expand with context
+    lines_to_show = expand_context(matching_indices, opts, length(lines))
+
+    # Build output
+    indexed_lines
+    |> Enum.filter(fn {_line, idx} -> MapSet.member?(lines_to_show, idx) end)
+    |> Enum.map_join(fn {line, idx} ->
+      format_line(line, idx, path, show_filename, opts)
+    end)
   end
 
-  defp format_match(line, path, true), do: "#{path}:#{line}\n"
-  defp format_match(line, _path, false), do: line <> "\n"
+  defp matches?(line, pattern, %{case_insensitive: true, invert: invert}) do
+    result = String.downcase(line) =~ String.downcase(pattern)
+    if invert, do: !result, else: result
+  end
+
+  defp matches?(line, pattern, %{invert: invert}) do
+    result = String.contains?(line, pattern)
+    if invert, do: !result, else: result
+  end
+
+  defp expand_context(matching_indices, opts, max_line) do
+    %{before_context: before, after_context: after_ctx} = opts
+
+    Enum.reduce(matching_indices, matching_indices, fn idx, acc ->
+      before_range = max(1, idx - before)..idx
+      after_range = idx..min(max_line, idx + after_ctx)
+
+      acc
+      |> add_range(before_range)
+      |> add_range(after_range)
+    end)
+  end
+
+  defp add_range(set, range) do
+    Enum.reduce(range, set, &MapSet.put(&2, &1))
+  end
+
+  defp format_line(line, idx, path, show_filename, opts) do
+    prefix =
+      cond do
+        show_filename && opts.line_numbers -> "#{path}:#{idx}:"
+        show_filename -> "#{path}:"
+        opts.line_numbers -> "#{idx}:"
+        true -> ""
+      end
+
+    "#{prefix}#{line}\n"
+  end
 end
