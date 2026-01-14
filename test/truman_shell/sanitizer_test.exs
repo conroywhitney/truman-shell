@@ -5,7 +5,7 @@ defmodule TrumanShell.SanitizerTest do
 
   describe "validate_path/2" do
     @tag :tmp_dir
-    test "rejects symlink that escapes sandbox", %{tmp_dir: sandbox} do
+    test "rejects symlink with absolute target outside sandbox", %{tmp_dir: sandbox} do
       # Create a symlink inside sandbox that points to /tmp (outside sandbox)
       symlink_path = Path.join(sandbox, "escape_link")
       File.ln_s("/tmp", symlink_path)
@@ -13,8 +13,51 @@ defmodule TrumanShell.SanitizerTest do
       # The symlink exists inside sandbox, but points outside
       result = Sanitizer.validate_path("escape_link", sandbox)
 
-      # Should be rejected because following it escapes the sandbox
+      # Should be rejected because absolute target escapes sandbox
       assert {:error, :outside_sandbox} = result
+    end
+
+    @tag :tmp_dir
+    test "rejects symlink with absolute target even inside sandbox", %{tmp_dir: sandbox} do
+      # Even if absolute path points inside sandbox, it's rejected
+      # because Path.safe_relative can't verify absolute targets safely
+      inside_dir = Path.join(sandbox, "inside")
+      File.mkdir_p!(inside_dir)
+
+      symlink_path = Path.join(sandbox, "abs_link")
+      File.ln_s(inside_dir, symlink_path)
+
+      result = Sanitizer.validate_path("abs_link", sandbox)
+
+      # Rejected: absolute symlink targets are unverifiable
+      assert {:error, :outside_sandbox} = result
+    end
+
+    @tag :tmp_dir
+    test "rejects symlink with relative escaping target", %{tmp_dir: sandbox} do
+      # Symlink with relative path that escapes via ..
+      symlink_path = Path.join(sandbox, "escape_link")
+      File.ln_s("../../etc/passwd", symlink_path)
+
+      result = Sanitizer.validate_path("escape_link", sandbox)
+
+      # Rejected: relative target escapes via ..
+      assert {:error, :outside_sandbox} = result
+    end
+
+    @tag :tmp_dir
+    test "allows symlink with safe relative target", %{tmp_dir: sandbox} do
+      # Create target directory and symlink with relative path
+      inside_dir = Path.join(sandbox, "inside")
+      File.mkdir_p!(inside_dir)
+
+      symlink_path = Path.join(sandbox, "safe_link")
+      File.ln_s("inside", symlink_path)
+
+      result = Sanitizer.validate_path("safe_link", sandbox)
+
+      # Allowed: relative target stays within sandbox
+      assert {:ok, _} = result
     end
 
     test "allows path within sandbox" do

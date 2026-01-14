@@ -14,7 +14,8 @@ defmodule TrumanShell.Sanitizer do
 
   Uses Elixir's `Path.safe_relative/2` which protects against:
   - Directory traversal attacks (../)
-  - Symlinks that point outside the sandbox
+  - Absolute-target symlinks (rejected as unverifiable)
+  - Relative-target symlinks that would escape via `..`
   """
   @spec validate_path(String.t(), String.t()) :: {:ok, String.t()} | {:error, :outside_sandbox}
   def validate_path(path, sandbox_root) do
