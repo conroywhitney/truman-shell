@@ -32,4 +32,21 @@ defmodule TrumanShell.Posix.ArgsTest do
       assert {:error, "option requires an argument: '-n'"} = Args.parse_int_flag(args, "-n")
     end
   end
+
+  describe "parse_string_flag/2" do
+    test "parses -name pattern style flag and returns remaining args" do
+      args = ["-name", "*.ex", "."]
+      assert {:ok, "*.ex", ["."]} = Args.parse_string_flag(args, "-name")
+    end
+
+    test "returns :not_found when flag is not present" do
+      args = ["."]
+      assert {:not_found, ["."]} = Args.parse_string_flag(args, "-name")
+    end
+
+    test "returns error when flag is present but value is missing" do
+      args = ["-name"]
+      assert {:error, "option requires an argument: '-name'"} = Args.parse_string_flag(args, "-name")
+    end
+  end
 end
