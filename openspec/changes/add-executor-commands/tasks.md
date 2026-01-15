@@ -87,12 +87,20 @@
 - `wc` supports `-l`, `-w`, `-c` flags
 - All commands enforce sandbox boundaries (404 principle)
 
-### Phase 7: Piping
-- [ ] 7.1 Write failing test: `cat file.txt | head -5` returns first 5 lines
-- [ ] 7.2 Implement pipe executor (chain command outputs)
-- [ ] 7.3 Write failing test: `ls | grep pattern` filters output
-- [ ] 7.4 Write failing test: 3-stage pipe `cat | grep | head`
-- [ ] 7.5 Implement pipe depth validation (max 10)
+### Phase 7: Piping ✅
+- [x] 7.1 Write failing test: `cat file.txt | head -5` returns first 5 lines
+- [x] 7.2 Implement pipe executor (chain command outputs)
+- [x] 7.3 Write failing test: `ls | grep pattern` filters output
+- [x] 7.4 Write failing test: 3-stage pipe `cat | grep | head`
+- [x] 7.5 Implement pipe depth validation (max 10)
+
+**Phase 7 Notes:**
+- Pipe executor chains command outputs via `run_pipeline/2`
+- Commands receive stdin via `context[:stdin]`
+- 4 commands support stdin: `head`, `tail`, `grep`, `wc`
+- Max 10 pipe stages enforced (11+ returns error)
+- Empty middle output → empty result (not error)
+- Test count: 249 → 258 tests (+9), 70 doctests
 
 ### Phase 8: Utility Commands
 - [ ] 8.1 Write failing test: `which ls` returns command info

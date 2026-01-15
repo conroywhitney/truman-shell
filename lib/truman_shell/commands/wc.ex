@@ -43,9 +43,25 @@ defmodule TrumanShell.Commands.Wc do
       {:ok, opts, paths} when paths != [] ->
         count_files(opts, paths, context)
 
-      {:ok, _opts, []} ->
-        {:error, "wc: missing file operand\n"}
+      {:ok, opts, []} ->
+        # No paths - check for stdin (piped input)
+        case context do
+          %{stdin: stdin} when is_binary(stdin) ->
+            counts = count_from_string(stdin)
+            output = format_line(counts, "", opts) <> "\n"
+            {:ok, output}
+
+          _ ->
+            {:error, "wc: missing file operand\n"}
+        end
     end
+  end
+
+  defp count_from_string(contents) do
+    lines = count_lines(contents)
+    words = count_words(contents)
+    bytes = byte_size(contents)
+    {lines, words, bytes}
   end
 
   defp parse_args(args) do

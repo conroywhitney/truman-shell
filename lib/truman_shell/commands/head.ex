@@ -35,7 +35,7 @@ defmodule TrumanShell.Commands.Head do
   def handle(args, context) do
     case FileIO.parse_line_count_args(args) do
       {:ok, n, path} ->
-        case FileIO.read_file(path, context) do
+        case get_contents(path, context) do
           {:ok, contents} ->
             lines = String.split(contents, "\n")
             result = lines |> Enum.take(n) |> Enum.join("\n")
@@ -49,4 +49,8 @@ defmodule TrumanShell.Commands.Head do
         {:error, FileIO.format_error("head", msg)}
     end
   end
+
+  # Use stdin if available (piped input), otherwise read from file
+  defp get_contents(_path, %{stdin: stdin}) when is_binary(stdin), do: {:ok, stdin}
+  defp get_contents(path, context), do: FileIO.read_file(path, context)
 end

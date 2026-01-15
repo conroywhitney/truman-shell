@@ -50,8 +50,16 @@ defmodule TrumanShell.Commands.Grep do
       {:ok, opts, pattern, paths} when paths != [] ->
         do_search(opts, pattern, paths, context)
 
-      {:ok, _opts, _pattern, []} ->
-        {:error, "grep: missing pattern or file operand\n"}
+      {:ok, opts, pattern, []} ->
+        # No paths - check for stdin (piped input)
+        case context do
+          %{stdin: stdin} when is_binary(stdin) ->
+            result = search_content(opts, pattern, stdin, "(standard input)", false)
+            {:ok, result}
+
+          _ ->
+            {:error, "grep: missing pattern or file operand\n"}
+        end
 
       {:error, msg} ->
         {:error, msg}

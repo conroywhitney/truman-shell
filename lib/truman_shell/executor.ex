@@ -44,14 +44,25 @@ defmodule TrumanShell.Executor do
   @spec run(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
   def run(command, opts \\ [])
 
-  def run(%Command{redirects: redirects} = command, opts) do
+  def run(%Command{redirects: redirects, pipes: pipes} = command, opts) do
     if root = Keyword.get(opts, :sandbox_root) do
       set_sandbox_root(Path.expand(root))
     end
 
     with :ok <- validate_depth(command),
-         {:ok, output} <- execute(command) do
-      apply_redirects(output, redirects)
+         {:ok, output} <- execute(command),
+         {:ok, piped_output} <- run_pipeline(output, pipes) do
+      apply_redirects(piped_output, redirects)
+    end
+  end
+
+  # Execute each pipe stage, passing previous output as stdin
+  defp run_pipeline(output, []), do: {:ok, output}
+
+  defp run_pipeline(output, [%Command{} = next_cmd | rest]) do
+    case execute(next_cmd, stdin: output) do
+      {:ok, next_output} -> run_pipeline(next_output, rest)
+      {:error, _} = error -> error
     end
   end
 
@@ -75,9 +86,11 @@ defmodule TrumanShell.Executor do
     cmd_wc: Commands.Wc
   }
 
-  defp execute(%Command{name: name, args: args}) when is_map_key(@command_modules, name) do
+  defp execute(command, opts \\ [])
+
+  defp execute(%Command{name: name, args: args}, opts) when is_map_key(@command_modules, name) do
     module = @command_modules[name]
-    context = build_context()
+    context = build_context(opts)
 
     case module.handle(args, context) do
       # Handle side effects from commands like cd
@@ -91,16 +104,22 @@ defmodule TrumanShell.Executor do
     end
   end
 
-  defp execute(%Command{name: {:unknown, name}}) do
+  defp execute(%Command{name: {:unknown, name}}, _opts) do
     {:error, "bash: #{name}: command not found\n"}
   end
 
   # Context for command handlers
-  defp build_context do
-    %{
+  defp build_context(opts) do
+    base = %{
       sandbox_root: sandbox_root(),
       current_dir: current_dir()
     }
+
+    # Add stdin to context if provided (for piped commands)
+    case Keyword.get(opts, :stdin) do
+      nil -> base
+      stdin -> Map.put(base, :stdin, stdin)
+    end
   end
 
   # Depth validation for pipes

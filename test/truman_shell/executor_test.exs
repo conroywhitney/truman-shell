@@ -152,6 +152,46 @@ defmodule TrumanShell.ExecutorTest do
       assert {:ok, _output} = result
     end
 
+    test "accepts exactly 10 stages (boundary)" do
+      # 9 pipes = depth 10, exactly at limit
+      pipes_9 =
+        Enum.map(1..9, fn _ ->
+          %Command{name: :cmd_head, args: ["-n", "100"], pipes: [], redirects: []}
+        end)
+
+      command = %Command{
+        name: :cmd_echo,
+        args: ["test"],
+        pipes: pipes_9,
+        redirects: []
+      }
+
+      result = Executor.run(command)
+
+      # Should succeed - exactly at limit
+      assert {:ok, _output} = result
+    end
+
+    test "rejects 11 stages (exceeds limit)" do
+      # 10 pipes = depth 11, just over limit
+      pipes_10 =
+        Enum.map(1..10, fn _ ->
+          %Command{name: :cmd_head, args: ["-n", "100"], pipes: [], redirects: []}
+        end)
+
+      command = %Command{
+        name: :cmd_echo,
+        args: ["test"],
+        pipes: pipes_10,
+        redirects: []
+      }
+
+      result = Executor.run(command)
+
+      assert {:error, message} = result
+      assert message =~ "pipe depth exceeded"
+    end
+
     test "rejects command exceeding depth limit" do
       # Build a command with 15 pipes (depth 16)
       deep_pipes =
@@ -318,6 +358,222 @@ defmodule TrumanShell.ExecutorTest do
 
         # Last file should have the output
         assert File.read!(Path.join(tmp_dir, "b.txt")) == "hello\n"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+  end
+
+  describe "piping" do
+    test "ls | grep pattern filters directory output" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-ls-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create files with different names
+        File.write!(Path.join(tmp_dir, "test_file.txt"), "")
+        File.write!(Path.join(tmp_dir, "other_file.txt"), "")
+        File.write!(Path.join(tmp_dir, "readme.md"), "")
+
+        # ls | grep test
+        command = %Command{
+          name: :cmd_ls,
+          args: [],
+          pipes: [
+            %Command{name: :cmd_grep, args: ["test"], pipes: [], redirects: []}
+          ],
+          redirects: []
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:ok, output} = result
+        assert output =~ "test_file.txt"
+        refute output =~ "other_file.txt"
+        refute output =~ "readme.md"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "cat file.txt | head -5 returns first 5 lines" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create a file with 10 lines
+        content = Enum.map_join(1..10, "\n", &"line #{&1}")
+        File.write!(Path.join(tmp_dir, "data.txt"), content <> "\n")
+
+        # cat data.txt | head -5
+        command = %Command{
+          name: :cmd_cat,
+          args: ["data.txt"],
+          pipes: [
+            %Command{name: :cmd_head, args: ["-n", "5"], pipes: [], redirects: []}
+          ],
+          redirects: []
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:ok, output} = result
+        lines = String.split(output, "\n", trim: true)
+        assert length(lines) == 5
+        assert hd(lines) == "line 1"
+        assert List.last(lines) == "line 5"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "3-stage pipe: cat | grep | head chains correctly" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-3-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create a file with numbered lines, some matching a pattern
+        content = """
+        apple 1
+        banana 2
+        apple 3
+        cherry 4
+        apple 5
+        apple 6
+        banana 7
+        apple 8
+        """
+
+        File.write!(Path.join(tmp_dir, "fruits.txt"), content)
+
+        # cat fruits.txt | grep apple | head -3
+        command = %Command{
+          name: :cmd_cat,
+          args: ["fruits.txt"],
+          pipes: [
+            %Command{name: :cmd_grep, args: ["apple"], pipes: [], redirects: []},
+            %Command{name: :cmd_head, args: ["-n", "3"], pipes: [], redirects: []}
+          ],
+          redirects: []
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:ok, output} = result
+        lines = String.split(output, "\n", trim: true)
+        assert length(lines) == 3
+        assert Enum.all?(lines, &String.contains?(&1, "apple"))
+        assert hd(lines) == "apple 1"
+        assert List.last(lines) == "apple 5"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "pipe with tail: cat | tail -3 returns last 3 lines" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-tail-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        content = Enum.map_join(1..10, "\n", &"line #{&1}")
+        File.write!(Path.join(tmp_dir, "data.txt"), content <> "\n")
+
+        # cat data.txt | tail -3
+        command = %Command{
+          name: :cmd_cat,
+          args: ["data.txt"],
+          pipes: [
+            %Command{name: :cmd_tail, args: ["-n", "3"], pipes: [], redirects: []}
+          ],
+          redirects: []
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:ok, output} = result
+        lines = String.split(output, "\n", trim: true)
+        assert length(lines) == 3
+        assert hd(lines) == "line 8"
+        assert List.last(lines) == "line 10"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "pipe with wc: cat | wc -l counts lines" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-wc-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        content = Enum.map_join(1..5, "\n", &"line #{&1}")
+        File.write!(Path.join(tmp_dir, "data.txt"), content <> "\n")
+
+        # cat data.txt | wc -l
+        command = %Command{
+          name: :cmd_cat,
+          args: ["data.txt"],
+          pipes: [
+            %Command{name: :cmd_wc, args: ["-l"], pipes: [], redirects: []}
+          ],
+          redirects: []
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:ok, output} = result
+        # Output should contain "5" (5 lines)
+        assert output =~ "5"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "first command error stops pipeline" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-err-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # cat missing.txt | head -5 should error
+        command = %Command{
+          name: :cmd_cat,
+          args: ["missing.txt"],
+          pipes: [
+            %Command{name: :cmd_head, args: ["-n", "5"], pipes: [], redirects: []}
+          ],
+          redirects: []
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:error, msg} = result
+        assert msg =~ "No such file or directory"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "middle command with no matches returns empty output" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-empty-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "data.txt"), "hello\nworld\n")
+
+        # cat data.txt | grep nomatch | head -5
+        command = %Command{
+          name: :cmd_cat,
+          args: ["data.txt"],
+          pipes: [
+            %Command{name: :cmd_grep, args: ["nomatch"], pipes: [], redirects: []},
+            %Command{name: :cmd_head, args: ["-n", "5"], pipes: [], redirects: []}
+          ],
+          redirects: []
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        # Empty output is OK (not an error)
+        assert {:ok, ""} = result
       after
         File.rm_rf!(tmp_dir)
       end
