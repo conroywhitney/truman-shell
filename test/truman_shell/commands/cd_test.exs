@@ -159,6 +159,28 @@ defmodule TrumanShell.Commands.CdTest do
       assert new_dir == Path.join(sandbox_root, "lib")
     end
 
+    test "~// returns to sandbox root (double slash, no path)" do
+      sandbox_root = File.cwd!()
+      current = Path.join(sandbox_root, "lib/truman_shell")
+      context = %{sandbox_root: sandbox_root, current_dir: current}
+
+      # Double slash with no path should go home
+      {:ok, "", set_cwd: new_dir} = Cd.handle(["~//"], context)
+
+      assert new_dir == sandbox_root
+    end
+
+    test "~/// returns to sandbox root (triple slash)" do
+      sandbox_root = File.cwd!()
+      current = Path.join(sandbox_root, "lib/truman_shell")
+      context = %{sandbox_root: sandbox_root, current_dir: current}
+
+      # Triple slash should also go home
+      {:ok, "", set_cwd: new_dir} = Cd.handle(["~///"], context)
+
+      assert new_dir == sandbox_root
+    end
+
     test "~user syntax returns error (not supported)" do
       sandbox_root = File.cwd!()
       context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
