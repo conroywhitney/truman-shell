@@ -168,5 +168,32 @@ defmodule TrumanShell.Commands.WcTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "explicit file argument takes precedence over stdin" do
+      # Unix behavior: `echo "stdin" | wc -l file.txt` reads file.txt, ignores stdin
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-prec-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "file.txt"), "one\ntwo\nthree\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir, stdin: "stdin has ten\nlines here\n"}
+
+        {:ok, output} = Wc.handle(["-l", "file.txt"], context)
+
+        # Should show 3 lines (from file), not 2 (from stdin)
+        assert output =~ ~r/^\s*3\s+file\.txt/
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "uses stdin when no file argument provided" do
+      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: "one\ntwo\nthree\n"}
+
+      {:ok, output} = Wc.handle(["-l"], context)
+
+      # Should count 3 lines from stdin
+      assert output =~ "3"
+    end
   end
 end

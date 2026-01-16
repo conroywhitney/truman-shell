@@ -7,6 +7,19 @@ defmodule TrumanShell.Executor do
   (404 principle - no information leakage about protected paths).
 
   Command handlers are implemented in `TrumanShell.Commands.*` modules.
+
+  ## Memory Model
+
+  Piping is synchronous and in-memory: each stage passes a full binary string
+  to the next. For `cat file | grep pattern | head -5`, the entire file content
+  flows through each stage as a string.
+
+  **Mitigations:**
+  - FileIO enforces a 10MB per-file limit (see `TrumanShell.Commands.FileIO`)
+  - Pipeline depth is limited to 10 commands
+
+  **Acceptable for:** AI agent sandbox with controlled inputs (small files)
+  **Not suitable for:** Processing large files (would need streaming/GenStage)
   """
 
   alias TrumanShell.Command

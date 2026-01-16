@@ -27,13 +27,13 @@ defmodule TrumanShell.Commands.Cat do
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle([], %{stdin: stdin}) when is_binary(stdin) and stdin != "" do
-    # Unix behavior: `cat` with no args reads from stdin
+  def handle([], %{stdin: stdin}) when is_binary(stdin) do
+    # Unix behavior: `cat` with no args reads from stdin (including empty stdin)
     {:ok, stdin}
   end
 
   def handle([], _context) do
-    # No files and no stdin - nothing to output
+    # No files and no stdin context - nothing to output
     {:ok, ""}
   end
 

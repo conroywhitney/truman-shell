@@ -16,6 +16,25 @@ defmodule TrumanShell.ExecutorTest do
       assert output == "line 1\nline 2\n"
     end
 
+    test "passes stdin option to first command even with pipes" do
+      # Verify stdin flows to first command when pipeline exists
+      # head -n 2 | wc -l with stdin should work
+      command = %Command{
+        name: :cmd_head,
+        args: ["-n", "2"],
+        pipes: [
+          %Command{name: :cmd_wc, args: ["-l"], pipes: [], redirects: []}
+        ],
+        redirects: []
+      }
+
+      result = Executor.run(command, stdin: "line 1\nline 2\nline 3\nline 4\n")
+
+      assert {:ok, output} = result
+      # head -n 2 gives 2 lines, wc -l counts them
+      assert output =~ "2"
+    end
+
     test "executes a valid command and returns {:ok, output}" do
       command = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
 
@@ -551,6 +570,32 @@ defmodule TrumanShell.ExecutorTest do
           name: :cmd_cat,
           args: ["missing.txt"],
           pipes: [
+            %Command{name: :cmd_head, args: ["-n", "5"], pipes: [], redirects: []}
+          ],
+          redirects: []
+        }
+
+        result = Executor.run(command, sandbox_root: tmp_dir)
+
+        assert {:error, msg} = result
+        assert msg =~ "No such file or directory"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
+
+    test "middle command error stops pipeline" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-mid-err-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # echo ok | cat missing.txt | head -5
+        # Middle command (cat missing.txt) should error and stop pipeline
+        command = %Command{
+          name: :cmd_echo,
+          args: ["ok"],
+          pipes: [
+            %Command{name: :cmd_cat, args: ["missing.txt"], pipes: [], redirects: []},
             %Command{name: :cmd_head, args: ["-n", "5"], pipes: [], redirects: []}
           ],
           redirects: []
