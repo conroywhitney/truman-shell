@@ -46,7 +46,9 @@ defmodule TrumanShell.Commands.Cd do
 
   def handle(["~/" <> subpath], context) do
     # Expand ~/subdir to sandbox_root/subdir
-    change_directory(subpath, %{context | current_dir: context.sandbox_root})
+    # Strip leading slashes to handle ~//lib -> lib (not /lib)
+    normalized = String.trim_leading(subpath, "/")
+    change_directory(normalized, %{context | current_dir: context.sandbox_root})
   end
 
   def handle([path | _], context) do

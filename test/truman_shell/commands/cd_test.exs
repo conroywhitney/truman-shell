@@ -121,5 +121,62 @@ defmodule TrumanShell.Commands.CdTest do
       assert {:error, msg} = result
       assert msg =~ "Not a directory"
     end
+
+    # === SECURITY EDGE CASES ===
+    # These tests verify sandbox boundaries cannot be escaped via tilde paths
+
+    test "~/.. cannot escape sandbox (stays at root)" do
+      sandbox_root = File.cwd!()
+      context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
+
+      result = Cd.handle(["~/.."], context)
+
+      # Should error - can't go above sandbox root
+      assert {:error, msg} = result
+      assert msg =~ "No such file or directory"
+    end
+
+    test "~/../../etc cannot escape sandbox (traversal attack)" do
+      sandbox_root = File.cwd!()
+      context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
+
+      result = Cd.handle(["~/../../etc"], context)
+
+      # Must block - this is a traversal attack
+      assert {:error, msg} = result
+      assert msg =~ "No such file or directory"
+      # 404 principle - don't reveal /etc exists
+      refute msg =~ "permission"
+    end
+
+    test "~//lib handles double slash correctly" do
+      sandbox_root = File.cwd!()
+      context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
+
+      # Double slash should normalize to ~/lib
+      {:ok, "", set_cwd: new_dir} = Cd.handle(["~//lib"], context)
+
+      assert new_dir == Path.join(sandbox_root, "lib")
+    end
+
+    test "~user syntax returns error (not supported)" do
+      sandbox_root = File.cwd!()
+      context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
+
+      result = Cd.handle(["~root"], context)
+
+      # Should fail - no ~user expansion in sandbox
+      assert {:error, msg} = result
+      assert msg =~ "No such file or directory"
+    end
+
+    test "~/lib/../test navigates correctly within sandbox" do
+      sandbox_root = File.cwd!()
+      context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
+
+      {:ok, "", set_cwd: new_dir} = Cd.handle(["~/lib/../test"], context)
+
+      assert new_dir == Path.join(sandbox_root, "test")
+    end
   end
 end
