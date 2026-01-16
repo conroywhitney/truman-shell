@@ -11,9 +11,9 @@ defmodule TrumanShell.Commands.DateTest do
 
       {:ok, output} = DateCmd.handle([], context)
 
-      # Should match format like "Thu Jan 16 10:30:45 EST 2026"
-      # Day Mon DD HH:MM:SS TZ YYYY
-      assert output =~ ~r/^\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2} \w+ \d{4}\n$/
+      # Should match format like "Thu Jan 16 10:30:45 UTC 2026"
+      # Day Mon DD HH:MM:SS TZ YYYY (day is space-padded: " 9" not "09")
+      assert output =~ ~r/^\w{3} \w{3} [ \d]\d \d{2}:\d{2}:\d{2} \w+ \d{4}\n$/
     end
 
     test "ignores arguments" do
@@ -21,7 +21,7 @@ defmodule TrumanShell.Commands.DateTest do
 
       {:ok, output} = DateCmd.handle(["ignored", "args"], context)
 
-      assert output =~ ~r/^\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2} \w+ \d{4}\n$/
+      assert output =~ ~r/^\w{3} \w{3} [ \d]\d \d{2}:\d{2}:\d{2} \w+ \d{4}\n$/
     end
   end
 end

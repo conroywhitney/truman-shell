@@ -105,6 +105,29 @@ defmodule TrumanShell.Executor do
     cmd_which: Commands.Which
   }
 
+  @doc """
+  Returns the list of supported command names.
+
+  Used by commands like `which` to avoid duplicating the command registry.
+
+  ## Examples
+
+      iex> commands = TrumanShell.Executor.supported_commands()
+      iex> "ls" in commands
+      true
+      iex> "notreal" in commands
+      false
+
+  """
+  @spec supported_commands() :: [String.t()]
+  def supported_commands do
+    @command_modules
+    |> Map.keys()
+    |> Enum.map(fn atom ->
+      atom |> Atom.to_string() |> String.replace_prefix("cmd_", "")
+    end)
+  end
+
   defp execute(command, opts)
 
   defp execute(%Command{name: name, args: args}, opts) when is_map_key(@command_modules, name) do

@@ -7,17 +7,16 @@ defmodule TrumanShell.Commands.Date do
 
   alias TrumanShell.Commands.Behaviour
 
-  @days ~w(Mon Tue Wed Thu Fri Sat Sun)
-  @months ~w(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
-
   @doc """
   Returns the current date and time in Unix format.
+
+  Uses space-padded day to match Unix `date` output (e.g., "Jan  9" not "Jan 09").
 
   ## Examples
 
       iex> context = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
       iex> {:ok, output} = TrumanShell.Commands.Date.handle([], context)
-      iex> output =~ ~r/^\\w{3} \\w{3} \\d{1,2} \\d{2}:\\d{2}:\\d{2} \\w+ \\d{4}\\n$/
+      iex> output =~ ~r/^\\w{3} \\w{3} [ \\d]\\d \\d{2}:\\d{2}:\\d{2} \\w+ \\d{4}\\n$/
       true
 
   """
@@ -28,15 +27,13 @@ defmodule TrumanShell.Commands.Date do
     {:ok, format_date(now) <> "\n"}
   end
 
+  # Format: "Thu Jan  9 10:30:45 UTC 2026"
+  # Note: Elixir's Calendar.strftime doesn't support %e (space-padded day),
+  # so we use strftime for most fields and handle day padding manually.
   defp format_date(dt) do
-    day_name = Enum.at(@days, Date.day_of_week(dt) - 1)
-    month_name = Enum.at(@months, dt.month - 1)
-    day = dt.day
-    hour = String.pad_leading("#{dt.hour}", 2, "0")
-    minute = String.pad_leading("#{dt.minute}", 2, "0")
-    second = String.pad_leading("#{dt.second}", 2, "0")
-    year = dt.year
+    # Space-pad day to 2 chars (Unix style: " 9" not "09")
+    day = String.pad_leading("#{dt.day}", 2, " ")
 
-    "#{day_name} #{month_name} #{day} #{hour}:#{minute}:#{second} UTC #{year}"
+    Calendar.strftime(dt, "%a %b ") <> day <> Calendar.strftime(dt, " %H:%M:%S %Z %Y")
   end
 end

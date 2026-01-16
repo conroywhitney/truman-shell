@@ -6,11 +6,13 @@ defmodule TrumanShell.Commands.Which do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-
-  @known_commands ~w(cat cd cp echo find grep head ls mkdir mv pwd rm tail touch wc which date true false)
+  alias TrumanShell.Executor
 
   @doc """
   Returns info about the specified command(s).
+
+  Returns `{:ok, output}` if all commands are found, `{:error, output}` if any
+  command is not found (matching Unix `which` exit code behavior for chaining).
 
   ## Examples
 
@@ -20,7 +22,7 @@ defmodule TrumanShell.Commands.Which do
 
       iex> context = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
       iex> TrumanShell.Commands.Which.handle(["notreal"], context)
-      {:ok, "notreal not found\\n"}
+      {:error, "notreal not found\\n"}
 
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
@@ -30,16 +32,20 @@ defmodule TrumanShell.Commands.Which do
   end
 
   def handle(args, _context) do
-    output = Enum.map_join(args, "", &command_info/1)
+    known = Executor.supported_commands()
+    results = Enum.map(args, &command_info(&1, known))
 
-    {:ok, output}
+    output = Enum.map_join(results, "", fn {_, msg} -> msg end)
+    all_found? = Enum.all?(results, fn {found?, _} -> found? end)
+
+    if all_found?, do: {:ok, output}, else: {:error, output}
   end
 
-  defp command_info(name) when name in @known_commands do
-    "#{name}: TrumanShell builtin\n"
-  end
-
-  defp command_info(name) do
-    "#{name} not found\n"
+  defp command_info(name, known) do
+    if name in known do
+      {true, "#{name}: TrumanShell builtin\n"}
+    else
+      {false, "#{name} not found\n"}
+    end
   end
 end
