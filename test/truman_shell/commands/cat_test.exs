@@ -102,5 +102,31 @@ defmodule TrumanShell.Commands.CatTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "reads from stdin when no file arguments provided" do
+      # Unix behavior: `echo hello | cat` outputs "hello"
+      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: "hello from stdin\n"}
+
+      {:ok, output} = Cat.handle([], context)
+
+      assert output == "hello from stdin\n"
+    end
+
+    test "explicit file argument takes precedence over stdin" do
+      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-stdin-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        File.write!(Path.join(tmp_dir, "file.txt"), "from file\n")
+        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir, stdin: "from stdin\n"}
+
+        {:ok, output} = Cat.handle(["file.txt"], context)
+
+        assert output == "from file\n"
+        refute output =~ "stdin"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end

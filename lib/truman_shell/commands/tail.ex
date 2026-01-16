@@ -50,7 +50,9 @@ defmodule TrumanShell.Commands.Tail do
     end
   end
 
-  # Use stdin if available (piped input), otherwise read from file
-  defp get_contents(_path, %{stdin: stdin}) when is_binary(stdin), do: {:ok, stdin}
+  # Use stdin only when no file path provided (path is "-")
+  # Unix behavior: explicit file argument takes precedence over stdin
+  defp get_contents("-", %{stdin: stdin}) when is_binary(stdin), do: {:ok, stdin}
+  defp get_contents("-", _context), do: {:error, "missing file operand"}
   defp get_contents(path, context), do: FileIO.read_file(path, context)
 end

@@ -93,5 +93,24 @@ defmodule TrumanShell.Commands.HeadTest do
       assert {:error, msg} = result
       assert msg =~ "invalid number of lines"
     end
+
+    test "explicit file argument takes precedence over stdin" do
+      # Unix behavior: `echo "stdin" | head -n 1 file.txt` reads file.txt, ignores stdin
+      with_lines_file(5, fn context ->
+        context_with_stdin = Map.put(context, :stdin, "stdin line 1\nstdin line 2\n")
+        {:ok, output} = Head.handle(["-n", "1", "lines.txt"], context_with_stdin)
+
+        # Should read from file, not stdin
+        assert output == "Line 1\n"
+        refute output =~ "stdin"
+      end)
+    end
+
+    test "uses stdin when no file argument provided" do
+      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: "stdin line 1\nstdin line 2\n"}
+      {:ok, output} = Head.handle(["-n", "1"], context)
+
+      assert output == "stdin line 1\n"
+    end
   end
 end

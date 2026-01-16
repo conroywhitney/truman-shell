@@ -27,7 +27,18 @@ defmodule TrumanShell.Commands.Cat do
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
+  def handle([], %{stdin: stdin}) when is_binary(stdin) and stdin != "" do
+    # Unix behavior: `cat` with no args reads from stdin
+    {:ok, stdin}
+  end
+
+  def handle([], _context) do
+    # No files and no stdin - nothing to output
+    {:ok, ""}
+  end
+
   def handle(paths, context) do
+    # When file paths provided, ignore stdin (Unix behavior)
     Enum.reduce_while(paths, {:ok, ""}, fn path, {:ok, acc} ->
       case FileIO.read_file(path, context) do
         {:ok, contents} ->
