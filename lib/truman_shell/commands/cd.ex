@@ -40,10 +40,23 @@ defmodule TrumanShell.Commands.Cd do
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result_with_effects()
   @impl true
-  def handle(args, context) do
-    path = List.first(args) || "."
+  def handle([], context), do: go_home(context)
+  def handle(["~"], context), do: go_home(context)
+  def handle(["~/"], context), do: go_home(context)
+
+  def handle(["~/" <> subpath], context) do
+    # Expand ~/subdir to sandbox_root/subdir
+    # Strip leading slashes to handle ~//lib -> lib (not /lib)
+    normalized = String.trim_leading(subpath, "/")
+    change_directory(normalized, %{context | current_dir: context.sandbox_root})
+  end
+
+  def handle([path | _], context) do
     change_directory(path, context)
   end
+
+  # Sandbox root is "home" in TrumanShell
+  defp go_home(context), do: {:ok, "", set_cwd: context.sandbox_root}
 
   defp change_directory(path, context) do
     # Compute target path relative to current working directory
