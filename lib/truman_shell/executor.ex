@@ -87,7 +87,9 @@ defmodule TrumanShell.Executor do
     cmd_cat: Commands.Cat,
     cmd_cd: Commands.Cd,
     cmd_cp: Commands.Cp,
+    cmd_date: Commands.Date,
     cmd_echo: Commands.Echo,
+    cmd_false: Commands.False,
     cmd_find: Commands.Find,
     cmd_grep: Commands.Grep,
     cmd_head: Commands.Head,
@@ -98,7 +100,9 @@ defmodule TrumanShell.Executor do
     cmd_rm: Commands.Rm,
     cmd_tail: Commands.Tail,
     cmd_touch: Commands.Touch,
-    cmd_wc: Commands.Wc
+    cmd_true: Commands.True,
+    cmd_wc: Commands.Wc,
+    cmd_which: Commands.Which
   }
 
   defp execute(command, opts)
