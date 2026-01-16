@@ -42,6 +42,36 @@ defmodule TrumanShell.Commands.CdTest do
       assert new_dir == sandbox_root
     end
 
+    test "returns to sandbox root with ~/ (trailing slash)" do
+      sandbox_root = File.cwd!()
+      current = Path.join(sandbox_root, "lib/truman_shell")
+      context = %{sandbox_root: sandbox_root, current_dir: current}
+
+      {:ok, "", set_cwd: new_dir} = Cd.handle(["~/"], context)
+
+      assert new_dir == sandbox_root
+    end
+
+    test "expands ~/subdir to sandbox_root/subdir" do
+      sandbox_root = File.cwd!()
+      current = Path.join(sandbox_root, "lib/truman_shell")
+      context = %{sandbox_root: sandbox_root, current_dir: current}
+
+      {:ok, "", set_cwd: new_dir} = Cd.handle(["~/lib"], context)
+
+      assert new_dir == Path.join(sandbox_root, "lib")
+    end
+
+    test "returns error for ~/nonexistent" do
+      sandbox_root = File.cwd!()
+      context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
+
+      result = Cd.handle(["~/nonexistent"], context)
+
+      assert {:error, msg} = result
+      assert msg =~ "No such file or directory"
+    end
+
     test "navigates up with .." do
       sandbox_root = File.cwd!()
       current = Path.join(sandbox_root, "lib/truman_shell")
