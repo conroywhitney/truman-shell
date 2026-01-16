@@ -87,7 +87,9 @@ defmodule TrumanShell.Executor do
     cmd_cat: Commands.Cat,
     cmd_cd: Commands.Cd,
     cmd_cp: Commands.Cp,
+    cmd_date: Commands.Date,
     cmd_echo: Commands.Echo,
+    cmd_false: Commands.False,
     cmd_find: Commands.Find,
     cmd_grep: Commands.Grep,
     cmd_head: Commands.Head,
@@ -98,8 +100,33 @@ defmodule TrumanShell.Executor do
     cmd_rm: Commands.Rm,
     cmd_tail: Commands.Tail,
     cmd_touch: Commands.Touch,
-    cmd_wc: Commands.Wc
+    cmd_true: Commands.True,
+    cmd_wc: Commands.Wc,
+    cmd_which: Commands.Which
   }
+
+  @doc """
+  Returns the list of supported command names.
+
+  Used by commands like `which` to avoid duplicating the command registry.
+
+  ## Examples
+
+      iex> commands = TrumanShell.Executor.supported_commands()
+      iex> "ls" in commands
+      true
+      iex> "notreal" in commands
+      false
+
+  """
+  @spec supported_commands() :: [String.t()]
+  def supported_commands do
+    @command_modules
+    |> Map.keys()
+    |> Enum.map(fn atom ->
+      atom |> Atom.to_string() |> String.replace_prefix("cmd_", "")
+    end)
+  end
 
   defp execute(command, opts)
 

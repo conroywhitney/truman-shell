@@ -102,19 +102,25 @@
 - Empty middle output → empty result (not error)
 - Test count: 249 → 258 tests (+9), 70 doctests
 
-### Phase 8: Utility Commands
-- [ ] 8.1 Write failing test: `which ls` returns command info
-- [ ] 8.2 Implement `cmd_which` handler
-- [ ] 8.3 Write failing test: `date` returns current timestamp
-- [ ] 8.4 Implement `cmd_date` handler
-- [ ] 8.5 Implement `cmd_true` (exit 0) and `cmd_false` (exit 1)
+### Phase 8: Utility Commands ✅
+- [x] 8.1 Write failing test: `which ls` returns command info
+- [x] 8.2 Implement `cmd_which` handler
+- [x] 8.3 Write failing test: `date` returns current timestamp
+- [x] 8.4 Implement `cmd_date` handler
+- [x] 8.5 Implement `cmd_true` (exit 0) and `cmd_false` (exit 1)
 
-### Validation
-- [ ] All tests pass (`mix test`)
-- [ ] Code formatted (`mix format`)
-- [ ] Static analysis clean (`mix credo`)
-- [ ] Documentation updated
-- [ ] README roadmap updated to show v0.4 complete
+**Phase 8 Notes:**
+- `which` returns "TrumanShell builtin" for known commands, "not found" for unknown
+- `date` outputs Unix-style format: "Thu Jan 16 10:30:45 UTC 2026"
+- `true` returns `{:ok, ""}`, `false` returns `{:error, ""}`
+- Test count: 276 → 280 tests (+4), 70 doctests
+
+### Validation ✅
+- [x] All tests pass (`mix test`) - 280 tests, 70 doctests
+- [x] Code formatted (`mix format`)
+- [x] Static analysis clean (`mix credo --strict`)
+- [x] Documentation updated (module docs in place)
+- [x] README roadmap updated to show v0.4 complete
 
 ## Dependencies
 

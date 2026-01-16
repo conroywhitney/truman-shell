@@ -80,18 +80,27 @@ end
 - Parse into `%Command{}` structs
 - Handle pipes, redirects, chains
 
-### v0.3 - Executor POC ✅ (Current)
+### v0.3 - Executor POC ✅
 - `TrumanShell.execute/1` - parse and run in one call
 - `ls` command with sandbox enforcement
 - Path traversal protection (404 principle)
 - Output truncation (max 200 lines)
 - 145 tests passing
 
-### v0.4 - Read Operations (Next)
-- Read operations: `ls`, `cat`, `head`, `tail`, `pwd`, `cd`
-- Search operations: `grep`, `find`, `wc`
-- Write operations: `mkdir`, `touch`, `rm`, `mv`, `cp`, `echo`
-- Piping & composition
+### v0.4 - Executor Commands ✅ (Current)
+- Navigation: `cd`, `pwd`
+- Read: `cat`, `head`, `tail`
+- Search: `grep -rinvABC`, `find -name/-type/-maxdepth`, `wc -lwc`
+- Write: `mkdir -p`, `touch`, `rm` (soft delete), `mv`, `cp`, `echo`
+- Piping: `cmd1 | cmd2 | cmd3` (max 10 stages)
+- Redirects: `>` and `>>` with sandbox enforcement
+- Utility: `which`, `date`, `true`, `false`
+- 280 tests, 70 doctests passing
+
+### v0.5 - Enhanced Features (Next)
+- Glob expansion (`*.ex`, `**/*.md`)
+- `cd ~` home directory expansion
+- Additional flags for existing commands
 
 ### v0.8+ - Safety & Deception
 - The 404 Principle: protected paths return "not found"
