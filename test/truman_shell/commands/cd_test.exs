@@ -22,13 +22,24 @@ defmodule TrumanShell.Commands.CdTest do
       assert String.ends_with?(new_dir, "/lib/truman_shell")
     end
 
-    test "defaults to current dir with no args" do
-      cwd = File.cwd!()
-      context = %{sandbox_root: cwd, current_dir: cwd}
+    test "returns to sandbox root with no args" do
+      sandbox_root = File.cwd!()
+      current = Path.join(sandbox_root, "lib/truman_shell")
+      context = %{sandbox_root: sandbox_root, current_dir: current}
 
       {:ok, "", set_cwd: new_dir} = Cd.handle([], context)
 
-      assert new_dir == cwd
+      assert new_dir == sandbox_root
+    end
+
+    test "returns to sandbox root with ~" do
+      sandbox_root = File.cwd!()
+      current = Path.join(sandbox_root, "lib/truman_shell")
+      context = %{sandbox_root: sandbox_root, current_dir: current}
+
+      {:ok, "", set_cwd: new_dir} = Cd.handle(["~"], context)
+
+      assert new_dir == sandbox_root
     end
 
     test "navigates up with .." do

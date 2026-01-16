@@ -40,8 +40,17 @@ defmodule TrumanShell.Commands.Cd do
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result_with_effects()
   @impl true
-  def handle(args, context) do
-    path = List.first(args) || "."
+  def handle([], context) do
+    # No args: return to sandbox root (like cd with no args in bash returns to $HOME)
+    {:ok, "", set_cwd: context.sandbox_root}
+  end
+
+  def handle(["~"], context) do
+    # Tilde: return to sandbox root (sandbox root is "home" in TrumanShell)
+    {:ok, "", set_cwd: context.sandbox_root}
+  end
+
+  def handle([path | _], context) do
     change_directory(path, context)
   end
 
