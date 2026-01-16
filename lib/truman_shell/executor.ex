@@ -14,7 +14,9 @@ defmodule TrumanShell.Executor do
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
-  @max_pipe_depth 10
+  # Maximum number of commands in a pipeline (e.g., cmd1 | cmd2 | cmd3 = 3 commands)
+  # 9 pipe operators connect 10 commands maximum
+  @max_pipeline_commands 10
 
   @doc """
   Executes a parsed command and returns the output.
@@ -50,7 +52,7 @@ defmodule TrumanShell.Executor do
     end
 
     with :ok <- validate_depth(command),
-         {:ok, output} <- execute(command),
+         {:ok, output} <- execute(command, opts),
          {:ok, piped_output} <- run_pipeline(output, pipes) do
       apply_redirects(piped_output, redirects)
     end
@@ -86,7 +88,7 @@ defmodule TrumanShell.Executor do
     cmd_wc: Commands.Wc
   }
 
-  defp execute(command, opts \\ [])
+  defp execute(command, opts)
 
   defp execute(%Command{name: name, args: args}, opts) when is_map_key(@command_modules, name) do
     module = @command_modules[name]
@@ -122,12 +124,12 @@ defmodule TrumanShell.Executor do
     end
   end
 
-  # Depth validation for pipes
+  # Depth validation for pipelines
   defp validate_depth(%Command{pipes: pipes}) do
-    depth = length(pipes) + 1
+    command_count = length(pipes) + 1
 
-    if depth > @max_pipe_depth do
-      {:error, "pipe depth exceeded (max #{@max_pipe_depth})\n"}
+    if command_count > @max_pipeline_commands do
+      {:error, "pipeline too deep: #{command_count} commands (max #{@max_pipeline_commands})\n"}
     else
       :ok
     end

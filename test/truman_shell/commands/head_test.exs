@@ -112,5 +112,14 @@ defmodule TrumanShell.Commands.HeadTest do
 
       assert output == "stdin line 1\n"
     end
+
+    test "empty stdin is valid and returns empty output" do
+      # Unix behavior: empty stdin is valid input, not an error
+      # `printf "" | head -n 2` returns empty output, not "missing file operand"
+      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: ""}
+      {:ok, output} = Head.handle(["-n", "2"], context)
+
+      assert output == ""
+    end
   end
 end

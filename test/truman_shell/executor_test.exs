@@ -5,6 +5,17 @@ defmodule TrumanShell.ExecutorTest do
   alias TrumanShell.Executor
 
   describe "run/2" do
+    test "passes stdin option to first command" do
+      # Bug: run/2 was calling execute(command) without opts,
+      # so stdin passed to run() was ignored for the first command
+      command = %Command{name: :cmd_head, args: ["-n", "2"], pipes: [], redirects: []}
+
+      result = Executor.run(command, stdin: "line 1\nline 2\nline 3\n")
+
+      assert {:ok, output} = result
+      assert output == "line 1\nline 2\n"
+    end
+
     test "executes a valid command and returns {:ok, output}" do
       command = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
 
@@ -189,11 +200,12 @@ defmodule TrumanShell.ExecutorTest do
       result = Executor.run(command)
 
       assert {:error, message} = result
-      assert message =~ "pipe depth exceeded"
+      assert message =~ "pipeline too deep"
+      assert message =~ "11 commands"
     end
 
     test "rejects command exceeding depth limit" do
-      # Build a command with 15 pipes (depth 16)
+      # Build a command with 15 pipes (16 commands total)
       deep_pipes =
         Enum.map(1..15, fn _ ->
           %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
@@ -209,7 +221,8 @@ defmodule TrumanShell.ExecutorTest do
       result = Executor.run(command)
 
       assert {:error, message} = result
-      assert message =~ "pipe depth exceeded"
+      assert message =~ "pipeline too deep"
+      assert message =~ "16 commands"
     end
   end
 
