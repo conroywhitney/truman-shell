@@ -7,6 +7,19 @@ defmodule TrumanShell.Executor do
   (404 principle - no information leakage about protected paths).
 
   Command handlers are implemented in `TrumanShell.Commands.*` modules.
+
+  ## Memory Model
+
+  Piping is synchronous and in-memory: each stage passes a full binary string
+  to the next. For `cat file | grep pattern | head -5`, the entire file content
+  flows through each stage as a string.
+
+  **Mitigations:**
+  - FileIO enforces a 10MB per-file limit (see `TrumanShell.Commands.FileIO`)
+  - Pipeline depth is limited to 10 commands
+
+  **Acceptable for:** AI agent sandbox with controlled inputs (small files)
+  **Not suitable for:** Processing large files (would need streaming/GenStage)
   """
 
   alias TrumanShell.Command
@@ -14,7 +27,9 @@ defmodule TrumanShell.Executor do
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Sanitizer
 
-  @max_pipe_depth 10
+  # Maximum number of commands in a pipeline (e.g., cmd1 | cmd2 | cmd3 = 3 commands)
+  # 9 pipe operators connect 10 commands maximum
+  @max_pipeline_commands 10
 
   @doc """
   Executes a parsed command and returns the output.
@@ -44,14 +59,25 @@ defmodule TrumanShell.Executor do
   @spec run(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
   def run(command, opts \\ [])
 
-  def run(%Command{redirects: redirects} = command, opts) do
+  def run(%Command{redirects: redirects, pipes: pipes} = command, opts) do
     if root = Keyword.get(opts, :sandbox_root) do
       set_sandbox_root(Path.expand(root))
     end
 
     with :ok <- validate_depth(command),
-         {:ok, output} <- execute(command) do
-      apply_redirects(output, redirects)
+         {:ok, output} <- execute(command, opts),
+         {:ok, piped_output} <- run_pipeline(output, pipes) do
+      apply_redirects(piped_output, redirects)
+    end
+  end
+
+  # Execute each pipe stage, passing previous output as stdin
+  defp run_pipeline(output, []), do: {:ok, output}
+
+  defp run_pipeline(output, [%Command{} = next_cmd | rest]) do
+    case execute(next_cmd, stdin: output) do
+      {:ok, next_output} -> run_pipeline(next_output, rest)
+      {:error, _} = error -> error
     end
   end
 
@@ -75,9 +101,11 @@ defmodule TrumanShell.Executor do
     cmd_wc: Commands.Wc
   }
 
-  defp execute(%Command{name: name, args: args}) when is_map_key(@command_modules, name) do
+  defp execute(command, opts)
+
+  defp execute(%Command{name: name, args: args}, opts) when is_map_key(@command_modules, name) do
     module = @command_modules[name]
-    context = build_context()
+    context = build_context(opts)
 
     case module.handle(args, context) do
       # Handle side effects from commands like cd
@@ -91,24 +119,30 @@ defmodule TrumanShell.Executor do
     end
   end
 
-  defp execute(%Command{name: {:unknown, name}}) do
+  defp execute(%Command{name: {:unknown, name}}, _opts) do
     {:error, "bash: #{name}: command not found\n"}
   end
 
   # Context for command handlers
-  defp build_context do
-    %{
+  defp build_context(opts) do
+    base = %{
       sandbox_root: sandbox_root(),
       current_dir: current_dir()
     }
+
+    # Add stdin to context if provided (for piped commands)
+    case Keyword.get(opts, :stdin) do
+      nil -> base
+      stdin -> Map.put(base, :stdin, stdin)
+    end
   end
 
-  # Depth validation for pipes
+  # Depth validation for pipelines
   defp validate_depth(%Command{pipes: pipes}) do
-    depth = length(pipes) + 1
+    command_count = length(pipes) + 1
 
-    if depth > @max_pipe_depth do
-      {:error, "pipe depth exceeded (max #{@max_pipe_depth})\n"}
+    if command_count > @max_pipeline_commands do
+      {:error, "pipeline too deep: #{command_count} commands (max #{@max_pipeline_commands})\n"}
     else
       :ok
     end
