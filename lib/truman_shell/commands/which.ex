@@ -6,7 +6,7 @@ defmodule TrumanShell.Commands.Which do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Executor
+  alias TrumanShell.Stages.Executor
 
   @doc """
   Returns info about the specified command(s).

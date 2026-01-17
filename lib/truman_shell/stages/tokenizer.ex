@@ -1,4 +1,4 @@
-defmodule TrumanShell.Tokenizer do
+defmodule TrumanShell.Stages.Tokenizer do
   @moduledoc """
   Tokenizes shell command strings into a list of tokens.
 
@@ -21,10 +21,10 @@ defmodule TrumanShell.Tokenizer do
 
   ## Examples
 
-      iex> TrumanShell.Tokenizer.tokenize("ls -la")
+      iex> TrumanShell.Stages.Tokenizer.tokenize("ls -la")
       {:ok, [{:word, "ls"}, {:word, "-la"}]}
 
-      iex> TrumanShell.Tokenizer.tokenize("cat file.txt | grep pattern")
+      iex> TrumanShell.Stages.Tokenizer.tokenize("cat file.txt | grep pattern")
       {:ok, [{:word, "cat"}, {:word, "file.txt"}, {:pipe, "|"}, {:word, "grep"}, {:word, "pattern"}]}
 
   """

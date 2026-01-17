@@ -24,8 +24,8 @@ defmodule TrumanShell do
 
   """
 
-  alias TrumanShell.Executor
-  alias TrumanShell.Parser
+  alias TrumanShell.Stages.Executor
+  alias TrumanShell.Stages.Parser
 
   @doc """
   Parse and execute a shell command string.

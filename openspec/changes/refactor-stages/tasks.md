@@ -2,14 +2,14 @@
 
 ## 1. Move Support Modules
 
-- [ ] 1.1 Create `lib/truman_shell/support/` directory
-- [ ] 1.2 Move `sanitizer.ex` → `support/sanitizer.ex`, update module name to `TrumanShell.Support.Sanitizer`
-- [ ] 1.3 Update all imports of `TrumanShell.Sanitizer` across codebase
-- [ ] 1.4 Move `commands/file_io.ex` → `support/file_io.ex`, update module name to `TrumanShell.Support.FileIO`
-- [ ] 1.5 Update all imports of `TrumanShell.Commands.FileIO` across codebase
-- [ ] 1.6 Move `commands/tree_walker.ex` → `support/tree_walker.ex`, update module name to `TrumanShell.Support.TreeWalker`
-- [ ] 1.7 Update all imports of `TrumanShell.Commands.TreeWalker` across codebase
-- [ ] 1.8 Run `mix test` - all 292 tests must pass
+- [x] 1.1 Create `lib/truman_shell/support/` directory
+- [x] 1.2 Move `sanitizer.ex` → `support/sanitizer.ex`, update module name to `TrumanShell.Support.Sanitizer`
+- [x] 1.3 Update all imports of `TrumanShell.Sanitizer` across codebase
+- [x] 1.4 Move `commands/file_io.ex` → `support/file_io.ex`, update module name to `TrumanShell.Support.FileIO`
+- [x] 1.5 Update all imports of `TrumanShell.Commands.FileIO` across codebase
+- [x] 1.6 Move `commands/tree_walker.ex` → `support/tree_walker.ex`, update module name to `TrumanShell.Support.TreeWalker`
+- [x] 1.7 Update all imports of `TrumanShell.Commands.TreeWalker` across codebase
+- [x] 1.8 Run `mix test` - all 292 tests must pass
 
 ## 2. Move Stage Modules
 

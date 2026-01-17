@@ -1,4 +1,4 @@
-defmodule TrumanShell.Executor do
+defmodule TrumanShell.Stages.Executor do
   @moduledoc """
   Executes parsed commands in a sandboxed environment.
 
@@ -46,13 +46,13 @@ defmodule TrumanShell.Executor do
 
       iex> alias TrumanShell.Command
       iex> cmd = %Command{name: :cmd_ls, args: ["lib"], pipes: [], redirects: []}
-      iex> {:ok, output} = TrumanShell.Executor.run(cmd)
+      iex> {:ok, output} = TrumanShell.Stages.Executor.run(cmd)
       iex> output =~ "truman_shell"
       true
 
       iex> alias TrumanShell.Command
       iex> cmd = %Command{name: {:unknown, "fake"}, args: [], pipes: [], redirects: []}
-      iex> TrumanShell.Executor.run(cmd)
+      iex> TrumanShell.Stages.Executor.run(cmd)
       {:error, "bash: fake: command not found\\n"}
 
   """
@@ -112,7 +112,7 @@ defmodule TrumanShell.Executor do
 
   ## Examples
 
-      iex> commands = TrumanShell.Executor.supported_commands()
+      iex> commands = TrumanShell.Stages.Executor.supported_commands()
       iex> "ls" in commands
       true
       iex> "notreal" in commands
