@@ -189,4 +189,76 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert hd(result.pipes).redirects == [{:stdout, "/sandbox/filtered.txt"}]
     end
   end
+
+  describe "expand/2 glob expansion" do
+    setup do
+      # Create a unique temp directory for filesystem tests
+      tmp_dir = Path.join(System.tmp_dir!(), "expander_glob_#{:erlang.unique_integer([:positive])}")
+      File.mkdir_p!(tmp_dir)
+
+      on_exit(fn ->
+        File.rm_rf!(tmp_dir)
+      end)
+
+      {:ok, sandbox_root: tmp_dir, current_dir: tmp_dir}
+    end
+
+    test "expands *.md to matching files", %{sandbox_root: sandbox, current_dir: current_dir} do
+      # Create test files
+      File.write!(Path.join(current_dir, "README.md"), "readme")
+      File.write!(Path.join(current_dir, "CHANGELOG.md"), "changelog")
+
+      command = Command.new(:cmd_ls, ["*.md"])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      assert result.args == ["CHANGELOG.md", "README.md"]
+    end
+
+    test "expands tilde then glob ~/*.md", %{sandbox_root: sandbox, current_dir: current_dir} do
+      # Create test files
+      File.write!(Path.join(current_dir, "README.md"), "readme")
+      File.write!(Path.join(current_dir, "CHANGELOG.md"), "changelog")
+
+      command = Command.new(:cmd_ls, ["~/*.md"])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      # Tilde expands to sandbox, then glob finds files
+      assert result.args == ["#{sandbox}/CHANGELOG.md", "#{sandbox}/README.md"]
+    end
+
+    test "preserves non-glob args", %{sandbox_root: sandbox, current_dir: current_dir} do
+      command = Command.new(:cmd_ls, ["-la", "src"])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      assert result.args == ["-la", "src"]
+    end
+
+    test "mixes glob and non-glob args", %{sandbox_root: sandbox, current_dir: current_dir} do
+      # Create test files
+      File.write!(Path.join(current_dir, "a.md"), "a")
+      File.write!(Path.join(current_dir, "b.md"), "b")
+
+      command = Command.new(:cmd_cat, ["-n", "*.md"])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      assert result.args == ["-n", "a.md", "b.md"]
+    end
+
+    test "no-match glob returns original pattern", %{sandbox_root: sandbox, current_dir: current_dir} do
+      command = Command.new(:cmd_ls, ["*.nonexistent"])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      assert result.args == ["*.nonexistent"]
+    end
+  end
 end
