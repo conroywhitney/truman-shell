@@ -6,7 +6,7 @@ defmodule TrumanShell.Commands.Head do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.FileIO
+  alias TrumanShell.Support.FileIO
 
   @doc """
   Returns the first n lines of a file (default: 10).

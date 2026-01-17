@@ -1,4 +1,4 @@
-defmodule TrumanShell.Executor do
+defmodule TrumanShell.Stages.Executor do
   @moduledoc """
   Executes parsed commands in a sandboxed environment.
 
@@ -15,7 +15,7 @@ defmodule TrumanShell.Executor do
   flows through each stage as a string.
 
   **Mitigations:**
-  - FileIO enforces a 10MB per-file limit (see `TrumanShell.Commands.FileIO`)
+  - FileIO enforces a 10MB per-file limit (see `TrumanShell.Support.FileIO`)
   - Pipeline depth is limited to 10 commands
 
   **Acceptable for:** AI agent sandbox with controlled inputs (small files)
@@ -24,8 +24,7 @@ defmodule TrumanShell.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
-  alias TrumanShell.Posix.Errors
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Stages.Redirector
 
   # Maximum number of commands in a pipeline (e.g., cmd1 | cmd2 | cmd3 = 3 commands)
   # 9 pipe operators connect 10 commands maximum
@@ -46,28 +45,33 @@ defmodule TrumanShell.Executor do
 
       iex> alias TrumanShell.Command
       iex> cmd = %Command{name: :cmd_ls, args: ["lib"], pipes: [], redirects: []}
-      iex> {:ok, output} = TrumanShell.Executor.run(cmd)
+      iex> {:ok, output} = TrumanShell.Stages.Executor.run(cmd)
       iex> output =~ "truman_shell"
       true
 
       iex> alias TrumanShell.Command
       iex> cmd = %Command{name: {:unknown, "fake"}, args: [], pipes: [], redirects: []}
-      iex> TrumanShell.Executor.run(cmd)
+      iex> TrumanShell.Stages.Executor.run(cmd)
       {:error, "bash: fake: command not found\\n"}
 
   """
   @spec run(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
   def run(command, opts \\ [])
 
-  def run(%Command{redirects: redirects, pipes: pipes} = command, opts) do
+  def run(%Command{pipes: pipes} = command, opts) do
     if root = Keyword.get(opts, :sandbox_root) do
       set_sandbox_root(Path.expand(root))
     end
 
+    context = %{sandbox_root: sandbox_root(), current_dir: current_dir()}
+
+    # Get redirects from the LAST command in pipeline (most common: cmd1 | cmd2 > file.txt)
+    final_command = if pipes == [], do: command, else: List.last(pipes)
+
     with :ok <- validate_depth(command),
          {:ok, output} <- execute(command, opts),
          {:ok, piped_output} <- run_pipeline(output, pipes) do
-      apply_redirects(piped_output, redirects)
+      Redirector.apply(piped_output, final_command.redirects, context)
     end
   end
 
@@ -112,7 +116,7 @@ defmodule TrumanShell.Executor do
 
   ## Examples
 
-      iex> commands = TrumanShell.Executor.supported_commands()
+      iex> commands = TrumanShell.Stages.Executor.supported_commands()
       iex> "ls" in commands
       true
       iex> "notreal" in commands
@@ -172,51 +176,6 @@ defmodule TrumanShell.Executor do
       {:error, "pipeline too deep: #{command_count} commands (max #{@max_pipeline_commands})\n"}
     else
       :ok
-    end
-  end
-
-  # Redirect handling - apply redirects after command execution
-  defp apply_redirects(output, []), do: {:ok, output}
-
-  defp apply_redirects(output, [{:stdout, path} | rest]) do
-    write_redirect(output, path, [], rest)
-  end
-
-  defp apply_redirects(output, [{:stdout_append, path} | rest]) do
-    write_redirect(output, path, [:append], rest)
-  end
-
-  defp write_redirect(output, path, write_opts, rest) do
-    # Bash behavior: for multiple redirects, only LAST one gets output
-    # Earlier redirects are truncated/created with empty content
-    {content_to_write, next_output} =
-      if rest == [] do
-        {output, ""}
-      else
-        {"", output}
-      end
-
-    # Validate the original path first (catches absolute paths outside sandbox)
-    case Sanitizer.validate_path(path, sandbox_root()) do
-      {:ok, _} ->
-        # Then resolve relative to current directory
-        target_path = Path.join(current_dir(), path)
-
-        with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()),
-             :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
-          apply_redirects(next_output, rest)
-        end
-
-      {:error, :outside_sandbox} ->
-        {:error, "bash: #{path}: No such file or directory\n"}
-    end
-  end
-
-  # Wrap File.write to return bash-like errors instead of crashing
-  defp do_write_file(safe_path, output, write_opts, original_path) do
-    case File.write(safe_path, output, write_opts) do
-      :ok -> :ok
-      {:error, reason} -> {:error, "bash: #{original_path}: #{Errors.to_message(reason)}\n"}
     end
   end
 

@@ -1,7 +1,7 @@
-defmodule TrumanShell.TokenizerTest do
+defmodule TrumanShell.Stages.TokenizerTest do
   use ExUnit.Case, async: true
 
-  alias TrumanShell.Tokenizer
+  alias TrumanShell.Stages.Tokenizer
 
   describe "tokenize/1 - basic words" do
     test "single word" do

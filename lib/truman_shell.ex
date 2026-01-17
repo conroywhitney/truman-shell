@@ -24,8 +24,9 @@ defmodule TrumanShell do
 
   """
 
-  alias TrumanShell.Executor
-  alias TrumanShell.Parser
+  alias TrumanShell.Stages.Executor
+  alias TrumanShell.Stages.Expander
+  alias TrumanShell.Stages.Parser
 
   @doc """
   Parse and execute a shell command string.
@@ -50,8 +51,12 @@ defmodule TrumanShell do
   """
   @spec execute(String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def execute(input) do
+    # Pipeline: Tokenizer → Parser → Expander → Executor → Redirector
+    # (Tokenizer is called by Parser, Redirector is called by Executor)
     with {:ok, command} <- parse(input) do
-      Executor.run(command)
+      context = %{sandbox_root: File.cwd!()}
+      expanded = Expander.expand(command, context)
+      Executor.run(expanded)
     end
   end
 

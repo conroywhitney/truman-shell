@@ -1,4 +1,4 @@
-defmodule TrumanShell.Parser do
+defmodule TrumanShell.Stages.Parser do
   @moduledoc """
   Parses tokenized shell commands into Command structs.
 
@@ -15,23 +15,23 @@ defmodule TrumanShell.Parser do
 
   ## Examples
 
-      iex> TrumanShell.Parser.parse("pwd")
-      {:ok, %TrumanShell.Command{name: :pwd, args: []}}
+      iex> TrumanShell.Stages.Parser.parse("pwd")
+      {:ok, %TrumanShell.Command{name: :cmd_pwd, args: []}}
 
-      iex> TrumanShell.Parser.parse("ls -la /tmp")
-      {:ok, %TrumanShell.Command{name: :ls, args: ["-la", "/tmp"]}}
+      iex> TrumanShell.Stages.Parser.parse("ls -la /tmp")
+      {:ok, %TrumanShell.Command{name: :cmd_ls, args: ["-la", "/tmp"]}}
 
-      iex> TrumanShell.Parser.parse("cat file.txt | grep pattern")
+      iex> TrumanShell.Stages.Parser.parse("cat file.txt | grep pattern")
       {:ok, %TrumanShell.Command{
-        name: :cat,
+        name: :cmd_cat,
         args: ["file.txt"],
-        pipes: [%TrumanShell.Command{name: :grep, args: ["pattern"]}]
+        pipes: [%TrumanShell.Command{name: :cmd_grep, args: ["pattern"]}]
       }}
 
   """
 
   alias TrumanShell.Command
-  alias TrumanShell.Tokenizer
+  alias TrumanShell.Stages.Tokenizer
 
   @doc """
   Parse a shell command string into a Command struct.

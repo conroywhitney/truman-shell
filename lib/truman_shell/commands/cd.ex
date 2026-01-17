@@ -14,7 +14,7 @@ defmodule TrumanShell.Commands.Cd do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Changes the current working directory within the sandbox.
@@ -40,17 +40,11 @@ defmodule TrumanShell.Commands.Cd do
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result_with_effects()
   @impl true
+  # No args means go home (sandbox root)
   def handle([], context), do: go_home(context)
-  def handle(["~"], context), do: go_home(context)
-  def handle(["~/"], context), do: go_home(context)
 
-  def handle(["~/" <> subpath], context) do
-    # Expand ~/subdir to sandbox_root/subdir
-    # Strip leading slashes to handle ~//lib -> lib (not /lib)
-    normalized = String.trim_leading(subpath, "/")
-    change_directory(normalized, %{context | current_dir: context.sandbox_root})
-  end
-
+  # Tilde expansion is now handled by Stages.Expander before we get here.
+  # By the time cd receives args, ~ has already been expanded to sandbox_root.
   def handle([path | _], context) do
     change_directory(path, context)
   end
@@ -64,7 +58,7 @@ defmodule TrumanShell.Commands.Cd do
     target_abs = Path.expand(path, context.current_dir)
     target_rel = Path.relative_to(target_abs, context.sandbox_root)
 
-    with {:ok, safe_path} <- Sanitizer.validate_path(target_rel, context.sandbox_root),
+    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, context.sandbox_root),
          {:dir, true} <- {:dir, File.dir?(safe_path)} do
       # Return success with the new cwd for executor to apply
       {:ok, "", set_cwd: safe_path}

@@ -1,9 +1,9 @@
-defmodule TrumanShell.Commands.FileIO do
+defmodule TrumanShell.Support.FileIO do
   @moduledoc """
   Shared file I/O functions for command handlers.
   """
 
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   # Maximum file size in bytes (10MB) to prevent memory exhaustion
   # Large enough for most source files, small enough to prevent OOM attacks
@@ -21,16 +21,16 @@ defmodule TrumanShell.Commands.FileIO do
   ## Examples
 
       iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> {:ok, content} = TrumanShell.Commands.FileIO.read_file("mix.exs", context)
+      iex> {:ok, content} = TrumanShell.Support.FileIO.read_file("mix.exs", context)
       iex> content =~ "defmodule TrumanShell.MixProject"
       true
 
       iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.FileIO.read_file("nonexistent.txt", context)
+      iex> TrumanShell.Support.FileIO.read_file("nonexistent.txt", context)
       {:error, "nonexistent.txt: No such file or directory"}
 
       iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.FileIO.read_file("/etc/passwd", context)
+      iex> TrumanShell.Support.FileIO.read_file("/etc/passwd", context)
       {:error, "/etc/passwd: No such file or directory"}
 
   """
@@ -40,7 +40,7 @@ defmodule TrumanShell.Commands.FileIO do
     target = Path.expand(path, context.current_dir)
     target_rel = Path.relative_to(target, context.sandbox_root)
 
-    with {:ok, safe_path} <- Sanitizer.validate_path(target_rel, context.sandbox_root),
+    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, context.sandbox_root),
          {:ok, contents} <- read_with_limit(safe_path) do
       {:ok, contents}
     else
@@ -94,10 +94,10 @@ defmodule TrumanShell.Commands.FileIO do
 
   ## Examples
 
-      iex> TrumanShell.Commands.FileIO.format_error("cat", "file.txt: No such file")
+      iex> TrumanShell.Support.FileIO.format_error("cat", "file.txt: No such file")
       "cat: file.txt: No such file\\n"
 
-      iex> TrumanShell.Commands.FileIO.format_error("head", "invalid number")
+      iex> TrumanShell.Support.FileIO.format_error("head", "invalid number")
       "head: invalid number\\n"
 
   """
@@ -118,16 +118,16 @@ defmodule TrumanShell.Commands.FileIO do
 
   ## Examples
 
-      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-n", "5", "file.txt"])
+      iex> TrumanShell.Support.FileIO.parse_line_count_args(["-n", "5", "file.txt"])
       {:ok, 5, "file.txt"}
 
-      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-20", "file.txt"])
+      iex> TrumanShell.Support.FileIO.parse_line_count_args(["-20", "file.txt"])
       {:ok, 20, "file.txt"}
 
-      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["file.txt"])
+      iex> TrumanShell.Support.FileIO.parse_line_count_args(["file.txt"])
       {:ok, 10, "file.txt"}
 
-      iex> TrumanShell.Commands.FileIO.parse_line_count_args(["-n", "abc", "file.txt"])
+      iex> TrumanShell.Support.FileIO.parse_line_count_args(["-n", "abc", "file.txt"])
       {:error, "invalid number of lines: 'abc'"}
 
   """

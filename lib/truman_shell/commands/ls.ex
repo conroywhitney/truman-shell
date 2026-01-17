@@ -6,7 +6,7 @@ defmodule TrumanShell.Commands.Ls do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @max_output_lines 200
 
@@ -58,7 +58,7 @@ defmodule TrumanShell.Commands.Ls do
   end
 
   defp list_directory(path, context) do
-    with {:ok, safe_path} <- Sanitizer.validate_path(path, context.sandbox_root),
+    with {:ok, safe_path} <- Sandbox.validate_path(path, context.sandbox_root),
          {:ok, entries} <- File.ls(safe_path) do
       sorted = Enum.sort(entries)
       total_count = length(sorted)

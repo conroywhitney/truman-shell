@@ -4,11 +4,11 @@ defmodule TrumanShell.DoctestTest do
   # Run doctests from all public modules
   doctest TrumanShell
   doctest TrumanShell.Command
-  doctest TrumanShell.Executor
+  doctest TrumanShell.Stages.Executor
 
   # Shared utilities
-  doctest TrumanShell.Commands.FileIO
-  doctest TrumanShell.Commands.TreeWalker
+  doctest TrumanShell.Support.FileIO
+  doctest TrumanShell.Support.TreeWalker
 
   # Command handlers
   doctest TrumanShell.Commands.Pwd

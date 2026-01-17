@@ -1,9 +1,9 @@
-defmodule TrumanShell.Commands.TreeWalkerTest do
+defmodule TrumanShell.Support.TreeWalkerTest do
   use ExUnit.Case, async: true
 
-  alias TrumanShell.Commands.TreeWalker
+  alias TrumanShell.Support.TreeWalker
 
-  @moduletag :commands
+  @moduletag :support
 
   describe "walk/2" do
     test "walks nested directory structure returning files and directories" do

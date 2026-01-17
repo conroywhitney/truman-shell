@@ -6,9 +6,9 @@ defmodule TrumanShell.Commands.Grep do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.FileIO
-  alias TrumanShell.Commands.TreeWalker
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.FileIO
+  alias TrumanShell.Support.Sandbox
+  alias TrumanShell.Support.TreeWalker
 
   @default_opts %{
     recursive: false,
@@ -147,7 +147,7 @@ defmodule TrumanShell.Commands.Grep do
 
   # Recursive search in directory
   defp search_recursive(opts, pattern, path, context) do
-    case Sanitizer.validate_path(path, context.sandbox_root) do
+    case Sandbox.validate_path(path, context.sandbox_root) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
           files = collect_files(safe_path)

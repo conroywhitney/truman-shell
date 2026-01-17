@@ -1,8 +1,8 @@
-defmodule TrumanShell.ExecutorTest do
+defmodule TrumanShell.Stages.ExecutorTest do
   use ExUnit.Case, async: true
 
   alias TrumanShell.Command
-  alias TrumanShell.Executor
+  alias TrumanShell.Stages.Executor
 
   describe "run/2" do
     test "passes stdin option to first command" do

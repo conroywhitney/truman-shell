@@ -6,8 +6,8 @@ defmodule TrumanShell.Commands.Find do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.TreeWalker
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sandbox
+  alias TrumanShell.Support.TreeWalker
 
   @default_opts %{
     name_pattern: nil,
@@ -93,7 +93,7 @@ defmodule TrumanShell.Commands.Find do
   end
 
   defp find_files(path, opts, context) do
-    case Sanitizer.validate_path(path, context.sandbox_root) do
+    case Sandbox.validate_path(path, context.sandbox_root) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
           do_find(safe_path, path, opts)
