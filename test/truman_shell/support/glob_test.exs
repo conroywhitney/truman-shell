@@ -209,6 +209,42 @@ defmodule TrumanShell.Support.GlobTest do
       # Should only include dotfiles, sorted
       assert result == [".config", ".hidden"]
     end
+
+    test ".config/* pattern matches files in dotdir", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create dotdir with files
+      config_dir = Path.join(current_dir, ".config")
+      File.mkdir_p!(config_dir)
+      File.write!(Path.join(config_dir, "settings.json"), "settings")
+      File.write!(Path.join(config_dir, "cache.db"), "cache")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand(".config/*", context)
+
+      # Should match files in the .config directory
+      assert result == [".config/cache.db", ".config/settings.json"]
+    end
+
+    test "*/*.txt does NOT match files in dotdirs (bash compat)", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create visible dir and dotdir with files
+      File.mkdir_p!(Path.join(current_dir, "visible"))
+      File.write!(Path.join([current_dir, "visible", "file.txt"]), "visible")
+      File.mkdir_p!(Path.join(current_dir, ".hidden"))
+      File.write!(Path.join([current_dir, ".hidden", "file.txt"]), "hidden")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand("*/*.txt", context)
+
+      # Should only match visible/file.txt, not .hidden/file.txt
+      assert result == ["visible/file.txt"]
+    end
   end
 
   describe "expand/2 multiple wildcards" do
