@@ -4,10 +4,18 @@ defmodule TrumanShell.DoctestTest do
   # Run doctests from all public modules
   doctest TrumanShell
   doctest TrumanShell.Command
+
+  # Pipeline stages
   doctest TrumanShell.Stages.Executor
+  doctest TrumanShell.Stages.Expander
+  doctest TrumanShell.Stages.Parser
+  doctest TrumanShell.Stages.Tokenizer
 
   # Shared utilities
   doctest TrumanShell.Support.FileIO
+  doctest TrumanShell.Support.Glob
+  doctest TrumanShell.Support.Sandbox
+  doctest TrumanShell.Support.Tilde
   doctest TrumanShell.Support.TreeWalker
 
   # Command handlers

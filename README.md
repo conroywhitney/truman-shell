@@ -18,7 +18,7 @@ Add `truman_shell` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:truman_shell, "~> 0.3.2"}
+    {:truman_shell, "~> 0.6.0"}
   ]
 end
 ```
@@ -39,6 +39,14 @@ end
 # Path traversal is blocked (404 principle)
 {:error, msg} = TrumanShell.execute("ls /etc")
 # => "ls: /etc: No such file or directory\n"
+
+# Glob patterns expand to matching files
+{:ok, output} = TrumanShell.execute("ls *.ex")
+# => "mix.ex\n"
+
+# Quoted globs are treated as literal filenames
+{:error, msg} = TrumanShell.execute("ls \"*.ex\"")
+# => "ls: *.ex: No such file or directory\n"
 ```
 
 ### Parse Commands
@@ -97,15 +105,18 @@ end
 - Utility: `which`, `date`, `true`, `false`
 - 280 tests, 71 doctests passing
 
-### v0.5 - Tilde Expansion ✅ (Current)
+### v0.5 - Tilde Expansion ✅
 - `cd ~`, `cd ~/subdir` → sandbox root navigation
 - Security hardening: `~/..` traversal blocked, `~user` rejected
 - 292 tests passing
 
-### v0.6 - Glob Expansion (Next)
-- Glob patterns in commands: `ls *.ex`, `cat **/*.md`
-- `find` glob support improvements
-- Additional flags for existing commands as needed
+### v0.6 - Glob Expansion ✅ (Current)
+- Glob patterns: `ls *.ex`, `cat **/*.md`, `ls src/**/*.ex`
+- Recursive `**` patterns with depth limit (100 levels)
+- Sandbox enforcement: globs cannot escape sandbox
+- Quoted globs preserved: `ls "*.txt"` treats `*.txt` as literal
+- Bash compatibility: `./` prefix preserved, dotfile handling
+- 367 tests, 93 doctests passing
 
 ### v1.0 - Production Ready
 - All common bash commands for AI agent workflows

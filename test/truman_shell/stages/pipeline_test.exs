@@ -225,4 +225,104 @@ defmodule TrumanShell.Stages.PipelineTest do
       assert File.read!(full_path) == "hello world\n"
     end
   end
+
+  describe "full pipeline: glob expansion" do
+    setup do
+      rel_dir = ".test_glob_#{:rand.uniform(100_000)}"
+      tmp_dir = Path.join(File.cwd!(), rel_dir)
+      File.mkdir_p!(tmp_dir)
+
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+      {:ok, tmp_dir: tmp_dir, rel_dir: rel_dir}
+    end
+
+    test "ls *.md returns matching files", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # Create test files
+      File.write!(Path.join(tmp_dir, "README.md"), "readme")
+      File.write!(Path.join(tmp_dir, "CHANGELOG.md"), "changelog")
+      File.write!(Path.join(tmp_dir, "other.txt"), "other")
+
+      {:ok, output} = TrumanShell.execute("ls #{rel_dir}/*.md")
+
+      # ls outputs one file per line, sorted
+      lines = output |> String.trim() |> String.split("\n") |> Enum.sort()
+      assert lines == ["#{rel_dir}/CHANGELOG.md", "#{rel_dir}/README.md"]
+    end
+
+    test "ls **/*.ex recursive listing", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # Create nested structure
+      File.write!(Path.join(tmp_dir, "root.ex"), "root")
+      File.mkdir_p!(Path.join(tmp_dir, "sub"))
+      File.write!(Path.join([tmp_dir, "sub", "nested.ex"]), "nested")
+      File.mkdir_p!(Path.join([tmp_dir, "sub", "deep"]))
+      File.write!(Path.join([tmp_dir, "sub", "deep", "deeper.ex"]), "deeper")
+
+      {:ok, output} = TrumanShell.execute("ls #{rel_dir}/**/*.ex")
+
+      lines = output |> String.trim() |> String.split("\n") |> Enum.sort()
+
+      assert lines == [
+               "#{rel_dir}/root.ex",
+               "#{rel_dir}/sub/deep/deeper.ex",
+               "#{rel_dir}/sub/nested.ex"
+             ]
+    end
+
+    test "cat *.txt concatenates matching files", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      File.write!(Path.join(tmp_dir, "a.txt"), "content-a\n")
+      File.write!(Path.join(tmp_dir, "b.txt"), "content-b\n")
+
+      {:ok, output} = TrumanShell.execute("cat #{rel_dir}/*.txt")
+
+      # cat outputs file contents (sorted by glob)
+      assert output == "content-a\ncontent-b\n"
+    end
+
+    test "ls *.nonexistent returns error", %{rel_dir: rel_dir} do
+      # No matching files - glob returns literal pattern, ls reports not found
+      {:error, msg} = TrumanShell.execute("ls #{rel_dir}/*.nonexistent")
+      assert msg =~ "No such file or directory"
+    end
+
+    test "glob cannot escape sandbox" do
+      # Pattern trying to escape - should find nothing (filtered by sandbox)
+      {:error, msg} = TrumanShell.execute("ls ../*.md")
+      assert msg =~ "No such file or directory"
+    end
+
+    test "quoted glob pattern is NOT expanded", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # Create matching files
+      File.write!(Path.join(tmp_dir, "a.md"), "a")
+      File.write!(Path.join(tmp_dir, "b.md"), "b")
+
+      # Quoted pattern should be treated as literal filename, not expanded
+      # bash: ls "*.md" -> error: *.md: No such file or directory
+      {:error, msg} = TrumanShell.execute("ls \"#{rel_dir}/*.md\"")
+      assert msg =~ "No such file or directory"
+    end
+
+    test "single-quoted glob pattern is NOT expanded", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # Create matching files
+      File.write!(Path.join(tmp_dir, "x.txt"), "x")
+
+      # Single-quoted pattern should be treated as literal
+      {:error, msg} = TrumanShell.execute("ls '#{rel_dir}/*.txt'")
+      assert msg =~ "No such file or directory"
+    end
+
+    test "glob works with filenames containing spaces", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # Create files with spaces in names
+      File.write!(Path.join(tmp_dir, "my file.txt"), "content a\n")
+      File.write!(Path.join(tmp_dir, "other file.txt"), "content b\n")
+      File.write!(Path.join(tmp_dir, "non-text file.xyz"), "content c\n")
+
+      {:ok, output} = TrumanShell.execute("cat #{rel_dir}/*.txt")
+
+      # cat concatenates both .txt files (sorted: "my file" < "other file")
+      assert output == "content a\ncontent b\n"
+      # .xyz file should NOT be included
+      refute output =~ "content c"
+    end
+  end
 end

@@ -189,4 +189,97 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert hd(result.pipes).redirects == [{:stdout, "/sandbox/filtered.txt"}]
     end
   end
+
+  describe "expand/2 glob expansion" do
+    setup do
+      # Create a unique temp directory for filesystem tests
+      tmp_dir = Path.join(System.tmp_dir!(), "expander_glob_#{:erlang.unique_integer([:positive])}")
+      File.mkdir_p!(tmp_dir)
+
+      on_exit(fn ->
+        File.rm_rf!(tmp_dir)
+      end)
+
+      {:ok, sandbox_root: tmp_dir, current_dir: tmp_dir}
+    end
+
+    test "expands {:glob, *.md} to matching files", %{sandbox_root: sandbox, current_dir: current_dir} do
+      # Create test files
+      File.write!(Path.join(current_dir, "README.md"), "readme")
+      File.write!(Path.join(current_dir, "CHANGELOG.md"), "changelog")
+
+      # Use {:glob, pattern} tuple to mark as expandable (matches Parser output)
+      command = Command.new(:cmd_ls, [{:glob, "*.md"}])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      assert result.args == ["CHANGELOG.md", "README.md"]
+    end
+
+    test "expands tilde then glob ~/*.md", %{sandbox_root: sandbox, current_dir: current_dir} do
+      # Create test files
+      File.write!(Path.join(current_dir, "README.md"), "readme")
+      File.write!(Path.join(current_dir, "CHANGELOG.md"), "changelog")
+
+      command = Command.new(:cmd_ls, [{:glob, "~/*.md"}])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      # Tilde expands to sandbox, then glob finds files
+      assert result.args == ["#{sandbox}/CHANGELOG.md", "#{sandbox}/README.md"]
+    end
+
+    test "preserves non-glob args", %{sandbox_root: sandbox, current_dir: current_dir} do
+      command = Command.new(:cmd_ls, ["-la", "src"])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      assert result.args == ["-la", "src"]
+    end
+
+    test "mixes glob and non-glob args", %{sandbox_root: sandbox, current_dir: current_dir} do
+      # Create test files
+      File.write!(Path.join(current_dir, "a.md"), "a")
+      File.write!(Path.join(current_dir, "b.md"), "b")
+
+      # -n is literal string, *.md is {:glob, ...} - matches Parser output
+      command = Command.new(:cmd_cat, ["-n", {:glob, "*.md"}])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      assert result.args == ["-n", "a.md", "b.md"]
+    end
+
+    test "no-match glob returns original pattern", %{sandbox_root: sandbox, current_dir: current_dir} do
+      command = Command.new(:cmd_ls, [{:glob, "*.nonexistent"}])
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      assert result.args == ["*.nonexistent"]
+    end
+
+    test "expands glob in piped commands", %{sandbox_root: sandbox, current_dir: current_dir} do
+      # Create test files
+      File.write!(Path.join(current_dir, "a.txt"), "content-a")
+      File.write!(Path.join(current_dir, "b.txt"), "content-b")
+
+      # cat *.txt | grep pattern
+      base = Command.new(:cmd_cat, [{:glob, "*.txt"}])
+      piped = Command.new(:cmd_grep, ["pattern"])
+      command = %{base | pipes: [piped]}
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      # Base command args should be expanded
+      assert result.args == ["a.txt", "b.txt"]
+      # Piped command args should be unchanged (no glob)
+      assert hd(result.pipes).args == ["pattern"]
+    end
+  end
 end

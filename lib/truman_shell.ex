@@ -54,7 +54,8 @@ defmodule TrumanShell do
     # Pipeline: Tokenizer → Parser → Expander → Executor → Redirector
     # (Tokenizer is called by Parser, Redirector is called by Executor)
     with {:ok, command} <- parse(input) do
-      context = %{sandbox_root: File.cwd!()}
+      cwd = File.cwd!()
+      context = %{sandbox_root: cwd, current_dir: cwd}
       expanded = Expander.expand(command, context)
       Executor.run(expanded)
     end

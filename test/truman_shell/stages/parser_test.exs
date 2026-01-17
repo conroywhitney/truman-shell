@@ -109,8 +109,8 @@ defmodule TrumanShell.Stages.ParserTest do
       assert {:ok, %Command{name: :cmd_ls, args: ["-la", "/tmp"]}} = Parser.parse("ls -la /tmp")
     end
 
-    test "ls with glob pattern" do
-      assert {:ok, %Command{name: :cmd_ls, args: ["*.md"]}} = Parser.parse("ls *.md")
+    test "ls with glob pattern preserves {:glob, pattern} tuple" do
+      assert {:ok, %Command{name: :cmd_ls, args: [{:glob, "*.md"}]}} = Parser.parse("ls *.md")
     end
   end
 

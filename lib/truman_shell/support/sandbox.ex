@@ -16,6 +16,30 @@ defmodule TrumanShell.Support.Sandbox do
   - Directory traversal attacks (`../` sequences)
   - Absolute paths outside sandbox
 
+  ## Examples
+
+      # Relative paths within sandbox are allowed
+      iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("lib/foo.ex", "/sandbox")
+      iex> path
+      "/sandbox/lib/foo.ex"
+
+      # Directory traversal is blocked
+      iex> TrumanShell.Support.Sandbox.validate_path("../escape", "/sandbox")
+      {:error, :outside_sandbox}
+
+      # Absolute paths outside sandbox are blocked
+      iex> TrumanShell.Support.Sandbox.validate_path("/etc/passwd", "/sandbox")
+      {:error, :outside_sandbox}
+
+      # Similar prefix but different directory is blocked
+      iex> TrumanShell.Support.Sandbox.validate_path("/sandbox2/file", "/sandbox")
+      {:error, :outside_sandbox}
+
+      # Absolute paths within sandbox are allowed
+      iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("/sandbox/file", "/sandbox")
+      iex> path
+      "/sandbox/file"
+
   ## Symlink Limitation
 
   `Path.safe_relative/2` performs **lexical (string-based) validation only** -
