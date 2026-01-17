@@ -1,0 +1,23 @@
+#!/bin/bash
+# Pre-commit checks: format + credo + dialyzer
+#
+# To install as git hook:
+#   ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+#
+# Or run manually before committing:
+#   ./scripts/pre-commit
+
+set -e
+
+echo "Running pre-commit checks..."
+
+echo "→ mix format --check-formatted"
+mix format --check-formatted
+
+echo "→ mix credo --strict"
+mix credo --strict
+
+echo "→ mix dialyzer"
+mix dialyzer
+
+echo "✓ All checks passed!"

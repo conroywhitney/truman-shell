@@ -102,9 +102,6 @@ defmodule TrumanShell.Commands.Ls do
 
       {:error, :outside_sandbox} ->
         {:error, "ls: #{path}: No such file or directory\n"}
-
-      {:error, _reason} ->
-        {:error, "ls: #{path}: No such file or directory\n"}
     end
   end
 
