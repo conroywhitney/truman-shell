@@ -12,12 +12,12 @@ AI agents (especially Claude Code) frequently use glob patterns like `ls *.md` a
 
 **Supported patterns (v0.6):**
 - `*` - matches any characters (e.g., `*.md`, `file*`, `*test*`)
+- `**` - recursive globbing (e.g., `**/*.md`, `src/**/*.ts`)
 - `dir/*.ext` - glob within subdirectory
 
 **Deferred to later:**
 - `?` single character match
 - `[abc]` character classes
-- `**` recursive globbing
 
 ## Capabilities
 
@@ -49,6 +49,8 @@ _None - glob expansion enhances existing Expander stage (created in refactor-sta
 ls *.md              → README.md\nCHANGELOG.md
 ls *.nonexistent     → ls: *.nonexistent: No such file or directory
 cat src/*.ts         → concatenated ts files
+ls **/*.md           → finds .md files in all subdirectories
+cat src/**/*.ex      → concatenates all .ex files recursively
 ```
 
 ## Dependencies
