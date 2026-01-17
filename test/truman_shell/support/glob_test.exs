@@ -245,4 +245,38 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == ["src/lib/deep/file.ex", "src/root.ex"]
     end
   end
+
+  describe "expand/2 filenames with spaces" do
+    test "matches files with spaces in name", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create files with spaces
+      File.write!(Path.join(current_dir, "my file.txt"), "content")
+      File.write!(Path.join(current_dir, "another file.txt"), "content")
+      File.write!(Path.join(current_dir, "nospace.txt"), "content")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand("*.txt", context)
+
+      assert result == ["another file.txt", "my file.txt", "nospace.txt"]
+    end
+
+    test "matches files in directory with spaces", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create directory with space
+      dir_with_space = Path.join(current_dir, "my dir")
+      File.mkdir_p!(dir_with_space)
+      File.write!(Path.join(dir_with_space, "file.md"), "content")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand("my dir/*.md", context)
+
+      assert result == ["my dir/file.md"]
+    end
+  end
 end

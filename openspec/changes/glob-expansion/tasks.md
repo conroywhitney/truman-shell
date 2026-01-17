@@ -17,14 +17,14 @@
 - [x] 3.1 Implement basic `*` matching via `Path.wildcard/2`
 - [x] 3.2 Implement `**` recursive matching (Path.wildcard supports this)
 - [x] 3.3 Add sandbox filtering - exclude matches outside sandbox_root
-- [ ] 3.4 Add depth limit for `**` patterns (max 100, consistent with TreeWalker)
+- [x] 3.4 Add depth limit for `**` patterns (max 100, consistent with TreeWalker)
 - [x] 3.5 Sort results alphabetically
 - [x] 3.6 Return original pattern when no matches (nullglob=off behavior)
 
 ## 4. Edge Cases
 
 - [x] 4.1 Handle dotfiles (match_dot: false by default, true if pattern starts with `.`)
-- [ ] 4.2 Handle filenames with spaces (ensure proper handling through pipeline)
+- [x] 4.2 Handle filenames with spaces (ensure proper handling through pipeline)
 - [x] 4.3 Handle empty directories (return original pattern)
 - [x] 4.4 Handle non-existent directories in pattern (return original pattern)
 
@@ -36,15 +36,15 @@
 - [x] 5.4 Test no-match returns original pattern
 - [x] 5.5 Test dotfile exclusion/inclusion
 - [x] 5.6 Test sorted results
-- [ ] 5.7 Test filenames with spaces
-- [ ] 5.8 Test multiple wildcards (`*_*_test.exs`, `f*o.*d`)
-- [ ] 5.9 Test `**` depth limit (max 100 levels)
+- [x] 5.7 Test filenames with spaces
+- [x] 5.8 Test multiple wildcards (`*_*_test.exs`, `f*o.*d`)
+- [x] 5.9 Test `**` depth limit (max 100 levels)
 
 ## 6. Expander Tests
 
 - [x] 6.1 Test `Expander.expand/2` with glob in args
 - [x] 6.2 Test tilde-then-glob expansion (`~/*.md`)
-- [ ] 6.3 Test glob in piped commands
+- [x] 6.3 Test glob in piped commands
 - [x] 6.4 Test non-glob args unchanged
 
 ## 7. Integration Tests
@@ -54,4 +54,4 @@
 - [x] 7.3 Test `cat *.txt` concatenates matching files
 - [x] 7.4 Test `ls *.nonexistent` returns "No such file or directory"
 - [x] 7.5 Test glob cannot escape sandbox
-- [ ] 7.6 Test filenames with spaces work end-to-end
+- [x] 7.6 Test filenames with spaces work end-to-end

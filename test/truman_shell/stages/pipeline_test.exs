@@ -289,5 +289,19 @@ defmodule TrumanShell.Stages.PipelineTest do
       {:error, msg} = TrumanShell.execute("ls ../*.md")
       assert msg =~ "No such file or directory"
     end
+
+    test "glob works with filenames containing spaces", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # Create files with spaces in names
+      File.write!(Path.join(tmp_dir, "my file.txt"), "content a\n")
+      File.write!(Path.join(tmp_dir, "other file.txt"), "content b\n")
+      File.write!(Path.join(tmp_dir, "non-text file.xyz"), "content c\n")
+
+      {:ok, output} = TrumanShell.execute("cat #{rel_dir}/*.txt")
+
+      # cat concatenates both .txt files (sorted: "my file" < "other file")
+      assert output == "content a\ncontent b\n"
+      # .xyz file should NOT be included
+      refute output =~ "content c"
+    end
   end
 end
