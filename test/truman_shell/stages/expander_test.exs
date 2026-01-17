@@ -203,12 +203,13 @@ defmodule TrumanShell.Stages.ExpanderTest do
       {:ok, sandbox_root: tmp_dir, current_dir: tmp_dir}
     end
 
-    test "expands *.md to matching files", %{sandbox_root: sandbox, current_dir: current_dir} do
+    test "expands {:glob, *.md} to matching files", %{sandbox_root: sandbox, current_dir: current_dir} do
       # Create test files
       File.write!(Path.join(current_dir, "README.md"), "readme")
       File.write!(Path.join(current_dir, "CHANGELOG.md"), "changelog")
 
-      command = Command.new(:cmd_ls, ["*.md"])
+      # Use {:glob, pattern} tuple to mark as expandable (matches Parser output)
+      command = Command.new(:cmd_ls, [{:glob, "*.md"}])
       context = %{sandbox_root: sandbox, current_dir: current_dir}
 
       result = Expander.expand(command, context)
@@ -221,7 +222,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
       File.write!(Path.join(current_dir, "README.md"), "readme")
       File.write!(Path.join(current_dir, "CHANGELOG.md"), "changelog")
 
-      command = Command.new(:cmd_ls, ["~/*.md"])
+      command = Command.new(:cmd_ls, [{:glob, "~/*.md"}])
       context = %{sandbox_root: sandbox, current_dir: current_dir}
 
       result = Expander.expand(command, context)
@@ -244,7 +245,8 @@ defmodule TrumanShell.Stages.ExpanderTest do
       File.write!(Path.join(current_dir, "a.md"), "a")
       File.write!(Path.join(current_dir, "b.md"), "b")
 
-      command = Command.new(:cmd_cat, ["-n", "*.md"])
+      # -n is literal string, *.md is {:glob, ...} - matches Parser output
+      command = Command.new(:cmd_cat, ["-n", {:glob, "*.md"}])
       context = %{sandbox_root: sandbox, current_dir: current_dir}
 
       result = Expander.expand(command, context)
@@ -253,7 +255,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
     end
 
     test "no-match glob returns original pattern", %{sandbox_root: sandbox, current_dir: current_dir} do
-      command = Command.new(:cmd_ls, ["*.nonexistent"])
+      command = Command.new(:cmd_ls, [{:glob, "*.nonexistent"}])
       context = %{sandbox_root: sandbox, current_dir: current_dir}
 
       result = Expander.expand(command, context)
@@ -267,7 +269,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
       File.write!(Path.join(current_dir, "b.txt"), "content-b")
 
       # cat *.txt | grep pattern
-      base = Command.new(:cmd_cat, ["*.txt"])
+      base = Command.new(:cmd_cat, [{:glob, "*.txt"}])
       piped = Command.new(:cmd_grep, ["pattern"])
       command = %{base | pipes: [piped]}
       context = %{sandbox_root: sandbox, current_dir: current_dir}

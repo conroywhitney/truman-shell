@@ -248,6 +248,27 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 depth limit" do
+    test "depth limit works correctly with absolute glob patterns", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create a structure 5 levels deep
+      deep_path = Path.join([current_dir, "a", "b", "c", "d", "e"])
+      File.mkdir_p!(deep_path)
+      File.write!(Path.join(deep_path, "deep.ex"), "deep")
+      File.write!(Path.join(current_dir, "root.ex"), "root")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Absolute pattern with ** - depth should be counted from the base_dir (sandbox)
+      result = Glob.expand("#{sandbox}/**/*.ex", context)
+
+      assert is_list(result)
+      # Both files should be found since 5 levels is under 100 limit
+      assert "#{sandbox}/a/b/c/d/e/deep.ex" in result
+      assert "#{sandbox}/root.ex" in result
+    end
+
     test "recursive glob includes files within depth limit", %{
       sandbox_root: sandbox,
       current_dir: current_dir

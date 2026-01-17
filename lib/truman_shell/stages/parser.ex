@@ -148,9 +148,9 @@ defmodule TrumanShell.Stages.Parser do
     parse_args_and_redirects(rest, [word | args], redirects)
   end
 
-  # Glob argument
+  # Glob argument - preserve as {:glob, pattern} for Expander to know it's expandable
   defp parse_args_and_redirects([{:glob, pattern} | rest], args, redirects) do
-    parse_args_and_redirects(rest, [pattern | args], redirects)
+    parse_args_and_redirects(rest, [{:glob, pattern} | args], redirects)
   end
 
   # Skip other token types (shouldn't happen after split_by_pipes)

@@ -51,23 +51,20 @@ defmodule TrumanShell.Stages.Expander do
     %{command | args: expanded_args, redirects: expanded_redirects, pipes: expanded_pipes}
   end
 
-  # Expand a single argument - returns a list (glob can expand to multiple files)
-  defp expand_arg(arg, context) when is_binary(arg) do
-    arg
-    |> Tilde.expand(context.sandbox_root)
-    |> maybe_expand_glob(context)
+  # Expand a {:glob, pattern} argument - tilde expansion then glob expansion
+  defp expand_arg({:glob, pattern}, context) do
+    expanded = Tilde.expand(pattern, context.sandbox_root)
+
+    case Glob.expand(expanded, context) do
+      files when is_list(files) -> files
+      result when is_binary(result) -> [result]
+    end
   end
 
-  # If arg contains *, expand as glob pattern
-  defp maybe_expand_glob(arg, context) do
-    if String.contains?(arg, "*") do
-      case Glob.expand(arg, context) do
-        files when is_list(files) -> files
-        pattern when is_binary(pattern) -> [pattern]
-      end
-    else
-      [arg]
-    end
+  # Expand a literal string argument - tilde expansion only, NO glob expansion
+  # This handles quoted args like "*.txt" which should remain literal
+  defp expand_arg(arg, context) when is_binary(arg) do
+    [Tilde.expand(arg, context.sandbox_root)]
   end
 
   # Expand tilde in redirect path

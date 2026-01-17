@@ -291,6 +291,26 @@ defmodule TrumanShell.Stages.PipelineTest do
       assert msg =~ "No such file or directory"
     end
 
+    test "quoted glob pattern is NOT expanded", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # Create matching files
+      File.write!(Path.join(tmp_dir, "a.md"), "a")
+      File.write!(Path.join(tmp_dir, "b.md"), "b")
+
+      # Quoted pattern should be treated as literal filename, not expanded
+      # bash: ls "*.md" -> error: *.md: No such file or directory
+      {:error, msg} = TrumanShell.execute("ls \"#{rel_dir}/*.md\"")
+      assert msg =~ "No such file or directory"
+    end
+
+    test "single-quoted glob pattern is NOT expanded", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # Create matching files
+      File.write!(Path.join(tmp_dir, "x.txt"), "x")
+
+      # Single-quoted pattern should be treated as literal
+      {:error, msg} = TrumanShell.execute("ls '#{rel_dir}/*.txt'")
+      assert msg =~ "No such file or directory"
+    end
+
     test "glob works with filenames containing spaces", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
       # Create files with spaces in names
       File.write!(Path.join(tmp_dir, "my file.txt"), "content a\n")
