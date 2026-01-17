@@ -7,6 +7,18 @@ defmodule TrumanShell.Stages.Expander do
   2. Glob expansion: `*.ex` → list of matching files
 
   Runs after Parser, before Executor in the pipeline.
+
+  ## Argument Types
+
+  The Parser stage marks arguments with their expansion behavior:
+
+  - `{:glob, pattern}` - Unquoted args containing `*` wildcards. These get
+    both tilde and glob expansion.
+  - `String.t()` - Quoted args or args without wildcards. These get tilde
+    expansion only (no glob expansion), preserving literal filenames.
+
+  This allows `ls *.txt` to expand globs while `ls "*.txt"` treats it as
+  a literal filename (matching bash behavior).
   """
 
   alias TrumanShell.Command
@@ -52,12 +64,13 @@ defmodule TrumanShell.Stages.Expander do
   end
 
   # Expand a {:glob, pattern} argument - tilde expansion then glob expansion
+  # Glob.expand/2 returns [String.t()] if matches found, or String.t() if no matches
   defp expand_arg({:glob, pattern}, context) do
     expanded = Tilde.expand(pattern, context.sandbox_root)
 
     case Glob.expand(expanded, context) do
       files when is_list(files) -> files
-      result when is_binary(result) -> [result]
+      pattern when is_binary(pattern) -> [pattern]
     end
   end
 

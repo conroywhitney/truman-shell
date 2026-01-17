@@ -79,9 +79,9 @@ defmodule TrumanShell.Support.Glob do
     end
   end
 
-  defp normalize_paths(paths, true, _has_dot_prefix, _current_dir), do: paths
+  defp normalize_paths(paths, true = _is_absolute, _has_dot_prefix, _current_dir), do: paths
 
-  defp normalize_paths(paths, false, has_dot_prefix, current_dir) do
+  defp normalize_paths(paths, false = _is_absolute, has_dot_prefix, current_dir) do
     paths
     |> Enum.map(&Path.relative_to(&1, current_dir))
     |> then(fn relative_paths ->
