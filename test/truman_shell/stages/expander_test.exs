@@ -260,5 +260,24 @@ defmodule TrumanShell.Stages.ExpanderTest do
 
       assert result.args == ["*.nonexistent"]
     end
+
+    test "expands glob in piped commands", %{sandbox_root: sandbox, current_dir: current_dir} do
+      # Create test files
+      File.write!(Path.join(current_dir, "a.txt"), "content-a")
+      File.write!(Path.join(current_dir, "b.txt"), "content-b")
+
+      # cat *.txt | grep pattern
+      base = Command.new(:cmd_cat, ["*.txt"])
+      piped = Command.new(:cmd_grep, ["pattern"])
+      command = %{base | pipes: [piped]}
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Expander.expand(command, context)
+
+      # Base command args should be expanded
+      assert result.args == ["a.txt", "b.txt"]
+      # Piped command args should be unchanged (no glob)
+      assert hd(result.pipes).args == ["pattern"]
+    end
   end
 end
