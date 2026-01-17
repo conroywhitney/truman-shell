@@ -24,6 +24,23 @@ defmodule TrumanShell.Stages.Expander do
   Requires a context map with:
   - `:sandbox_root` - Root directory for tilde expansion and sandbox constraint
   - `:current_dir` - Current working directory for glob expansion
+
+  ## Examples
+
+      iex> alias TrumanShell.Command
+      iex> alias TrumanShell.Stages.Expander
+      iex> cmd = %Command{name: "cat", args: ["~/file.txt"], redirects: [], pipes: []}
+      iex> ctx = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
+      iex> Expander.expand(cmd, ctx)
+      %Command{name: "cat", args: ["/sandbox/file.txt"], redirects: [], pipes: []}
+
+      iex> alias TrumanShell.Command
+      iex> alias TrumanShell.Stages.Expander
+      iex> cmd = %Command{name: "echo", args: ["hi"], redirects: [{:stdout, "~/out.txt"}], pipes: []}
+      iex> ctx = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
+      iex> Expander.expand(cmd, ctx)
+      %Command{name: "echo", args: ["hi"], redirects: [{:stdout, "/sandbox/out.txt"}], pipes: []}
+
   """
   @spec expand(Command.t(), map()) :: Command.t()
   def expand(%Command{args: args, redirects: redirects, pipes: pipes} = command, context) do

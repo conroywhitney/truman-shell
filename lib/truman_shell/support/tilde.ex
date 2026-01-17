@@ -11,23 +11,26 @@ defmodule TrumanShell.Support.Tilde do
 
   ## Examples
 
-      iex> Tilde.expand("~", "/sandbox")
+      iex> TrumanShell.Support.Tilde.expand("~", "/sandbox")
       "/sandbox"
 
-      iex> Tilde.expand("~/foo", "/sandbox")
+      iex> TrumanShell.Support.Tilde.expand("~/foo", "/sandbox")
       "/sandbox/foo"
 
-      iex> Tilde.expand("~/", "/sandbox")
+      iex> TrumanShell.Support.Tilde.expand("~/", "/sandbox")
       "/sandbox"
 
-      iex> Tilde.expand("~//lib", "/sandbox")
+      iex> TrumanShell.Support.Tilde.expand("~//lib", "/sandbox")
       "/sandbox/lib"
 
-      iex> Tilde.expand("/absolute/path", "/sandbox")
+      iex> TrumanShell.Support.Tilde.expand("/absolute/path", "/sandbox")
       "/absolute/path"
 
-      iex> Tilde.expand("relative", "/sandbox")
+      iex> TrumanShell.Support.Tilde.expand("relative", "/sandbox")
       "relative"
+
+      iex> TrumanShell.Support.Tilde.expand("~user", "/sandbox")
+      "~user"
 
   ## Notes
 

@@ -24,6 +24,25 @@ defmodule TrumanShell.Support.Glob do
   Requires a context map with:
   - `:sandbox_root` - Root directory for sandbox constraint
   - `:current_dir` - Current working directory for relative patterns
+
+  ## Examples
+
+      # No match returns original pattern
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Support.Glob.expand("no_match_*.xyz", context)
+      "no_match_*.xyz"
+
+      # Matching files returns sorted list
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> result = TrumanShell.Support.Glob.expand("mix.*", context)
+      iex> is_list(result) and "mix.exs" in result
+      true
+
+      # Outside sandbox returns original pattern
+      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      iex> TrumanShell.Support.Glob.expand("/etc/*", context)
+      "/etc/*"
+
   """
   @spec expand(String.t(), map()) :: [String.t()] | String.t()
   def expand(pattern, context) do
