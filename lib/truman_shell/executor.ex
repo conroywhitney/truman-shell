@@ -15,7 +15,7 @@ defmodule TrumanShell.Executor do
   flows through each stage as a string.
 
   **Mitigations:**
-  - FileIO enforces a 10MB per-file limit (see `TrumanShell.Commands.FileIO`)
+  - FileIO enforces a 10MB per-file limit (see `TrumanShell.Support.FileIO`)
   - Pipeline depth is limited to 10 commands
 
   **Acceptable for:** AI agent sandbox with controlled inputs (small files)
@@ -25,7 +25,7 @@ defmodule TrumanShell.Executor do
   alias TrumanShell.Command
   alias TrumanShell.Commands
   alias TrumanShell.Posix.Errors
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   # Maximum number of commands in a pipeline (e.g., cmd1 | cmd2 | cmd3 = 3 commands)
   # 9 pipe operators connect 10 commands maximum

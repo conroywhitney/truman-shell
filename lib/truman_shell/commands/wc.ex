@@ -6,7 +6,7 @@ defmodule TrumanShell.Commands.Wc do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.FileIO
+  alias TrumanShell.Support.FileIO
 
   @default_opts %{
     lines: false,

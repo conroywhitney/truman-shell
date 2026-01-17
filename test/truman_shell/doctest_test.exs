@@ -7,8 +7,8 @@ defmodule TrumanShell.DoctestTest do
   doctest TrumanShell.Executor
 
   # Shared utilities
-  doctest TrumanShell.Commands.FileIO
-  doctest TrumanShell.Commands.TreeWalker
+  doctest TrumanShell.Support.FileIO
+  doctest TrumanShell.Support.TreeWalker
 
   # Command handlers
   doctest TrumanShell.Commands.Pwd

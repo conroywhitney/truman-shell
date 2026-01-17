@@ -6,7 +6,7 @@ defmodule TrumanShell.Commands.Ls do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   @max_output_lines 200
 

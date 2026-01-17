@@ -8,7 +8,7 @@ defmodule TrumanShell.Commands.Mkdir do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   @doc """
   Creates a new directory within the sandbox.

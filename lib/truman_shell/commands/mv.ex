@@ -9,7 +9,7 @@ defmodule TrumanShell.Commands.Mv do
 
   alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Posix.Errors
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   @doc """
   Moves or renames a file within the sandbox.

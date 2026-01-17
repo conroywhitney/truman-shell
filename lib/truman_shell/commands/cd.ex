@@ -14,7 +14,7 @@ defmodule TrumanShell.Commands.Cd do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   @doc """
   Changes the current working directory within the sandbox.

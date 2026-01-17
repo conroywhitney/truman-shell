@@ -6,9 +6,9 @@ defmodule TrumanShell.Commands.Grep do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.FileIO
-  alias TrumanShell.Commands.TreeWalker
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.FileIO
+  alias TrumanShell.Support.TreeWalker
+  alias TrumanShell.Support.Sanitizer
 
   @default_opts %{
     recursive: false,

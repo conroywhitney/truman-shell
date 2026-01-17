@@ -1,4 +1,4 @@
-defmodule TrumanShell.Sanitizer do
+defmodule TrumanShell.Support.Sanitizer do
   @moduledoc """
   Path sanitization and validation for the Truman Shell sandbox.
 

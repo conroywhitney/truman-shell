@@ -6,8 +6,8 @@ defmodule TrumanShell.Commands.Find do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.TreeWalker
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.TreeWalker
+  alias TrumanShell.Support.Sanitizer
 
   @default_opts %{
     name_pattern: nil,

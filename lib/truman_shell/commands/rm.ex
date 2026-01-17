@@ -19,7 +19,7 @@ defmodule TrumanShell.Commands.Rm do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   @doc """
   Soft deletes a file by moving it to .trash within the sandbox.

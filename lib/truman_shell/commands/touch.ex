@@ -9,7 +9,7 @@ defmodule TrumanShell.Commands.Touch do
 
   alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Posix.Errors
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   @doc """
   Creates an empty file or updates timestamp within the sandbox.

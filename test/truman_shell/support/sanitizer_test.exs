@@ -1,7 +1,7 @@
-defmodule TrumanShell.SanitizerTest do
+defmodule TrumanShell.Support.SanitizerTest do
   use ExUnit.Case, async: true
 
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   describe "validate_path/2" do
     @tag :tmp_dir

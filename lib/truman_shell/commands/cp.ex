@@ -9,7 +9,7 @@ defmodule TrumanShell.Commands.Cp do
 
   alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Posix.Errors
-  alias TrumanShell.Sanitizer
+  alias TrumanShell.Support.Sanitizer
 
   @doc """
   Copies a file within the sandbox.

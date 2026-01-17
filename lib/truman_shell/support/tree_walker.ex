@@ -1,4 +1,4 @@
-defmodule TrumanShell.Commands.TreeWalker do
+defmodule TrumanShell.Support.TreeWalker do
   @moduledoc """
   Shared utility for walking directory trees.
 
@@ -40,7 +40,7 @@ defmodule TrumanShell.Commands.TreeWalker do
 
   ## Examples
 
-      iex> entries = TrumanShell.Commands.TreeWalker.walk(File.cwd!())
+      iex> entries = TrumanShell.Support.TreeWalker.walk(File.cwd!())
       iex> Enum.any?(entries, fn {path, _} -> path =~ "mix.exs" end)
       true
 

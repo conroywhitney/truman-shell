@@ -6,7 +6,7 @@ defmodule TrumanShell.Commands.Cat do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.FileIO
+  alias TrumanShell.Support.FileIO
 
   @doc """
   Concatenates and displays file contents.
