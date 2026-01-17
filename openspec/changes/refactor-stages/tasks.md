@@ -41,8 +41,10 @@
 
 ## 5. Wire Full Pipeline
 
-- [ ] 5.1 Update `TrumanShell.run/2` to use explicit pipeline: `Tokenizer → Parser → Expander → Executor → Redirector`
-- [ ] 5.2 Add integration tests for full pipeline flow
-- [ ] 5.3 Run `mix format && mix test && mix credo`
-- [ ] 5.4 Verify 292+ tests pass
-- [ ] 5.5 Commit with message "refactor: pipeline stages architecture"
+- [x] 5.1 Update `TrumanShell.run/2` to use explicit pipeline: `Tokenizer → Parser → Expander → Executor → Redirector`
+- [x] 5.2 Add integration tests for full pipeline flow (14 tests)
+- [x] 5.3 Run `mix format && mix test && mix credo`
+- [x] 5.4 Verify 292+ tests pass (321 tests, 71 doctests, 0 failures)
+- [x] 5.5 Commit with message "refactor: complete pipeline stages architecture"
+
+**Bug found and fixed:** Redirects on piped commands were being ignored. Fixed to apply redirects from the LAST command in the pipeline (most common pattern: `cmd1 | cmd2 > file.txt`).
