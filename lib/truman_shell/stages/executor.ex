@@ -176,7 +176,6 @@ defmodule TrumanShell.Stages.Executor do
     end
   end
 
-
   # State management - sandbox root and current directory
   # These are placed at the bottom as they are called by many functions above
 

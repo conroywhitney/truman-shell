@@ -32,12 +32,12 @@
 
 ## 4. Create Expander Stage
 
-- [ ] 4.1 Create `stages/expander.ex` with `TrumanShell.Stages.Expander` module
-- [ ] 4.2 Write tests for Expander: `~`, `~/path`, `~//path`, `~user` (unchanged)
-- [ ] 4.3 Implement `expand/2` function that transforms `%Command{}` args
-- [ ] 4.4 Remove tilde expansion logic from `commands/cd.ex` (lines 44-49)
-- [ ] 4.5 Wire Expander into pipeline: call before Executor in `truman_shell.ex`
-- [ ] 4.6 Run `mix test` - all tests must pass (tilde tests still work via Expander)
+- [x] 4.1 Create `stages/expander.ex` with `TrumanShell.Stages.Expander` module
+- [x] 4.2 Write tests for Expander: `~`, `~/path`, `~//path`, `~user` (unchanged)
+- [x] 4.3 Implement `expand/2` function that transforms `%Command{}` args
+- [x] 4.4 Remove tilde expansion logic from `commands/cd.ex` (lines 44-49)
+- [x] 4.5 Wire Expander into pipeline: call before Executor in `truman_shell.ex`
+- [x] 4.6 Run `mix test` - all tests must pass (tilde tests still work via Expander)
 
 ## 5. Wire Full Pipeline
 
