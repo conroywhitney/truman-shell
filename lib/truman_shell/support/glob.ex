@@ -47,34 +47,41 @@ defmodule TrumanShell.Support.Glob do
   @spec expand(String.t(), map()) :: [String.t()] | String.t()
   def expand(pattern, context) do
     is_absolute = String.starts_with?(pattern, "/")
-
-    full_pattern =
-      if is_absolute do
-        pattern
-      else
-        Path.join(context.current_dir, pattern)
-      end
-
-    match_dot = pattern_matches_dotfiles?(pattern)
+    full_pattern = resolve_pattern(pattern, is_absolute, context.current_dir)
     base_dir = glob_base_dir(full_pattern)
+
+    # Security: validate base path is in sandbox BEFORE calling Path.wildcard
+    # This prevents filesystem enumeration outside the sandbox
+    if in_sandbox?(base_dir, context.sandbox_root) do
+      do_expand(pattern, full_pattern, base_dir, is_absolute, context)
+    else
+      pattern
+    end
+  end
+
+  defp resolve_pattern(pattern, true, _current_dir), do: pattern
+  defp resolve_pattern(pattern, false, current_dir), do: Path.join(current_dir, pattern)
+
+  defp do_expand(pattern, full_pattern, base_dir, is_absolute, context) do
+    match_dot = pattern_matches_dotfiles?(pattern)
 
     matches =
       full_pattern
       |> Path.wildcard(match_dot: match_dot)
       |> Enum.filter(&(in_sandbox?(&1, context.sandbox_root) and within_depth_limit?(&1, base_dir)))
-      |> then(fn paths ->
-        if is_absolute do
-          paths
-        else
-          Enum.map(paths, &Path.relative_to(&1, context.current_dir))
-        end
-      end)
+      |> normalize_paths(is_absolute, context.current_dir)
       |> Enum.sort()
 
     case matches do
       [] -> pattern
       files -> files
     end
+  end
+
+  defp normalize_paths(paths, true, _current_dir), do: paths
+
+  defp normalize_paths(paths, false, current_dir) do
+    Enum.map(paths, &Path.relative_to(&1, current_dir))
   end
 
   # Extract the base directory from a glob pattern (everything before first wildcard)

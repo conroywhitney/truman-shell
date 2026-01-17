@@ -54,6 +54,45 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 sandbox boundary enforcement" do
+    test "rejects glob when base path is outside sandbox before expansion", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create a file inside sandbox to prove we're not just failing on no-match
+      File.write!(Path.join(current_dir, "exists.md"), "exists")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Absolute path outside sandbox - base path (/etc) is not in sandbox
+      # This should return original pattern WITHOUT calling Path.wildcard
+      result = Glob.expand("/etc/*.conf", context)
+      assert result == "/etc/*.conf"
+
+      # Relative path that escapes - base path (../) resolves outside sandbox
+      result = Glob.expand("../../../etc/*.conf", context)
+      assert result == "../../../etc/*.conf"
+    end
+
+    test "expands absolute glob pattern within sandbox", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create test files
+      File.write!(Path.join(current_dir, "file1.md"), "one")
+      File.write!(Path.join(current_dir, "file2.md"), "two")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Absolute path INSIDE sandbox should expand and return absolute paths
+      result = Glob.expand("#{sandbox}/*.md", context)
+
+      assert is_list(result)
+      assert length(result) == 2
+      # Results should be absolute paths since pattern was absolute
+      assert "#{sandbox}/file1.md" in result
+      assert "#{sandbox}/file2.md" in result
+    end
+
     test "excludes files outside sandbox via parent traversal", %{
       sandbox_root: sandbox,
       current_dir: current_dir
