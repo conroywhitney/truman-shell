@@ -58,17 +58,20 @@ defmodule TrumanShell.Stages.Executor do
   @spec run(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
   def run(command, opts \\ [])
 
-  def run(%Command{redirects: redirects, pipes: pipes} = command, opts) do
+  def run(%Command{pipes: pipes} = command, opts) do
     if root = Keyword.get(opts, :sandbox_root) do
       set_sandbox_root(Path.expand(root))
     end
 
     context = %{sandbox_root: sandbox_root(), current_dir: current_dir()}
 
+    # Get redirects from the LAST command in pipeline (most common: cmd1 | cmd2 > file.txt)
+    final_command = if pipes == [], do: command, else: List.last(pipes)
+
     with :ok <- validate_depth(command),
          {:ok, output} <- execute(command, opts),
          {:ok, piped_output} <- run_pipeline(output, pipes) do
-      Redirector.apply(piped_output, redirects, context)
+      Redirector.apply(piped_output, final_command.redirects, context)
     end
   end
 
