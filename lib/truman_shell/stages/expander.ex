@@ -16,7 +16,7 @@ defmodule TrumanShell.Stages.Expander do
   @doc """
   Expands shell syntax in a Command struct.
 
-  Transforms the command's args, expanding `~` to the sandbox root.
+  Transforms the command's args and redirect paths, expanding `~` to the sandbox root.
   Also recursively expands piped commands.
 
   ## Context
@@ -25,16 +25,22 @@ defmodule TrumanShell.Stages.Expander do
   - `:sandbox_root` - Root directory for tilde expansion
   """
   @spec expand(Command.t(), map()) :: Command.t()
-  def expand(%Command{args: args, pipes: pipes} = command, context) do
+  def expand(%Command{args: args, redirects: redirects, pipes: pipes} = command, context) do
     expanded_args = Enum.map(args, &expand_arg(&1, context))
+    expanded_redirects = Enum.map(redirects, &expand_redirect(&1, context))
     expanded_pipes = Enum.map(pipes, &expand(&1, context))
 
-    %{command | args: expanded_args, pipes: expanded_pipes}
+    %{command | args: expanded_args, redirects: expanded_redirects, pipes: expanded_pipes}
   end
 
   # Expand a single argument
   defp expand_arg(arg, context) when is_binary(arg) do
     expand_tilde(arg, context.sandbox_root)
+  end
+
+  # Expand tilde in redirect path
+  defp expand_redirect({type, path}, context) when is_binary(path) do
+    {type, expand_tilde(path, context.sandbox_root)}
   end
 
   # Tilde alone → sandbox root

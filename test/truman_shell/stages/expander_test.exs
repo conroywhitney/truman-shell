@@ -121,4 +121,72 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert hd(result.pipes).args == ["pattern"]
     end
   end
+
+  describe "expand/2 redirect tilde expansion" do
+    test "expands ~ in stdout redirect target" do
+      command = Command.new(:cmd_echo, ["hello"], redirects: [{:stdout, "~/out.txt"}])
+      context = %{sandbox_root: "/sandbox"}
+
+      result = Expander.expand(command, context)
+
+      assert result.redirects == [{:stdout, "/sandbox/out.txt"}]
+    end
+
+    test "expands ~ in stdout_append redirect target" do
+      command = Command.new(:cmd_echo, ["more"], redirects: [{:stdout_append, "~/log.txt"}])
+      context = %{sandbox_root: "/sandbox"}
+
+      result = Expander.expand(command, context)
+
+      assert result.redirects == [{:stdout_append, "/sandbox/log.txt"}]
+    end
+
+    test "expands ~/subpath in redirect target" do
+      command = Command.new(:cmd_echo, ["data"], redirects: [{:stdout, "~/logs/app.log"}])
+      context = %{sandbox_root: "/sandbox"}
+
+      result = Expander.expand(command, context)
+
+      assert result.redirects == [{:stdout, "/sandbox/logs/app.log"}]
+    end
+
+    test "expands tilde in multiple redirects" do
+      command =
+        Command.new(:cmd_echo, ["hi"],
+          redirects: [
+            {:stdout, "~/out.txt"},
+            {:stderr, "~/err.txt"}
+          ]
+        )
+
+      context = %{sandbox_root: "/sandbox"}
+
+      result = Expander.expand(command, context)
+
+      assert result.redirects == [
+               {:stdout, "/sandbox/out.txt"},
+               {:stderr, "/sandbox/err.txt"}
+             ]
+    end
+
+    test "leaves non-tilde redirect paths unchanged" do
+      command = Command.new(:cmd_echo, ["hi"], redirects: [{:stdout, "out.txt"}])
+      context = %{sandbox_root: "/sandbox"}
+
+      result = Expander.expand(command, context)
+
+      assert result.redirects == [{:stdout, "out.txt"}]
+    end
+
+    test "expands tilde in piped command redirects" do
+      base = Command.new(:cmd_echo, ["hello"])
+      piped = Command.new(:cmd_grep, ["hello"], redirects: [{:stdout, "~/filtered.txt"}])
+      command = %{base | pipes: [piped]}
+      context = %{sandbox_root: "/sandbox"}
+
+      result = Expander.expand(command, context)
+
+      assert hd(result.pipes).redirects == [{:stdout, "/sandbox/filtered.txt"}]
+    end
+  end
 end

@@ -70,19 +70,24 @@ defmodule TrumanShell.Stages.Redirector do
     sandbox_root = context.sandbox_root
     current_dir = context.current_dir
 
-    # Validate the original path first (catches absolute paths outside sandbox)
-    case Sandbox.validate_path(path, sandbox_root) do
-      {:ok, _} ->
-        # Then resolve relative to current directory
-        target_path = Path.join(current_dir, path)
+    # Resolve path: absolute paths stay as-is, relative paths join with current_dir
+    target_path =
+      if String.starts_with?(path, "/") do
+        path
+      else
+        Path.join(current_dir, path)
+      end
 
-        with {:ok, safe_path} <- Sandbox.validate_path(target_path, sandbox_root),
-             :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
-          do_apply(next_output, rest, context)
-        end
-
+    # Validate the resolved path against sandbox
+    with {:ok, safe_path} <- Sandbox.validate_path(target_path, sandbox_root),
+         :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
+      do_apply(next_output, rest, context)
+    else
       {:error, :outside_sandbox} ->
         {:error, "bash: #{path}: No such file or directory\n"}
+
+      {:error, _} = error ->
+        error
     end
   end
 

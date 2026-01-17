@@ -132,4 +132,97 @@ defmodule TrumanShell.Stages.PipelineTest do
       assert File.read!(full_path) == expected_content
     end
   end
+
+  describe "full pipeline: tilde expansion in redirect targets" do
+    setup do
+      # Create a temp directory at sandbox root for tilde-relative paths
+      rel_dir = ".test_tilde_redirect_#{:rand.uniform(100_000)}"
+      tmp_dir = Path.join(File.cwd!(), rel_dir)
+      File.mkdir_p!(tmp_dir)
+
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+      {:ok, tmp_dir: tmp_dir, rel_dir: rel_dir}
+    end
+
+    test "echo hi > ~/out.txt expands tilde in redirect target", %{rel_dir: rel_dir} do
+      # ~/rel_dir/out.txt should expand to sandbox_root/rel_dir/out.txt
+      {:ok, _} = TrumanShell.execute("echo hi > ~/#{rel_dir}/out.txt")
+
+      full_path = Path.join([File.cwd!(), rel_dir, "out.txt"])
+      assert File.exists?(full_path)
+      assert File.read!(full_path) == "hi\n"
+    end
+
+    test "tilde redirect with pipe: cmd1 | cmd2 > ~/out.txt", %{rel_dir: rel_dir} do
+      {:ok, _} = TrumanShell.execute("echo hello world | grep hello > ~/#{rel_dir}/piped.txt")
+
+      full_path = Path.join([File.cwd!(), rel_dir, "piped.txt"])
+      assert File.exists?(full_path)
+      assert File.read!(full_path) == "hello world\n"
+    end
+
+    test "append redirect with tilde: echo more >> ~/log.txt", %{rel_dir: rel_dir} do
+      # Create initial file
+      full_path = Path.join([File.cwd!(), rel_dir, "log.txt"])
+      File.write!(full_path, "first\n")
+
+      {:ok, _} = TrumanShell.execute("echo second >> ~/#{rel_dir}/log.txt")
+
+      assert File.read!(full_path) == "first\nsecond\n"
+    end
+  end
+
+  describe "full pipeline: redirect edge cases" do
+    setup do
+      rel_dir = ".test_redirect_edge_#{:rand.uniform(100_000)}"
+      tmp_dir = Path.join(File.cwd!(), rel_dir)
+      # Create nested structure for relative path tests
+      File.mkdir_p!(Path.join(tmp_dir, "subdir"))
+
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+      {:ok, tmp_dir: tmp_dir, rel_dir: rel_dir}
+    end
+
+    test "redirect with ../: echo h > subdir/../out.txt stays in sandbox", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      # subdir/../out.txt resolves to out.txt in rel_dir (stays in sandbox)
+      {:ok, _} = TrumanShell.execute("echo h > #{rel_dir}/subdir/../out.txt")
+
+      full_path = Path.join(tmp_dir, "out.txt")
+      assert File.exists?(full_path)
+      assert File.read!(full_path) == "h\n"
+    end
+
+    test "redirect escaping sandbox with ../ fails", %{rel_dir: _rel_dir} do
+      # Trying to escape sandbox should fail
+      {:error, msg} = TrumanShell.execute("echo escape > ../../outside.txt")
+      assert msg =~ "No such file or directory"
+    end
+
+    test "intermediate redirect: cmd1 > file.txt | cmd2 - first cmd redirect ignored", %{
+      tmp_dir: tmp_dir,
+      rel_dir: rel_dir
+    } do
+      # Current behavior: only last command's redirect applies
+      # So cmd1's redirect to first.txt is ignored, output goes to stdout
+      {:ok, output} = TrumanShell.execute("echo hello > #{rel_dir}/first.txt | grep hello")
+
+      # The redirect on echo is ignored (only last cmd redirects apply)
+      # So grep receives "hello" and outputs it
+      assert String.trim(output) == "hello"
+
+      # first.txt should NOT be created (redirect was ignored)
+      first_path = Path.join(tmp_dir, "first.txt")
+      refute File.exists?(first_path)
+    end
+
+    test "last command redirect: cmd1 | cmd2 > file.txt works", %{tmp_dir: tmp_dir, rel_dir: rel_dir} do
+      {:ok, _} = TrumanShell.execute("echo hello world | grep hello > #{rel_dir}/last.txt")
+
+      full_path = Path.join(tmp_dir, "last.txt")
+      assert File.exists?(full_path)
+      assert File.read!(full_path) == "hello world\n"
+    end
+  end
 end
