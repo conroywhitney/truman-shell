@@ -3,7 +3,7 @@ defmodule TrumanShell.Support.FileIO do
   Shared file I/O functions for command handlers.
   """
 
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   # Maximum file size in bytes (10MB) to prevent memory exhaustion
   # Large enough for most source files, small enough to prevent OOM attacks
@@ -40,7 +40,7 @@ defmodule TrumanShell.Support.FileIO do
     target = Path.expand(path, context.current_dir)
     target_rel = Path.relative_to(target, context.sandbox_root)
 
-    with {:ok, safe_path} <- Sanitizer.validate_path(target_rel, context.sandbox_root),
+    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, context.sandbox_root),
          {:ok, contents} <- read_with_limit(safe_path) do
       {:ok, contents}
     else

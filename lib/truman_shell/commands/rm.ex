@@ -19,7 +19,7 @@ defmodule TrumanShell.Commands.Rm do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Soft deletes a file by moving it to .trash within the sandbox.
@@ -69,7 +69,7 @@ defmodule TrumanShell.Commands.Rm do
     target = Path.expand(file_name, context.current_dir)
     target_rel = Path.relative_to(target, context.sandbox_root)
 
-    case Sanitizer.validate_path(target_rel, context.sandbox_root) do
+    case Sandbox.validate_path(target_rel, context.sandbox_root) do
       {:ok, safe_path} ->
         soft_delete(safe_path, file_name, context.sandbox_root, opts)
 

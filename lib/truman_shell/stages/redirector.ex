@@ -18,7 +18,7 @@ defmodule TrumanShell.Stages.Redirector do
   """
 
   alias TrumanShell.Posix.Errors
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Apply redirects to command output.
@@ -71,12 +71,12 @@ defmodule TrumanShell.Stages.Redirector do
     current_dir = context.current_dir
 
     # Validate the original path first (catches absolute paths outside sandbox)
-    case Sanitizer.validate_path(path, sandbox_root) do
+    case Sandbox.validate_path(path, sandbox_root) do
       {:ok, _} ->
         # Then resolve relative to current directory
         target_path = Path.join(current_dir, path)
 
-        with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root),
+        with {:ok, safe_path} <- Sandbox.validate_path(target_path, sandbox_root),
              :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
           do_apply(next_output, rest, context)
         end

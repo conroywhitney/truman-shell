@@ -1,6 +1,6 @@
-defmodule TrumanShell.Support.Sanitizer do
+defmodule TrumanShell.Support.Sandbox do
   @moduledoc """
-  Path sanitization and validation for the Truman Shell sandbox.
+  Path validation for the Truman Shell sandbox.
 
   Implements the "404 Principle" - paths outside the sandbox appear
   as "not found" rather than "permission denied" to avoid information leakage.

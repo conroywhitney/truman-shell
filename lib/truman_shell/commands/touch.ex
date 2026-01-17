@@ -9,7 +9,7 @@ defmodule TrumanShell.Commands.Touch do
 
   alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Posix.Errors
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Creates an empty file or updates timestamp within the sandbox.
@@ -31,7 +31,7 @@ defmodule TrumanShell.Commands.Touch do
     target = Path.expand(file_name, context.current_dir)
     target_rel = Path.relative_to(target, context.sandbox_root)
 
-    case Sanitizer.validate_path(target_rel, context.sandbox_root) do
+    case Sandbox.validate_path(target_rel, context.sandbox_root) do
       {:ok, safe_path} ->
         case File.touch(safe_path) do
           :ok -> {:ok, ""}

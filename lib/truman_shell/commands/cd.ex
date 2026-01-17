@@ -14,7 +14,7 @@ defmodule TrumanShell.Commands.Cd do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Changes the current working directory within the sandbox.
@@ -58,7 +58,7 @@ defmodule TrumanShell.Commands.Cd do
     target_abs = Path.expand(path, context.current_dir)
     target_rel = Path.relative_to(target_abs, context.sandbox_root)
 
-    with {:ok, safe_path} <- Sanitizer.validate_path(target_rel, context.sandbox_root),
+    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, context.sandbox_root),
          {:dir, true} <- {:dir, File.dir?(safe_path)} do
       # Return success with the new cwd for executor to apply
       {:ok, "", set_cwd: safe_path}

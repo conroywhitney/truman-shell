@@ -8,7 +8,7 @@ defmodule TrumanShell.Commands.Mkdir do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Creates a new directory within the sandbox.
@@ -42,7 +42,7 @@ defmodule TrumanShell.Commands.Mkdir do
     target = Path.expand(dir_name, context.current_dir)
     target_rel = Path.relative_to(target, context.sandbox_root)
 
-    case Sanitizer.validate_path(target_rel, context.sandbox_root) do
+    case Sandbox.validate_path(target_rel, context.sandbox_root) do
       {:ok, safe_path} ->
         # mkdir -p never fails for existing directories
         File.mkdir_p(safe_path)
@@ -57,7 +57,7 @@ defmodule TrumanShell.Commands.Mkdir do
     target = Path.expand(dir_name, context.current_dir)
     target_rel = Path.relative_to(target, context.sandbox_root)
 
-    case Sanitizer.validate_path(target_rel, context.sandbox_root) do
+    case Sandbox.validate_path(target_rel, context.sandbox_root) do
       {:ok, safe_path} ->
         case File.mkdir(safe_path) do
           :ok -> {:ok, ""}

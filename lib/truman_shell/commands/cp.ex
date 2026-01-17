@@ -9,7 +9,7 @@ defmodule TrumanShell.Commands.Cp do
 
   alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Posix.Errors
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Copies a file within the sandbox.
@@ -51,8 +51,8 @@ defmodule TrumanShell.Commands.Cp do
     dst_target = Path.expand(dst, context.current_dir)
     dst_rel = Path.relative_to(dst_target, context.sandbox_root)
 
-    with {:ok, src_safe} <- Sanitizer.validate_path(src_rel, context.sandbox_root),
-         {:ok, dst_safe} <- Sanitizer.validate_path(dst_rel, context.sandbox_root) do
+    with {:ok, src_safe} <- Sandbox.validate_path(src_rel, context.sandbox_root),
+         {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, context.sandbox_root) do
       do_copy(src_safe, dst_safe, src, opts)
     else
       {:error, :outside_sandbox} ->

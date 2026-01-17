@@ -1,7 +1,7 @@
-defmodule TrumanShell.Support.SanitizerTest do
+defmodule TrumanShell.Support.SandboxTest do
   use ExUnit.Case, async: true
 
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   describe "validate_path/2" do
     @tag :tmp_dir
@@ -11,7 +11,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       File.ln_s("/tmp", symlink_path)
 
       # The symlink exists inside sandbox, but points outside
-      result = Sanitizer.validate_path("escape_link", sandbox)
+      result = Sandbox.validate_path("escape_link", sandbox)
 
       # Should be rejected because absolute target escapes sandbox
       assert {:error, :outside_sandbox} = result
@@ -27,7 +27,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       symlink_path = Path.join(sandbox, "abs_link")
       File.ln_s(inside_dir, symlink_path)
 
-      result = Sanitizer.validate_path("abs_link", sandbox)
+      result = Sandbox.validate_path("abs_link", sandbox)
 
       # Rejected: absolute symlink targets are unverifiable
       assert {:error, :outside_sandbox} = result
@@ -39,7 +39,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       symlink_path = Path.join(sandbox, "escape_link")
       File.ln_s("../../etc/passwd", symlink_path)
 
-      result = Sanitizer.validate_path("escape_link", sandbox)
+      result = Sandbox.validate_path("escape_link", sandbox)
 
       # Rejected: relative target escapes via ..
       assert {:error, :outside_sandbox} = result
@@ -54,7 +54,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       symlink_path = Path.join(sandbox, "safe_link")
       File.ln_s("inside", symlink_path)
 
-      result = Sanitizer.validate_path("safe_link", sandbox)
+      result = Sandbox.validate_path("safe_link", sandbox)
 
       # Allowed: relative target stays within sandbox
       assert {:ok, _} = result
@@ -64,7 +64,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       sandbox = "/tmp/truman-test"
       path = "subdir/file.txt"
 
-      result = Sanitizer.validate_path(path, sandbox)
+      result = Sandbox.validate_path(path, sandbox)
 
       assert {:ok, "/tmp/truman-test/subdir/file.txt"} = result
     end
@@ -73,7 +73,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       sandbox = "/tmp/truman-test"
       path = "../../../etc/passwd"
 
-      result = Sanitizer.validate_path(path, sandbox)
+      result = Sandbox.validate_path(path, sandbox)
 
       assert {:error, :outside_sandbox} = result
     end
@@ -84,7 +84,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       sandbox = "/tmp/truman-test"
       path = "/etc/passwd"
 
-      result = Sanitizer.validate_path(path, sandbox)
+      result = Sandbox.validate_path(path, sandbox)
 
       # Path is rejected, not confined
       assert {:error, :outside_sandbox} = result
@@ -95,7 +95,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       sandbox = "/tmp/truman-test"
       path = "/tmp/truman-test/subdir/file.txt"
 
-      result = Sanitizer.validate_path(path, sandbox)
+      result = Sandbox.validate_path(path, sandbox)
 
       assert {:ok, "/tmp/truman-test/subdir/file.txt"} = result
     end
@@ -106,7 +106,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       sandbox = "/tmp/truman-test"
       path = "/tmp/truman-test2/secret"
 
-      result = Sanitizer.validate_path(path, sandbox)
+      result = Sandbox.validate_path(path, sandbox)
 
       assert {:error, :outside_sandbox} = result
     end
@@ -115,7 +115,7 @@ defmodule TrumanShell.Support.SanitizerTest do
       sandbox = "/tmp/truman-test"
       path = "."
 
-      result = Sanitizer.validate_path(path, sandbox)
+      result = Sandbox.validate_path(path, sandbox)
 
       assert {:ok, "/tmp/truman-test"} = result
     end

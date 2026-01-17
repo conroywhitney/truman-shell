@@ -9,7 +9,7 @@ defmodule TrumanShell.Commands.Mv do
 
   alias TrumanShell.Commands.Behaviour
   alias TrumanShell.Posix.Errors
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Moves or renames a file within the sandbox.
@@ -35,8 +35,8 @@ defmodule TrumanShell.Commands.Mv do
     dst_target = Path.expand(dst, context.current_dir)
     dst_rel = Path.relative_to(dst_target, context.sandbox_root)
 
-    with {:ok, src_safe} <- Sanitizer.validate_path(src_rel, context.sandbox_root),
-         {:ok, dst_safe} <- Sanitizer.validate_path(dst_rel, context.sandbox_root),
+    with {:ok, src_safe} <- Sandbox.validate_path(src_rel, context.sandbox_root),
+         {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, context.sandbox_root),
          true <- File.exists?(src_safe) do
       case File.rename(src_safe, dst_safe) do
         :ok -> {:ok, ""}
