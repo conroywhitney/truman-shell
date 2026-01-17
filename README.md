@@ -87,7 +87,7 @@ end
 - Output truncation (max 200 lines)
 - 145 tests passing
 
-### v0.4 - Executor Commands ✅ (Current)
+### v0.4 - Executor Commands ✅
 - Navigation: `cd`, `pwd`
 - Read: `cat`, `head`, `tail`
 - Search: `grep -rinvABC`, `find -name/-type/-maxdepth`, `wc -lwc`
@@ -95,17 +95,29 @@ end
 - Piping: `cmd1 | cmd2 | cmd3` (max 10 stages)
 - Redirects: `>` and `>>` with sandbox enforcement
 - Utility: `which`, `date`, `true`, `false`
-- 280 tests, 70 doctests passing
+- 280 tests, 71 doctests passing
 
-### v0.5 - Enhanced Features (Next)
-- Glob expansion (`*.ex`, `**/*.md`)
-- `cd ~` home directory expansion
-- Additional flags for existing commands
+### v0.5 - Tilde Expansion ✅ (Current)
+- `cd ~`, `cd ~/subdir` → sandbox root navigation
+- Security hardening: `~/..` traversal blocked, `~user` rejected
+- 292 tests passing
 
-### v0.8+ - Safety & Deception
-- The 404 Principle: protected paths return "not found"
-- WASM script sandboxing
+### v0.6 - Glob Expansion (Next)
+- Glob patterns in commands: `ls *.ex`, `cat **/*.md`
+- `find` glob support improvements
+- Additional flags for existing commands as needed
+
+### v1.0 - Production Ready
+- All common bash commands for AI agent workflows
+- Battle-tested with real Claude Code sessions
+- Comprehensive test coverage (target: 300+ tests)
+- Published to Hex.pm
+
+### v1.x+ - Future Enhancements
 - Virtual FS (ETS-backed) for true isolation without real File.* calls
+- WASM script sandboxing for AI-generated scripts
+- `curl`/`wget` with URL allowlisting
+- `git` command simulation (shadow repo)
 
 ## The 404 Principle
 
