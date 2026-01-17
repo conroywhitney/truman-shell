@@ -24,11 +24,11 @@
 
 ## 3. Extract Redirector Stage
 
-- [ ] 3.1 Create `stages/redirector.ex` with `TrumanShell.Stages.Redirector` module
-- [ ] 3.2 Write tests for Redirector: write redirect, append redirect, sandbox validation
-- [ ] 3.3 Extract `apply_redirects/3` logic from `Stages.Executor` to `Stages.Redirector`
-- [ ] 3.4 Update `Stages.Executor` to call `Stages.Redirector.apply/3` after execution
-- [ ] 3.5 Run `mix test` - all tests must pass
+- [x] 3.1 Create `stages/redirector.ex` with `TrumanShell.Stages.Redirector` module
+- [x] 3.2 Write tests for Redirector: write redirect, append redirect, sandbox validation
+- [x] 3.3 Extract `apply_redirects/3` logic from `Stages.Executor` to `Stages.Redirector`
+- [x] 3.4 Update `Stages.Executor` to call `Stages.Redirector.apply/3` after execution
+- [x] 3.5 Run `mix test` - all tests must pass
 
 ## 4. Create Expander Stage
 

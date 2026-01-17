@@ -40,17 +40,11 @@ defmodule TrumanShell.Commands.Cd do
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result_with_effects()
   @impl true
+  # No args means go home (sandbox root)
   def handle([], context), do: go_home(context)
-  def handle(["~"], context), do: go_home(context)
-  def handle(["~/"], context), do: go_home(context)
 
-  def handle(["~/" <> subpath], context) do
-    # Expand ~/subdir to sandbox_root/subdir
-    # Strip leading slashes to handle ~//lib -> lib (not /lib)
-    normalized = String.trim_leading(subpath, "/")
-    change_directory(normalized, %{context | current_dir: context.sandbox_root})
-  end
-
+  # Tilde expansion is now handled by Stages.Expander before we get here.
+  # By the time cd receives args, ~ has already been expanded to sandbox_root.
   def handle([path | _], context) do
     change_directory(path, context)
   end

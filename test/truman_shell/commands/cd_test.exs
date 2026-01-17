@@ -32,41 +32,39 @@ defmodule TrumanShell.Commands.CdTest do
       assert new_dir == sandbox_root
     end
 
-    test "returns to sandbox root with ~" do
+    # NOTE: Tilde expansion is now handled by Stages.Expander before Cd.handle.
+    # These tests pass pre-expanded paths to test Cd.handle behavior.
+
+    test "navigates to sandbox root (pre-expanded from ~)" do
       sandbox_root = File.cwd!()
       current = Path.join(sandbox_root, "lib/truman_shell")
       context = %{sandbox_root: sandbox_root, current_dir: current}
 
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["~"], context)
+      # ~ is expanded to sandbox_root by Expander before reaching Cd
+      {:ok, "", set_cwd: new_dir} = Cd.handle([sandbox_root], context)
 
       assert new_dir == sandbox_root
     end
 
-    test "returns to sandbox root with ~/ (trailing slash)" do
+    test "navigates to subdir (pre-expanded from ~/lib)" do
       sandbox_root = File.cwd!()
       current = Path.join(sandbox_root, "lib/truman_shell")
       context = %{sandbox_root: sandbox_root, current_dir: current}
 
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["~/"], context)
-
-      assert new_dir == sandbox_root
-    end
-
-    test "expands ~/subdir to sandbox_root/subdir" do
-      sandbox_root = File.cwd!()
-      current = Path.join(sandbox_root, "lib/truman_shell")
-      context = %{sandbox_root: sandbox_root, current_dir: current}
-
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["~/lib"], context)
+      # ~/lib is expanded to sandbox_root/lib by Expander before reaching Cd
+      expanded_path = Path.join(sandbox_root, "lib")
+      {:ok, "", set_cwd: new_dir} = Cd.handle([expanded_path], context)
 
       assert new_dir == Path.join(sandbox_root, "lib")
     end
 
-    test "returns error for ~/nonexistent" do
+    test "returns error for nonexistent path (pre-expanded from ~/nonexistent)" do
       sandbox_root = File.cwd!()
       context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
 
-      result = Cd.handle(["~/nonexistent"], context)
+      # ~/nonexistent is expanded to sandbox_root/nonexistent by Expander
+      expanded_path = Path.join(sandbox_root, "nonexistent")
+      result = Cd.handle([expanded_path], context)
 
       assert {:error, msg} = result
       assert msg =~ "No such file or directory"
@@ -149,54 +147,16 @@ defmodule TrumanShell.Commands.CdTest do
       refute msg =~ "permission"
     end
 
-    test "~//lib handles double slash correctly" do
+    # NOTE: ~//lib, ~user, etc. tests moved to Stages.ExpanderTest
+    # since Expander now handles all tilde expansion before Cd.handle.
+
+    test "navigates with .. within sandbox" do
       sandbox_root = File.cwd!()
       context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
 
-      # Double slash should normalize to ~/lib
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["~//lib"], context)
-
-      assert new_dir == Path.join(sandbox_root, "lib")
-    end
-
-    test "~// returns to sandbox root (double slash, no path)" do
-      sandbox_root = File.cwd!()
-      current = Path.join(sandbox_root, "lib/truman_shell")
-      context = %{sandbox_root: sandbox_root, current_dir: current}
-
-      # Double slash with no path should go home
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["~//"], context)
-
-      assert new_dir == sandbox_root
-    end
-
-    test "~/// returns to sandbox root (triple slash)" do
-      sandbox_root = File.cwd!()
-      current = Path.join(sandbox_root, "lib/truman_shell")
-      context = %{sandbox_root: sandbox_root, current_dir: current}
-
-      # Triple slash should also go home
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["~///"], context)
-
-      assert new_dir == sandbox_root
-    end
-
-    test "~user syntax returns error (not supported)" do
-      sandbox_root = File.cwd!()
-      context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
-
-      result = Cd.handle(["~root"], context)
-
-      # Should fail - no ~user expansion in sandbox
-      assert {:error, msg} = result
-      assert msg =~ "No such file or directory"
-    end
-
-    test "~/lib/../test navigates correctly within sandbox" do
-      sandbox_root = File.cwd!()
-      context = %{sandbox_root: sandbox_root, current_dir: sandbox_root}
-
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["~/lib/../test"], context)
+      # Pre-expanded: ~/lib/../test becomes sandbox_root/lib/../test
+      expanded_path = Path.join(sandbox_root, "lib/../test")
+      {:ok, "", set_cwd: new_dir} = Cd.handle([expanded_path], context)
 
       assert new_dir == Path.join(sandbox_root, "test")
     end
