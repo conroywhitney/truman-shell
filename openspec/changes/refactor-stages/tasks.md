@@ -13,14 +13,14 @@
 
 ## 2. Move Stage Modules
 
-- [ ] 2.1 Create `lib/truman_shell/stages/` directory
-- [ ] 2.2 Move `tokenizer.ex` → `stages/tokenizer.ex`, update module name to `TrumanShell.Stages.Tokenizer`
-- [ ] 2.3 Update all imports of `TrumanShell.Tokenizer` across codebase
-- [ ] 2.4 Move `parser.ex` → `stages/parser.ex`, update module name to `TrumanShell.Stages.Parser`
-- [ ] 2.5 Update all imports of `TrumanShell.Parser` across codebase
-- [ ] 2.6 Move `executor.ex` → `stages/executor.ex`, update module name to `TrumanShell.Stages.Executor`
-- [ ] 2.7 Update all imports of `TrumanShell.Executor` across codebase
-- [ ] 2.8 Run `mix test` - all 292 tests must pass
+- [x] 2.1 Create `lib/truman_shell/stages/` directory
+- [x] 2.2 Move `tokenizer.ex` → `stages/tokenizer.ex`, update module name to `TrumanShell.Stages.Tokenizer`
+- [x] 2.3 Update all imports of `TrumanShell.Tokenizer` across codebase
+- [x] 2.4 Move `parser.ex` → `stages/parser.ex`, update module name to `TrumanShell.Stages.Parser`
+- [x] 2.5 Update all imports of `TrumanShell.Parser` across codebase
+- [x] 2.6 Move `executor.ex` → `stages/executor.ex`, update module name to `TrumanShell.Stages.Executor`
+- [x] 2.7 Update all imports of `TrumanShell.Executor` across codebase
+- [x] 2.8 Run `mix test` - all 292 tests must pass
 
 ## 3. Extract Redirector Stage
 

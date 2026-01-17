@@ -24,8 +24,7 @@ defmodule TrumanShell.Stages.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
-  alias TrumanShell.Posix.Errors
-  alias TrumanShell.Support.Sanitizer
+  alias TrumanShell.Stages.Redirector
 
   # Maximum number of commands in a pipeline (e.g., cmd1 | cmd2 | cmd3 = 3 commands)
   # 9 pipe operators connect 10 commands maximum
@@ -64,10 +63,12 @@ defmodule TrumanShell.Stages.Executor do
       set_sandbox_root(Path.expand(root))
     end
 
+    context = %{sandbox_root: sandbox_root(), current_dir: current_dir()}
+
     with :ok <- validate_depth(command),
          {:ok, output} <- execute(command, opts),
          {:ok, piped_output} <- run_pipeline(output, pipes) do
-      apply_redirects(piped_output, redirects)
+      Redirector.apply(piped_output, redirects, context)
     end
   end
 
@@ -175,50 +176,6 @@ defmodule TrumanShell.Stages.Executor do
     end
   end
 
-  # Redirect handling - apply redirects after command execution
-  defp apply_redirects(output, []), do: {:ok, output}
-
-  defp apply_redirects(output, [{:stdout, path} | rest]) do
-    write_redirect(output, path, [], rest)
-  end
-
-  defp apply_redirects(output, [{:stdout_append, path} | rest]) do
-    write_redirect(output, path, [:append], rest)
-  end
-
-  defp write_redirect(output, path, write_opts, rest) do
-    # Bash behavior: for multiple redirects, only LAST one gets output
-    # Earlier redirects are truncated/created with empty content
-    {content_to_write, next_output} =
-      if rest == [] do
-        {output, ""}
-      else
-        {"", output}
-      end
-
-    # Validate the original path first (catches absolute paths outside sandbox)
-    case Sanitizer.validate_path(path, sandbox_root()) do
-      {:ok, _} ->
-        # Then resolve relative to current directory
-        target_path = Path.join(current_dir(), path)
-
-        with {:ok, safe_path} <- Sanitizer.validate_path(target_path, sandbox_root()),
-             :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
-          apply_redirects(next_output, rest)
-        end
-
-      {:error, :outside_sandbox} ->
-        {:error, "bash: #{path}: No such file or directory\n"}
-    end
-  end
-
-  # Wrap File.write to return bash-like errors instead of crashing
-  defp do_write_file(safe_path, output, write_opts, original_path) do
-    case File.write(safe_path, output, write_opts) do
-      :ok -> :ok
-      {:error, reason} -> {:error, "bash: #{original_path}: #{Errors.to_message(reason)}\n"}
-    end
-  end
 
   # State management - sandbox root and current directory
   # These are placed at the bottom as they are called by many functions above
