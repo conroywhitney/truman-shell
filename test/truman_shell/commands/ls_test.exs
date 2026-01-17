@@ -49,13 +49,15 @@ defmodule TrumanShell.Commands.LsTest do
       assert message =~ "invalid option"
     end
 
-    test "rejects multiple path arguments" do
+    test "accepts multiple path arguments" do
       context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
 
       result = Ls.handle(["lib", "test"], context)
 
-      assert {:error, message} = result
-      assert message =~ "too many arguments"
+      assert {:ok, output} = result
+      # Should list contents of both directories
+      assert output =~ "truman_shell"
+      assert output =~ "test_helper"
     end
 
     test "rejects access to paths outside sandbox (404 principle)" do
