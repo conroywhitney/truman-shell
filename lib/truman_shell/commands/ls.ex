@@ -43,14 +43,12 @@ defmodule TrumanShell.Commands.Ls do
   defp validate_args(args) do
     {flags, paths} = Enum.split_with(args, &String.starts_with?(&1, "-"))
 
-    cond do
-      flags != [] ->
-        flag = hd(flags)
-        {:error, "ls: invalid option -- '#{String.trim_leading(flag, "-")}'\n"}
-
-      true ->
-        # Default to "." if no paths specified
-        {:ok, if(paths == [], do: ["."], else: paths)}
+    if flags == [] do
+      # Default to "." if no paths specified
+      {:ok, if(paths == [], do: ["."], else: paths)}
+    else
+      flag = hd(flags)
+      {:error, "ls: invalid option -- '#{String.trim_leading(flag, "-")}'\n"}
     end
   end
 
@@ -88,19 +86,20 @@ defmodule TrumanShell.Commands.Ls do
 
   # List a single path (file or directory)
   defp list_single_path(path, context) do
-    with {:ok, safe_path} <- Sandbox.validate_path(path, context.sandbox_root) do
-      cond do
-        File.regular?(safe_path) ->
-          # It's a file - just output the path
-          {:ok, path <> "\n"}
+    case Sandbox.validate_path(path, context.sandbox_root) do
+      {:ok, safe_path} ->
+        cond do
+          File.regular?(safe_path) ->
+            # It's a file - just output the path
+            {:ok, path <> "\n"}
 
-        File.dir?(safe_path) ->
-          list_directory(path, safe_path)
+          File.dir?(safe_path) ->
+            list_directory(path, safe_path)
 
-        true ->
-          {:error, "ls: #{path}: No such file or directory\n"}
-      end
-    else
+          true ->
+            {:error, "ls: #{path}: No such file or directory\n"}
+        end
+
       {:error, :outside_sandbox} ->
         {:error, "ls: #{path}: No such file or directory\n"}
 

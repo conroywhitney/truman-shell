@@ -261,6 +261,7 @@ defmodule TrumanShell.Stages.PipelineTest do
       {:ok, output} = TrumanShell.execute("ls #{rel_dir}/**/*.ex")
 
       lines = output |> String.trim() |> String.split("\n") |> Enum.sort()
+
       assert lines == [
                "#{rel_dir}/root.ex",
                "#{rel_dir}/sub/deep/deeper.ex",

@@ -11,6 +11,7 @@ defmodule TrumanShell.Stages.Expander do
 
   alias TrumanShell.Command
   alias TrumanShell.Support.Glob
+  alias TrumanShell.Support.Tilde
 
   @doc """
   Expands shell syntax in a Command struct.
@@ -36,7 +37,7 @@ defmodule TrumanShell.Stages.Expander do
   # Expand a single argument - returns a list (glob can expand to multiple files)
   defp expand_arg(arg, context) when is_binary(arg) do
     arg
-    |> expand_tilde(context.sandbox_root)
+    |> Tilde.expand(context.sandbox_root)
     |> maybe_expand_glob(context)
   end
 
@@ -54,22 +55,6 @@ defmodule TrumanShell.Stages.Expander do
 
   # Expand tilde in redirect path
   defp expand_redirect({type, path}, context) when is_binary(path) do
-    {type, expand_tilde(path, context.sandbox_root)}
+    {type, Tilde.expand(path, context.sandbox_root)}
   end
-
-  # Tilde alone → sandbox root
-  defp expand_tilde("~", sandbox_root), do: sandbox_root
-
-  # Tilde with trailing slash → sandbox root
-  defp expand_tilde("~/", sandbox_root), do: sandbox_root
-
-  # Tilde with path → sandbox_root/path
-  # Strips leading slashes to handle ~//lib -> sandbox_root/lib
-  defp expand_tilde("~/" <> rest, sandbox_root) do
-    subpath = String.trim_leading(rest, "/")
-    Path.join(sandbox_root, subpath)
-  end
-
-  # No tilde or ~user (not supported) → pass through unchanged
-  defp expand_tilde(arg, _sandbox_root), do: arg
 end

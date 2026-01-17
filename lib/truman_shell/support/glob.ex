@@ -40,7 +40,8 @@ defmodule TrumanShell.Support.Glob do
     base_dir = glob_base_dir(full_pattern)
 
     matches =
-      Path.wildcard(full_pattern, match_dot: match_dot)
+      full_pattern
+      |> Path.wildcard(match_dot: match_dot)
       |> Enum.filter(&in_sandbox?(&1, context.sandbox_root))
       |> Enum.filter(&within_depth_limit?(&1, base_dir))
       |> then(fn paths ->
