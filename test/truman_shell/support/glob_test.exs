@@ -207,4 +207,42 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == ["foo.md", "franco.bad"]
     end
   end
+
+  describe "expand/2 depth limit" do
+    test "recursive glob includes files within depth limit", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create structure 5 levels deep (well under 100 limit)
+      deep_path = Path.join([current_dir, "a", "b", "c", "d", "e"])
+      File.mkdir_p!(deep_path)
+      File.write!(Path.join(deep_path, "deep.md"), "deep")
+      File.write!(Path.join(current_dir, "root.md"), "root")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand("**/*.md", context)
+
+      # Both files should be found (5 levels is under 100 limit)
+      assert "a/b/c/d/e/deep.md" in result
+      assert "root.md" in result
+    end
+
+    test "depth is counted from glob base directory", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create nested structure
+      File.mkdir_p!(Path.join([current_dir, "src", "lib", "deep"]))
+      File.write!(Path.join([current_dir, "src", "lib", "deep", "file.ex"]), "")
+      File.write!(Path.join([current_dir, "src", "root.ex"]), "")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Glob from src/ - depth counts from there
+      result = Glob.expand("src/**/*.ex", context)
+
+      assert result == ["src/lib/deep/file.ex", "src/root.ex"]
+    end
+  end
 end
