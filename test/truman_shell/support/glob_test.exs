@@ -171,4 +171,40 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == [".config", ".hidden"]
     end
   end
+
+  describe "expand/2 multiple wildcards" do
+    test "matches pattern with multiple underscores *_*_test.exs", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create test files
+      File.write!(Path.join(current_dir, "foo_bar_test.exs"), "")
+      File.write!(Path.join(current_dir, "a_b_test.exs"), "")
+      File.write!(Path.join(current_dir, "single_test.exs"), "")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand("*_*_test.exs", context)
+
+      # Only matches files with 2+ underscores before _test.exs
+      assert result == ["a_b_test.exs", "foo_bar_test.exs"]
+    end
+
+    test "matches wildcards in both name and extension f*o.*d", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create test files
+      File.write!(Path.join(current_dir, "foo.md"), "")
+      File.write!(Path.join(current_dir, "filo.txt"), "")
+      File.write!(Path.join(current_dir, "franco.bad"), "")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand("f*o.*d", context)
+
+      # filo.txt excluded - extension doesn't end with 'd'
+      assert result == ["foo.md", "franco.bad"]
+    end
+  end
 end
