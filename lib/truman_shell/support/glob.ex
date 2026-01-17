@@ -64,12 +64,13 @@ defmodule TrumanShell.Support.Glob do
 
   defp do_expand(pattern, full_pattern, base_dir, is_absolute, context) do
     match_dot = pattern_matches_dotfiles?(pattern)
+    has_dot_prefix = String.starts_with?(pattern, "./")
 
     matches =
       full_pattern
       |> Path.wildcard(match_dot: match_dot)
       |> Enum.filter(&(in_sandbox?(&1, context.sandbox_root) and within_depth_limit?(&1, base_dir)))
-      |> normalize_paths(is_absolute, context.current_dir)
+      |> normalize_paths(is_absolute, has_dot_prefix, context.current_dir)
       |> Enum.sort()
 
     case matches do
@@ -78,10 +79,18 @@ defmodule TrumanShell.Support.Glob do
     end
   end
 
-  defp normalize_paths(paths, true, _current_dir), do: paths
+  defp normalize_paths(paths, true, _has_dot_prefix, _current_dir), do: paths
 
-  defp normalize_paths(paths, false, current_dir) do
-    Enum.map(paths, &Path.relative_to(&1, current_dir))
+  defp normalize_paths(paths, false, has_dot_prefix, current_dir) do
+    paths
+    |> Enum.map(&Path.relative_to(&1, current_dir))
+    |> then(fn relative_paths ->
+      if has_dot_prefix do
+        Enum.map(relative_paths, &"./#{&1}")
+      else
+        relative_paths
+      end
+    end)
   end
 
   # Extract the base directory from a glob pattern (everything before first wildcard)

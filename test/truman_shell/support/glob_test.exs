@@ -93,7 +93,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert "#{sandbox}/file2.md" in result
     end
 
-    test "excludes files outside sandbox via parent traversal", %{
+    test "glob with ../ parent traversal returns original pattern (no escape)", %{
       sandbox_root: sandbox,
       current_dir: current_dir
     } do
@@ -303,6 +303,36 @@ defmodule TrumanShell.Support.GlobTest do
       result = Glob.expand("src/**/*.ex", context)
 
       assert result == ["src/lib/deep/file.ex", "src/root.ex"]
+    end
+  end
+
+  describe "expand/2 preserves ./ prefix (bash compatibility)" do
+    test "./*.ex preserves ./ prefix in results", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      File.write!(Path.join(current_dir, "a.ex"), "a")
+      File.write!(Path.join(current_dir, "b.ex"), "b")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand("./*.ex", context)
+
+      # Bash preserves the ./ prefix
+      assert result == ["./a.ex", "./b.ex"]
+    end
+
+    test "*.ex without prefix has no prefix in results", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      File.write!(Path.join(current_dir, "x.ex"), "x")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      result = Glob.expand("*.ex", context)
+
+      assert result == ["x.ex"]
     end
   end
 
