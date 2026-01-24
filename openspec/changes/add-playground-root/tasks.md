@@ -29,16 +29,16 @@
   - File: `openspec/changes/add-playground-root/spec.md`
   - Flagged by: GPT, Grok
 
-- [ ] **Fix test isolation (async + env vars)**
+- [x] **Fix test isolation (async + env vars)** ✓ 4c068ab
   - Tests mutate `TRUMAN_DOME` via `System.put_env/2` with `async: true`
-  - Fix: Remove `async: true` or add proper cleanup in `setup`/`on_exit`
+  - Fix: Changed to `async: false` with comment explaining why
   - File: `test/truman_shell/support/sandbox_test.exs:1-80`
   - Flagged by: GPT, Claude
 
-- [ ] **Document TOCTOU limitation**
+- [x] **Document TOCTOU limitation** ✓ 4c068ab
   - Between `validate_path` and file ops, symlink could be modified
   - Inherent to userspace sandboxing
-  - Add clear documentation recommending OS-level sandboxing for untrusted envs
+  - Added "Security Limitations" section to moduledoc
   - File: `lib/truman_shell/support/sandbox.ex` (moduledoc)
   - Flagged by: Grok, Claude
 
@@ -55,11 +55,12 @@
   - File: `lib/truman_shell/support/sandbox.ex:175-185`
   - Flagged by: GPT, Claude
 
-- [ ] **Add symlink depth limit**
+- [x] **Add symlink depth limit** ✓ d308a1d
   - Prevent infinite loops with deep/recursive symlinks
-  - Add configurable limit (e.g., 10 levels)
-  - File: `lib/truman_shell/support/sandbox.ex:140-180`
+  - Added `@max_symlink_depth 10` with `:eloop` error
+  - File: `lib/truman_shell/support/sandbox.ex:198-223`
   - Flagged by: Grok
+  - Note: Implemented as part of P0 symlink fix
 
 ---
 

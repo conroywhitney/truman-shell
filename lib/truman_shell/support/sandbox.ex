@@ -129,9 +129,40 @@ defmodule TrumanShell.Support.Sandbox do
   def validate_path(path, sandbox_root, current_dir \\ nil)
 
   def validate_path(path, sandbox_root, current_dir) do
-    sandbox_resolved = resolve_sandbox_root(sandbox_root)
-    absolute_path = resolve_to_absolute(path, sandbox_resolved, current_dir)
-    validate_resolved_path(absolute_path, sandbox_resolved)
+    # Reject paths with embedded $VAR references (security risk)
+    if String.contains?(path, "$") do
+      {:error, :outside_sandbox}
+    else
+      sandbox_resolved = resolve_sandbox_root(sandbox_root)
+
+      case validate_current_dir(current_dir, sandbox_resolved) do
+        {:error, reason} ->
+          {:error, reason}
+
+        {:ok, validated_current_dir} ->
+          absolute_path = resolve_to_absolute(path, sandbox_resolved, validated_current_dir)
+          validate_resolved_path(absolute_path, sandbox_resolved)
+      end
+    end
+  end
+
+  # Validate current_dir is within sandbox
+  defp validate_current_dir(nil, _sandbox), do: {:ok, nil}
+
+  defp validate_current_dir(current_dir, sandbox_resolved) do
+    # Resolve current_dir to handle symlinks (e.g., /var -> /private/var on macOS)
+    resolved_current_dir =
+      case resolve_real_path(Path.expand(current_dir)) do
+        {:ok, resolved} -> resolved
+        {:error, _} -> Path.expand(current_dir)
+      end
+
+    if path_within_sandbox?(resolved_current_dir, sandbox_resolved) do
+      {:ok, current_dir}
+    else
+      # current_dir outside sandbox is a security error
+      {:error, :outside_sandbox}
+    end
   end
 
   defp resolve_sandbox_root(sandbox_root) do
@@ -155,8 +186,13 @@ defmodule TrumanShell.Support.Sandbox do
       {:ok, real_path} ->
         check_path_within_sandbox(real_path, sandbox_resolved)
 
-      {:error, _} ->
-        # Path doesn't exist - check if target would be valid
+      {:error, :eloop} ->
+        # Symlink depth limit exceeded - this is a security error, propagate
+        {:error, :eloop}
+
+      {:error, _reason} ->
+        # Path doesn't exist or other error - check if target would be valid
+        # Let the actual file operation return the specific error
         expanded = Path.expand(absolute_path)
         check_path_within_sandbox(expanded, sandbox_resolved)
     end
@@ -188,6 +224,7 @@ defmodule TrumanShell.Support.Sandbox do
   @spec error_message({:error, atom()}) :: String.t()
   def error_message({:error, :outside_sandbox}), do: "No such file or directory"
   def error_message({:error, :enoent}), do: "No such file or directory"
+  def error_message({:error, :eloop}), do: "Too many levels of symbolic links"
   def error_message({:error, reason}) when is_atom(reason), do: "#{reason}"
 
   # --- Private Functions ---
@@ -241,19 +278,28 @@ defmodule TrumanShell.Support.Sandbox do
   # Functions for recursive symlink resolution (mutual recursion)
   # Note: These have mutual recursion, so order matters for credo
 
-  defp resolve_symlink_target(target, current_path, rest, depth) do
-    target_path = List.to_string(target)
+  # Resolve a symlink target and continue with remaining path components.
+  # Each symlink hop consumes 1 depth.
+  # parent_dir: the directory containing the symlink (for relative target resolution)
+  defp resolve_symlink_target(target, parent_dir, rest, depth) do
+    # Check depth BEFORE processing this symlink
+    if depth <= 0 do
+      {:error, :eloop}
+    else
+      target_path = List.to_string(target)
+      new_depth = depth - 1
 
-    resolved =
-      if Path.type(target_path) == :absolute do
-        target_path
-      else
-        Path.join(current_path, target_path)
+      resolved =
+        if Path.type(target_path) == :absolute do
+          target_path
+        else
+          Path.join(parent_dir, target_path)
+        end
+
+      # Recursively resolve the target (it might also have symlinks)
+      with {:ok, resolved_target} <- do_resolve_path(Path.expand(resolved), new_depth) do
+        continue_after_symlink(resolved_target, rest, new_depth)
       end
-
-    # Recursively resolve the target (it might also have symlinks)
-    with {:ok, resolved_target} <- do_resolve_path(Path.expand(resolved), depth - 1) do
-      continue_after_symlink(resolved_target, rest, depth)
     end
   end
 
@@ -263,7 +309,7 @@ defmodule TrumanShell.Support.Sandbox do
 
   defp continue_after_symlink(resolved_target, rest, depth) do
     remaining_path = Path.join([resolved_target | rest])
-    do_resolve_path(remaining_path, depth - 1)
+    do_resolve_path(remaining_path, depth)
   end
 
   defp resolve_components([], current_path, _depth) do

@@ -4,12 +4,21 @@ defmodule TrumanShell.Support.SandboxTest do
 
   alias TrumanShell.Support.Sandbox
 
+  # Save and restore TRUMAN_DOME around tests that mutate it
+  setup do
+    original_dome = System.get_env("TRUMAN_DOME")
+    on_exit(fn -> restore_env("TRUMAN_DOME", original_dome) end)
+    :ok
+  end
+
+  defp restore_env(key, nil), do: System.delete_env(key)
+  defp restore_env(key, value), do: System.put_env(key, value)
+
   describe "sandbox_root/0" do
     test "returns TRUMAN_DOME env var when set" do
       System.put_env("TRUMAN_DOME", "/custom/dome")
       result = Sandbox.sandbox_root()
       assert result == "/custom/dome"
-      System.delete_env("TRUMAN_DOME")
     end
 
     test "returns File.cwd!() when env var is not set" do
@@ -22,7 +31,6 @@ defmodule TrumanShell.Support.SandboxTest do
       System.put_env("TRUMAN_DOME", "")
       result = Sandbox.sandbox_root()
       assert result == File.cwd!()
-      System.delete_env("TRUMAN_DOME")
     end
 
     test "expands tilde to home directory" do
@@ -30,36 +38,35 @@ defmodule TrumanShell.Support.SandboxTest do
       result = Sandbox.sandbox_root()
       home = System.get_env("HOME")
       assert result == Path.join(home, "studios/reification-labs")
-      System.delete_env("TRUMAN_DOME")
     end
 
     test "expands dot to current working directory" do
       System.put_env("TRUMAN_DOME", ".")
       result = Sandbox.sandbox_root()
       assert result == File.cwd!()
-      System.delete_env("TRUMAN_DOME")
     end
 
     test "expands relative path to absolute" do
       System.put_env("TRUMAN_DOME", "./my-project")
       result = Sandbox.sandbox_root()
       assert result == Path.join(File.cwd!(), "my-project")
-      System.delete_env("TRUMAN_DOME")
     end
 
     test "does NOT expand dollar-sign env var references" do
       System.put_env("TRUMAN_DOME", "$HOME/projects")
       result = Sandbox.sandbox_root()
       assert result == "$HOME/projects"
-      System.delete_env("TRUMAN_DOME")
     end
 
     test "normalizes trailing slashes" do
       System.put_env("TRUMAN_DOME", "/custom/dome///")
       result = Sandbox.sandbox_root()
       assert result == "/custom/dome"
-      System.delete_env("TRUMAN_DOME")
     end
+
+    # Note: TRUMAN_DOME existence validation deferred to future PR
+    # Current behavior: returns the configured path even if it doesn't exist
+    # This allows testing with mock paths while production should use real dirs
   end
 
   describe "build_context/0" do
@@ -84,6 +91,11 @@ defmodule TrumanShell.Support.SandboxTest do
     test "enoent error converts to 'No such file or directory'" do
       message = Sandbox.error_message({:error, :enoent})
       assert message == "No such file or directory"
+    end
+
+    test "eloop error converts to 'Too many levels of symbolic links'" do
+      message = Sandbox.error_message({:error, :eloop})
+      assert message == "Too many levels of symbolic links"
     end
   end
 
@@ -307,6 +319,71 @@ defmodule TrumanShell.Support.SandboxTest do
 
       # MUST be rejected - following the chain leads outside
       assert {:error, :outside_sandbox} = result
+    end
+
+    test "returns :eloop for self-referential symlinks", %{sandbox: sandbox} do
+      # SECURITY: Symlink that points to itself creates infinite loop
+      loop_link = Path.join(sandbox, "loop")
+      File.ln_s("loop", loop_link)
+
+      result = Sandbox.validate_path("loop", sandbox)
+
+      # Should return :eloop, not hang forever
+      assert {:error, :eloop} = result
+    end
+
+    test "returns :eloop for deeply nested symlink chains", %{sandbox: sandbox} do
+      # SECURITY: Very deep symlink chains should be rejected
+      # Create a chain of 15 symlinks (exceeds @max_symlink_depth of 10)
+      # link15 -> link14 -> ... -> link1 -> target
+      target = Path.join(sandbox, "target")
+      File.write!(target, "content")
+
+      # Use Enum.reduce to build the chain properly
+      Enum.reduce(1..15, "target", fn i, prev_name ->
+        link = Path.join(sandbox, "link#{i}")
+        File.ln_s(prev_name, link)
+        "link#{i}"
+      end)
+
+      result = Sandbox.validate_path("link15", sandbox)
+
+      # Should return :eloop after hitting depth limit
+      assert {:error, :eloop} = result
+    end
+
+    test "rejects path with embedded $VAR", %{sandbox: sandbox} do
+      # SECURITY: Embedded env var references could escape
+      # e.g., /sandbox/safe/$HOME/escape -> /sandbox/safe//Users/me/escape
+      path = "safe/$HOME/escape"
+
+      result = Sandbox.validate_path(path, sandbox)
+
+      # Should be rejected - embedded $VAR is not allowed
+      assert {:error, :outside_sandbox} = result
+    end
+
+    test "rejects current_dir outside sandbox", %{sandbox: sandbox} do
+      # SECURITY: If caller passes current_dir outside sandbox,
+      # relative paths should still be validated
+      outside_dir = "/tmp"
+      relative_path = "passwd"
+
+      result = Sandbox.validate_path(relative_path, sandbox, outside_dir)
+
+      # Should be rejected - current_dir is outside sandbox
+      assert {:error, :outside_sandbox} = result
+    end
+
+    test "allows current_dir inside sandbox", %{sandbox: sandbox} do
+      subdir = Path.join(sandbox, "lib")
+      File.mkdir_p!(subdir)
+      relative_path = "foo.ex"
+
+      result = Sandbox.validate_path(relative_path, sandbox, subdir)
+
+      assert {:ok, resolved} = result
+      assert String.ends_with?(resolved, "/lib/foo.ex")
     end
   end
 end
