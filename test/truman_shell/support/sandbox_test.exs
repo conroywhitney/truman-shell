@@ -149,7 +149,9 @@ defmodule TrumanShell.Support.SandboxTest do
 
       result = Sandbox.validate_path(path, sandbox)
 
-      assert {:ok, "/tmp/truman-test/subdir/file.txt"} = result
+      # Returns resolved path (may include /private/ on macOS)
+      assert {:ok, resolved} = result
+      assert String.ends_with?(resolved, "/truman-test/subdir/file.txt")
     end
 
     test "rejects path traversal attack" do
@@ -180,7 +182,9 @@ defmodule TrumanShell.Support.SandboxTest do
 
       result = Sandbox.validate_path(path, sandbox)
 
-      assert {:ok, "/tmp/truman-test/subdir/file.txt"} = result
+      # Returns resolved path (may include /private/ on macOS)
+      assert {:ok, resolved} = result
+      assert String.ends_with?(resolved, "/truman-test/subdir/file.txt")
     end
 
     test "rejects path with sandbox prefix but different directory" do
@@ -200,7 +204,9 @@ defmodule TrumanShell.Support.SandboxTest do
 
       result = Sandbox.validate_path(path, sandbox)
 
-      assert {:ok, "/tmp/truman-test"} = result
+      # Returns resolved path (may include /private/ on macOS)
+      assert {:ok, resolved} = result
+      assert String.ends_with?(resolved, "/truman-test")
     end
   end
 
@@ -223,8 +229,9 @@ defmodule TrumanShell.Support.SandboxTest do
 
       result = Sandbox.validate_path(relative_path, sandbox, current_dir)
 
-      expected = Path.join(sandbox, "lib/foo.ex")
-      assert {:ok, ^expected} = result
+      # Returns resolved path - check it ends with expected suffix
+      assert {:ok, resolved} = result
+      assert String.ends_with?(resolved, "/lib/foo.ex")
     end
 
     test "rejects relative path that escapes via traversal", %{sandbox: sandbox} do
@@ -252,8 +259,53 @@ defmodule TrumanShell.Support.SandboxTest do
 
       result = Sandbox.validate_path(symlink_path, sandbox)
 
+      # Returns resolved path - should end with same suffix as target
       assert {:ok, resolved} = result
-      assert resolved == target
+      assert String.ends_with?(resolved, "/lib/foo.ex")
+    end
+
+    test "rejects path through directory symlink pointing outside sandbox", %{sandbox: sandbox} do
+      # SECURITY: This is the intermediate symlink escape attack
+      # A directory symlink inside sandbox points outside,
+      # then we access files THROUGH that directory
+      #
+      # Attack scenario:
+      #   ln -s /etc /sandbox/escape_dir
+      #   validate_path("escape_dir/passwd", "/sandbox")
+      #
+      # If we only check the final path component, this passes
+      # because "passwd" is a regular file, not a symlink
+
+      escape_dir = Path.join(sandbox, "escape_dir")
+      File.ln_s("/etc", escape_dir)
+
+      # Try to access a file THROUGH the symlinked directory
+      result = Sandbox.validate_path("escape_dir/passwd", sandbox)
+
+      # MUST be rejected - the real path is /etc/passwd
+      assert {:error, :outside_sandbox} = result
+    end
+
+    test "rejects chained symlinks that escape sandbox", %{sandbox: sandbox} do
+      # SECURITY: Chained symlinks can also escape
+      # link1 -> link2 -> /etc/passwd
+
+      # Create a file outside sandbox to link to (use /tmp as it's more reliable)
+      outside_file = Path.join(System.tmp_dir!(), "outside_target_#{:rand.uniform(100_000)}")
+      File.write!(outside_file, "secret")
+      on_exit(fn -> File.rm(outside_file) end)
+
+      # Create chain: link1 -> link2 -> outside_file
+      link2 = Path.join(sandbox, "link2")
+      File.ln_s(outside_file, link2)
+
+      link1 = Path.join(sandbox, "link1")
+      File.ln_s(link2, link1)
+
+      result = Sandbox.validate_path("link1", sandbox)
+
+      # MUST be rejected - following the chain leads outside
+      assert {:error, :outside_sandbox} = result
     end
   end
 end

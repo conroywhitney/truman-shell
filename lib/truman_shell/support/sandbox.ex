@@ -119,40 +119,44 @@ defmodule TrumanShell.Support.Sandbox do
   def validate_path(path, sandbox_root, current_dir \\ nil)
 
   def validate_path(path, sandbox_root, current_dir) do
-    sandbox_expanded = Path.expand(sandbox_root)
+    sandbox_resolved = resolve_sandbox_root(sandbox_root)
+    absolute_path = resolve_to_absolute(path, sandbox_resolved, current_dir)
+    validate_resolved_path(absolute_path, sandbox_resolved)
+  end
 
-    # Resolve to absolute path
-    absolute_path =
-      cond do
-        Path.type(path) == :absolute ->
-          path
+  defp resolve_sandbox_root(sandbox_root) do
+    # Resolve symlinks in sandbox_root too (e.g., /tmp -> /private/tmp on macOS)
+    case resolve_real_path(Path.expand(sandbox_root)) do
+      {:ok, resolved} -> resolved
+      {:error, _} -> Path.expand(sandbox_root)
+    end
+  end
 
-        current_dir != nil ->
-          Path.join(current_dir, path)
+  defp resolve_to_absolute(path, sandbox_resolved, current_dir) do
+    cond do
+      Path.type(path) == :absolute -> path
+      current_dir != nil -> Path.join(current_dir, path)
+      true -> Path.join(sandbox_resolved, path)
+    end
+  end
 
-        true ->
-          Path.join(sandbox_expanded, path)
-      end
-
-    # Expand the path to resolve .. and symlinks
+  defp validate_resolved_path(absolute_path, sandbox_resolved) do
     case resolve_real_path(absolute_path) do
       {:ok, real_path} ->
-        if path_within_sandbox?(real_path, sandbox_expanded) do
-          {:ok, real_path}
-        else
-          {:error, :outside_sandbox}
-        end
+        check_path_within_sandbox(real_path, sandbox_resolved)
 
       {:error, _} ->
-        # Path doesn't exist or can't be resolved
-        # For non-existent paths, still check if target would be valid
+        # Path doesn't exist - check if target would be valid
         expanded = Path.expand(absolute_path)
+        check_path_within_sandbox(expanded, sandbox_resolved)
+    end
+  end
 
-        if path_within_sandbox?(expanded, sandbox_expanded) do
-          {:ok, expanded}
-        else
-          {:error, :outside_sandbox}
-        end
+  defp check_path_within_sandbox(path, sandbox) do
+    if path_within_sandbox?(path, sandbox) do
+      {:ok, path}
+    else
+      {:error, :outside_sandbox}
     end
   end
 
@@ -215,33 +219,71 @@ defmodule TrumanShell.Support.Sandbox do
     end
   end
 
+  # Maximum symlink depth to prevent infinite loops
+  @max_symlink_depth 10
+
   defp resolve_real_path(path) do
-    # Use :file.read_link_all to follow symlinks
-    case :file.read_link_all(path) do
+    # Resolve ALL symlinks in the path, not just the final component
+    # This prevents intermediate directory symlink escapes
+    do_resolve_path(Path.expand(path), @max_symlink_depth)
+  end
+
+  # Functions for recursive symlink resolution (mutual recursion)
+  # Note: These have mutual recursion, so order matters for credo
+
+  defp resolve_symlink_target(target, current_path, rest, depth) do
+    target_path = List.to_string(target)
+
+    resolved =
+      if Path.type(target_path) == :absolute do
+        target_path
+      else
+        Path.join(current_path, target_path)
+      end
+
+    # Recursively resolve the target (it might also have symlinks)
+    with {:ok, resolved_target} <- do_resolve_path(Path.expand(resolved), depth - 1) do
+      continue_after_symlink(resolved_target, rest, depth)
+    end
+  end
+
+  defp continue_after_symlink(resolved_target, [], _depth) do
+    {:ok, resolved_target}
+  end
+
+  defp continue_after_symlink(resolved_target, rest, depth) do
+    remaining_path = Path.join([resolved_target | rest])
+    do_resolve_path(remaining_path, depth - 1)
+  end
+
+  defp resolve_components([], current_path, _depth) do
+    {:ok, current_path}
+  end
+
+  defp resolve_components([component | rest], current_path, depth) do
+    next_path = Path.join(current_path, component)
+
+    case :file.read_link_all(next_path) do
       {:ok, target} when is_list(target) ->
-        # It's a symlink, resolve the target
-        target_path = List.to_string(target)
-
-        resolved =
-          if Path.type(target_path) == :absolute do
-            target_path
-          else
-            Path.join(Path.dirname(path), target_path)
-          end
-
-        {:ok, Path.expand(resolved)}
+        resolve_symlink_target(target, current_path, rest, depth)
 
       {:error, :einval} ->
-        # Not a symlink, just expand the path
-        if File.exists?(path) do
-          {:ok, Path.expand(path)}
-        else
-          {:error, :enoent}
-        end
+        resolve_components(rest, next_path, depth)
+
+      {:error, :enoent} ->
+        full_path = Path.join([next_path | rest])
+        {:ok, Path.expand(full_path)}
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp do_resolve_path(_path, 0), do: {:error, :eloop}
+
+  defp do_resolve_path(path, depth) do
+    components = Path.split(path)
+    resolve_components(components, "/", depth)
   end
 
   # Check if path is within sandbox using proper directory boundary check.
