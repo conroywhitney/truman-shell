@@ -352,6 +352,55 @@ defmodule TrumanShell.Support.SandboxTest do
       assert {:error, :eloop} = result
     end
 
+    test "tracks depth correctly when symlink target contains nested symlinks", %{sandbox: sandbox} do
+      # SECURITY: Depth must be tracked across nested symlink resolution
+      # Bug: resolve_symlink_target passes same depth to both do_resolve_path AND
+      # continue_after_symlink, so depth consumed inside do_resolve_path is lost.
+      #
+      # Setup: entry -> chain of 5 symlinks, then 5 more symlinks in remaining path
+      # Total = 1 (entry) + 5 (chain) + 5 (rem) = 11 > 10, should return :eloop
+      #
+      # Bug scenario:
+      # - entry uses 1 depth (10->9)
+      # - chain5 resolution: starts at 9, uses 5 internally (9->4), returns success
+      # - continue_after_symlink gets depth=9 (not 4!)
+      # - rem5 chain uses 5 (9->4 with bug, should be 4->-1 = fail)
+      # Result with bug: succeeds! Result correct: :eloop
+
+      # Create target directory structure
+      chain_dir = Path.join(sandbox, "chain")
+      File.mkdir_p!(chain_dir)
+
+      final_dir = Path.join(chain_dir, "final")
+      File.mkdir_p!(final_dir)
+
+      # Create chain inside chain_dir: chain5 -> chain4 -> ... -> chain1 -> final (5 hops)
+      Enum.reduce(1..5, "final", fn i, prev ->
+        link = Path.join(chain_dir, "chain#{i}")
+        File.ln_s(prev, link)
+        "chain#{i}"
+      end)
+
+      # Create entry symlink that points to chain5 (resolving it internally uses 5 depth)
+      entry_link = Path.join(sandbox, "entry")
+      File.ln_s(Path.join(chain_dir, "chain5"), entry_link)
+
+      # Create 5 remaining symlinks in final dir: rem5 -> rem4 -> ... -> rem1 -> target
+      File.write!(Path.join(final_dir, "target"), "content")
+
+      Enum.reduce(1..5, "target", fn i, prev ->
+        link = Path.join(final_dir, "rem#{i}")
+        File.ln_s(prev, link)
+        "rem#{i}"
+      end)
+
+      # Total depth: entry(1) + chain5->final(5) + rem5->target(5) = 11 > 10
+      result = Sandbox.validate_path("entry/rem5", sandbox)
+
+      # Should return :eloop - total depth exceeds limit of 10
+      assert {:error, :eloop} = result
+    end
+
     test "rejects path with embedded $VAR", %{sandbox: sandbox} do
       # SECURITY: Embedded env var references could escape
       # e.g., /sandbox/safe/$HOME/escape -> /sandbox/safe//Users/me/escape
@@ -384,6 +433,37 @@ defmodule TrumanShell.Support.SandboxTest do
 
       assert {:ok, resolved} = result
       assert String.ends_with?(resolved, "/lib/foo.ex")
+    end
+
+    test "uses resolved current_dir for path resolution", %{sandbox: sandbox} do
+      # When current_dir is a symlink, the resolved path should use the canonical form
+      # Create: sandbox/link_dir -> sandbox/real_dir
+      real_dir = Path.join(sandbox, "real_dir")
+      File.mkdir_p!(real_dir)
+      File.write!(Path.join(real_dir, "file.txt"), "content")
+
+      link_dir = Path.join(sandbox, "link_dir")
+      File.ln_s(real_dir, link_dir)
+
+      # Pass symlink as current_dir, resolve relative path
+      result = Sandbox.validate_path("file.txt", sandbox, link_dir)
+
+      # Result should use the canonical path (real_dir), not the symlink path
+      assert {:ok, resolved} = result
+      assert String.contains?(resolved, "real_dir/file.txt")
+      refute String.contains?(resolved, "link_dir")
+    end
+
+    test "rejects current_dir with embedded $VAR", %{sandbox: sandbox} do
+      # SECURITY: If current_dir contains $VAR, it could be exploited
+      # e.g., current_dir = "/sandbox/$HOME" could expand unexpectedly
+      path = "file.txt"
+      current_dir = Path.join(sandbox, "$HOME/subdir")
+
+      result = Sandbox.validate_path(path, sandbox, current_dir)
+
+      # Should be rejected - embedded $VAR in current_dir is not allowed
+      assert {:error, :outside_sandbox} = result
     end
   end
 end

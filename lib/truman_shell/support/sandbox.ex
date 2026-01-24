@@ -146,22 +146,29 @@ defmodule TrumanShell.Support.Sandbox do
     end
   end
 
-  # Validate current_dir is within sandbox
+  # Validate current_dir is within sandbox and return the resolved path
+  # Returns {:ok, resolved_current_dir} to avoid double symlink resolution
   defp validate_current_dir(nil, _sandbox), do: {:ok, nil}
 
   defp validate_current_dir(current_dir, sandbox_resolved) do
-    # Resolve current_dir to handle symlinks (e.g., /var -> /private/var on macOS)
-    resolved_current_dir =
-      case resolve_real_path(Path.expand(current_dir)) do
-        {:ok, resolved} -> resolved
-        {:error, _} -> Path.expand(current_dir)
-      end
-
-    if path_within_sandbox?(resolved_current_dir, sandbox_resolved) do
-      {:ok, current_dir}
-    else
-      # current_dir outside sandbox is a security error
+    # Reject current_dir with embedded $VAR references (same as path)
+    if String.contains?(current_dir, "$") do
       {:error, :outside_sandbox}
+    else
+      # Resolve current_dir to handle symlinks (e.g., /var -> /private/var on macOS)
+      resolved_current_dir =
+        case resolve_real_path(Path.expand(current_dir)) do
+          {:ok, resolved} -> resolved
+          {:error, _} -> Path.expand(current_dir)
+        end
+
+      if path_within_sandbox?(resolved_current_dir, sandbox_resolved) do
+        # Return the resolved path to avoid resolving again in resolve_to_absolute
+        {:ok, resolved_current_dir}
+      else
+        # current_dir outside sandbox is a security error
+        {:error, :outside_sandbox}
+      end
     end
   end
 
@@ -272,11 +279,18 @@ defmodule TrumanShell.Support.Sandbox do
   defp resolve_real_path(path) do
     # Resolve ALL symlinks in the path, not just the final component
     # This prevents intermediate directory symlink escapes
-    do_resolve_path(Path.expand(path), @max_symlink_depth)
+    # Returns {:ok, resolved_path} or {:error, reason}
+    case do_resolve_path(Path.expand(path), @max_symlink_depth) do
+      {:ok, resolved, _remaining_depth} -> {:ok, resolved}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   # Functions for recursive symlink resolution (mutual recursion)
   # Note: These have mutual recursion, so order matters for credo
+  #
+  # All resolve functions return {:ok, path, remaining_depth} or {:error, reason}
+  # to properly track depth consumption across nested symlink chains.
 
   # Resolve a symlink target and continue with remaining path components.
   # Each symlink hop consumes 1 depth.
@@ -297,14 +311,15 @@ defmodule TrumanShell.Support.Sandbox do
         end
 
       # Recursively resolve the target (it might also have symlinks)
-      with {:ok, resolved_target} <- do_resolve_path(Path.expand(resolved), new_depth) do
-        continue_after_symlink(resolved_target, rest, new_depth)
+      # IMPORTANT: Use the remaining depth from do_resolve_path for continue
+      with {:ok, resolved_target, remaining_depth} <- do_resolve_path(Path.expand(resolved), new_depth) do
+        continue_after_symlink(resolved_target, rest, remaining_depth)
       end
     end
   end
 
-  defp continue_after_symlink(resolved_target, [], _depth) do
-    {:ok, resolved_target}
+  defp continue_after_symlink(resolved_target, [], depth) do
+    {:ok, resolved_target, depth}
   end
 
   defp continue_after_symlink(resolved_target, rest, depth) do
@@ -312,8 +327,8 @@ defmodule TrumanShell.Support.Sandbox do
     do_resolve_path(remaining_path, depth)
   end
 
-  defp resolve_components([], current_path, _depth) do
-    {:ok, current_path}
+  defp resolve_components([], current_path, depth) do
+    {:ok, current_path, depth}
   end
 
   defp resolve_components([component | rest], current_path, depth) do
@@ -328,7 +343,7 @@ defmodule TrumanShell.Support.Sandbox do
 
       {:error, :enoent} ->
         full_path = Path.join([next_path | rest])
-        {:ok, Path.expand(full_path)}
+        {:ok, Path.expand(full_path), depth}
 
       {:error, reason} ->
         {:error, reason}
