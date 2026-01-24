@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# TrumanShell CLI - Execute commands through the sandboxed shell
+#
+# Usage:
+#   truman-shell execute "ls -la"
+#   truman-shell execute "cat file.txt | grep pattern"
+#
+# Returns the command output on success, error message on failure.
+# Exit code: 0 on success, 1 on error.
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+usage() {
+  echo "Usage: truman-shell <command> [args]"
+  echo ""
+  echo "Commands:"
+  echo "  execute <shell-command>  Execute a command through TrumanShell"
+  echo "  version                  Show version"
+  echo ""
+  echo "Examples:"
+  echo "  truman-shell execute 'ls -la'"
+  echo "  truman-shell execute 'cat README.md | head -10'"
+}
+
+case "${1:-}" in
+  execute)
+    shift
+    if [ -z "${1:-}" ]; then
+      echo "Error: No command provided" >&2
+      echo "Usage: truman-shell execute <shell-command>" >&2
+      exit 1
+    fi
+
+    CMD="$1"
+
+    cd "$SCRIPT_DIR"
+
+    # Run through Mix to ensure deps are loaded
+    elixir -S mix run --no-start -e "
+      Application.ensure_all_started(:truman_shell)
+
+      cmd = System.argv() |> List.first()
+
+      case TrumanShell.execute(cmd) do
+        {:ok, output} ->
+          IO.write(output)
+          System.halt(0)
+        {:error, reason} ->
+          IO.puts(:stderr, \"Error: #{reason}\")
+          System.halt(1)
+      end
+    " -- "$CMD"
+    ;;
+
+  version)
+    cd "$SCRIPT_DIR"
+    elixir -S mix run --no-start -e "
+      {:ok, vsn} = :application.get_key(:truman_shell, :vsn)
+      IO.puts(List.to_string(vsn))
+    "
+    ;;
+
+  -h|--help|help)
+    usage
+    ;;
+
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
