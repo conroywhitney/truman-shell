@@ -13,6 +13,16 @@ defmodule TrumanShell.Support.Sandbox do
 
   Implements the "404 Principle" - paths outside the sandbox appear
   as "not found" rather than "permission denied" to avoid information leakage.
+
+  ## Security Limitations
+
+  **TOCTOU (Time-of-Check to Time-of-Use):** This module validates paths at
+  check time, but the filesystem can change between validation and actual use.
+  A symlink could be modified after `validate_path/2` returns `{:ok, path}` but
+  before the file operation occurs.
+
+  This is inherent to userspace sandboxing. For untrusted environments, use
+  OS-level isolation (containers, chroot, namespaces) in addition to this module.
   """
 
   @env_var "TRUMAN_DOME"

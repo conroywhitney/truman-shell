@@ -1,5 +1,6 @@
 defmodule TrumanShell.Support.SandboxTest do
-  use ExUnit.Case, async: true
+  # async: false because sandbox_root/0 tests mutate TRUMAN_DOME env var
+  use ExUnit.Case, async: false
 
   alias TrumanShell.Support.Sandbox
 
