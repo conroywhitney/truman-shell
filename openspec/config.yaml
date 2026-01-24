@@ -1,20 +1,21 @@
-schema: spec-driven
+schema: elixir-tdd
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+# Project context
+context: |
+  Tech stack: Elixir 1.17+ / OTP 27
+  Testing: ExUnit with async: true
+  Style: mix format, Credo strict
+  Types: @spec for all public functions
+  Commits: Early and often, atomic changes
+  Merge strategy: Squash merge to main
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+# Per-artifact rules
+rules:
+  tests:
+    - Use ExUnit with describe/test blocks
+    - Pattern matching assertions preferred
+    - Mirror lib/ structure in test/
+  implementation:
+    - @moduledoc and @doc for all modules
+    - @spec for public functions
+    - Run mix format && mix credo before commit

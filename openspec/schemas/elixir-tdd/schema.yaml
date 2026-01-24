@@ -1,0 +1,264 @@
+name: elixir-tdd
+version: 1
+description: Test-driven development workflow for Elixir - tests → implementation → docs
+artifacts:
+  - id: spec
+    generates: spec.md
+    description: Feature specification defining requirements
+    template: spec.md
+    instruction: >
+      Create the feature specification that defines WHAT to build.
+
+
+      Sections:
+
+      - **Feature**: Name and high-level description of the feature's purpose
+      and user value
+
+      - **Requirements**: List of specific requirements. Use SHALL/MUST for
+      normative language.
+
+      - **Acceptance Criteria**: Testable criteria in WHEN/THEN format
+
+
+      Format requirements:
+
+      - Each requirement should be specific and testable
+
+      - Use `#### Scenario: <name>` with WHEN/THEN format for acceptance
+      criteria
+
+      - Define edge cases and error scenarios explicitly
+
+      - Every requirement MUST have at least one scenario
+
+
+      Example:
+
+      ```
+
+      ## Feature: User Authentication
+
+
+      Users can securely log into the application.
+
+
+      ## Requirements
+
+
+      ### Requirement: Password validation
+
+      The system SHALL validate passwords meet minimum security requirements.
+
+
+      #### Scenario: Valid password accepted
+
+      - **WHEN** password has 8+ chars, uppercase, lowercase, and number
+
+      - **THEN** password is accepted
+
+
+      #### Scenario: Weak password rejected
+
+      - **WHEN** password is less than 8 characters
+
+      - **THEN** system displays "Password too short" error
+
+      ```
+
+
+      This spec drives test creation - each scenario becomes a test case.
+    requires: []
+  - id: tests
+    generates: tests.md
+    description: Test manifest pointing to ExUnit test files
+    template: test.md
+    instruction: |
+      Write tests BEFORE implementation (TDD red phase).
+
+      File naming:
+      - Create test files at `test/<module_path>/<feature>_test.exs`
+      - Mirror the lib/ structure in test/
+      - Use descriptive names matching the spec
+
+      Test structure:
+      - Use `describe` blocks for grouping related tests
+      - Use `test` macro with descriptive names
+      - Follow Given/When/Then format in comments
+      - Use pattern matching in assertions
+
+      Coverage requirements:
+      - Cover each requirement from the spec
+      - Include happy path (success cases)
+      - Include edge cases (boundary conditions)
+      - Include error scenarios (invalid input, failures)
+      - Tests should fail initially (no implementation yet)
+
+      Example:
+      ```elixir
+      defmodule MyApp.PasswordTest do
+        use ExUnit.Case, async: true
+
+        alias MyApp.Password
+
+        describe "validate/1" do
+          test "accepts valid password with all requirements" do
+            # GIVEN a password meeting all requirements
+            password = "SecurePass1"
+
+            # WHEN validating
+            result = Password.validate(password)
+
+            # THEN it should be accepted
+            assert {:ok, ^password} = result
+          end
+
+          test "rejects password shorter than 8 characters" do
+            # GIVEN a short password
+            password = "Short1"
+
+            # WHEN validating
+            result = Password.validate(password)
+
+            # THEN it should be rejected with message
+            assert {:error, "Password too short"} = result
+          end
+        end
+      end
+      ```
+
+      Follow the spec requirements exactly - tests verify the spec.
+    requires:
+      - spec
+  - id: implementation
+    generates: implementation.md
+    description: Implementation manifest pointing to Elixir source files
+    template: implementation.md
+    instruction: |
+      Implement the feature to make tests pass (TDD green phase).
+
+      TDD workflow:
+      1. Run tests - confirm they fail (red): `mix test test/<path>_test.exs`
+      2. Write minimal code to pass ONE test
+      3. Run tests - confirm that test passes (green)
+      4. Refactor if needed while keeping tests green
+      5. Repeat for next failing test
+
+      Implementation guidelines:
+      - Write minimal code to pass each test - no more, no less
+      - Run tests frequently to verify progress
+      - Keep functions small and focused
+      - Use clear, descriptive names
+      - Add @spec for public functions
+
+      Code organization:
+      - Create source files in `lib/<app_name>/<feature>.ex`
+      - Use @moduledoc and @doc for documentation
+      - Keep implementation details in private functions
+      - Follow mix format style
+
+      Example structure:
+      ```elixir
+      defmodule MyApp.Password do
+        @moduledoc """
+        Password validation for user accounts.
+        """
+
+        @doc """
+        Validates a password meets security requirements.
+
+        ## Examples
+
+            iex> MyApp.Password.validate("SecurePass1")
+            {:ok, "SecurePass1"}
+
+            iex> MyApp.Password.validate("short")
+            {:error, "Password too short"}
+
+        """
+        @spec validate(String.t()) :: {:ok, String.t()} | {:error, String.t()}
+        def validate(password) when byte_size(password) < 8 do
+          {:error, "Password too short"}
+        end
+
+        def validate(password) do
+          {:ok, password}
+        end
+      end
+      ```
+
+      Don't over-engineer - implement only what tests require.
+    requires:
+      - tests
+  - id: docs
+    generates: docs/*.md
+    description: Documentation for the implemented feature
+    template: docs.md
+    instruction: |
+      Document the implemented feature.
+
+      Sections:
+      - **Overview**: What the feature does and why it exists (1-2 paragraphs)
+      - **Getting Started**: Quick start guide to use the feature immediately
+      - **Examples**: Code examples showing common use cases
+      - **Reference**: Detailed API documentation, configuration options
+
+      Guidelines:
+      - Write for the user, not the developer
+      - Start with the most common use case
+      - Include copy-pasteable code examples
+      - Document all configuration options with defaults
+      - Note any limitations, edge cases, or gotchas
+      - Link to related features or specs
+
+      Example structure:
+      ```markdown
+      ## Overview
+
+      Password validation ensures user passwords meet security requirements
+      before account creation or password changes.
+
+      ## Getting Started
+
+      Use the validation function:
+
+      ```elixir
+      alias MyApp.Password
+
+      case Password.validate("MySecurePass1") do
+        {:ok, password} -> # proceed with password
+        {:error, message} -> # show error to user
+      end
+      ```
+
+      ## Examples
+
+      ### Basic validation
+      ...
+
+      ### Pattern matching results
+      ...
+
+      ## Reference
+
+      ### Password.validate/1
+
+      | Parameter | Type | Description |
+      |-----------|------|-------------|
+      | password | String.t() | The password to validate |
+
+      **Returns**: `{:ok, password}` or `{:error, message}`
+      ```
+
+      Reference the spec for requirements, implementation for details.
+    requires:
+      - implementation
+apply:
+  requires:
+    - tests
+  tracks: null
+  instruction: |
+    Run tests to see failures: `mix test test/<path>_test.exs`
+    Implement minimal code to pass each test.
+    Refactor while keeping tests green.
+    Run `mix format` and `mix credo` before committing.
