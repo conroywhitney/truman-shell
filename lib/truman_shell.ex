@@ -24,10 +24,10 @@ defmodule TrumanShell do
 
   """
 
-  alias TrumanShell.Boundaries
   alias TrumanShell.Stages.Executor
   alias TrumanShell.Stages.Expander
   alias TrumanShell.Stages.Parser
+  alias TrumanShell.Support.Sandbox
 
   @doc """
   Parse and execute a shell command string.
@@ -55,7 +55,7 @@ defmodule TrumanShell do
     # Pipeline: Tokenizer → Parser → Expander → Executor → Redirector
     # (Tokenizer is called by Parser, Redirector is called by Executor)
     with {:ok, command} <- parse(input) do
-      context = Boundaries.build_context()
+      context = Sandbox.build_context()
       expanded = Expander.expand(command, context)
       Executor.run(expanded)
     end

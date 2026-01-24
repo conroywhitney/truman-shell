@@ -3,6 +3,89 @@ defmodule TrumanShell.Support.SandboxTest do
 
   alias TrumanShell.Support.Sandbox
 
+  describe "sandbox_root/0" do
+    test "returns TRUMAN_DOME env var when set" do
+      System.put_env("TRUMAN_DOME", "/custom/dome")
+      result = Sandbox.sandbox_root()
+      assert result == "/custom/dome"
+      System.delete_env("TRUMAN_DOME")
+    end
+
+    test "returns File.cwd!() when env var is not set" do
+      System.delete_env("TRUMAN_DOME")
+      result = Sandbox.sandbox_root()
+      assert result == File.cwd!()
+    end
+
+    test "returns File.cwd!() when env var is empty string" do
+      System.put_env("TRUMAN_DOME", "")
+      result = Sandbox.sandbox_root()
+      assert result == File.cwd!()
+      System.delete_env("TRUMAN_DOME")
+    end
+
+    test "expands tilde to home directory" do
+      System.put_env("TRUMAN_DOME", "~/studios/reification-labs")
+      result = Sandbox.sandbox_root()
+      home = System.get_env("HOME")
+      assert result == Path.join(home, "studios/reification-labs")
+      System.delete_env("TRUMAN_DOME")
+    end
+
+    test "expands dot to current working directory" do
+      System.put_env("TRUMAN_DOME", ".")
+      result = Sandbox.sandbox_root()
+      assert result == File.cwd!()
+      System.delete_env("TRUMAN_DOME")
+    end
+
+    test "expands relative path to absolute" do
+      System.put_env("TRUMAN_DOME", "./my-project")
+      result = Sandbox.sandbox_root()
+      assert result == Path.join(File.cwd!(), "my-project")
+      System.delete_env("TRUMAN_DOME")
+    end
+
+    test "does NOT expand dollar-sign env var references" do
+      System.put_env("TRUMAN_DOME", "$HOME/projects")
+      result = Sandbox.sandbox_root()
+      assert result == "$HOME/projects"
+      System.delete_env("TRUMAN_DOME")
+    end
+
+    test "normalizes trailing slashes" do
+      System.put_env("TRUMAN_DOME", "/custom/dome///")
+      result = Sandbox.sandbox_root()
+      assert result == "/custom/dome"
+      System.delete_env("TRUMAN_DOME")
+    end
+  end
+
+  describe "build_context/0" do
+    test "returns context map with sandbox_root key" do
+      context = Sandbox.build_context()
+      assert Map.has_key?(context, :sandbox_root)
+      assert Map.has_key?(context, :current_dir)
+    end
+
+    test "context includes current_dir matching sandbox_root by default" do
+      context = Sandbox.build_context()
+      assert context.current_dir == context.sandbox_root
+    end
+  end
+
+  describe "error_message/1" do
+    test "outside_sandbox error converts to 'No such file or directory'" do
+      message = Sandbox.error_message({:error, :outside_sandbox})
+      assert message == "No such file or directory"
+    end
+
+    test "enoent error converts to 'No such file or directory'" do
+      message = Sandbox.error_message({:error, :enoent})
+      assert message == "No such file or directory"
+    end
+  end
+
   describe "validate_path/2" do
     @tag :tmp_dir
     test "rejects symlink with absolute target outside sandbox", %{tmp_dir: sandbox} do
@@ -18,9 +101,9 @@ defmodule TrumanShell.Support.SandboxTest do
     end
 
     @tag :tmp_dir
-    test "rejects symlink with absolute target even inside sandbox", %{tmp_dir: sandbox} do
-      # Even if absolute path points inside sandbox, it's rejected
-      # because Path.safe_relative can't verify absolute targets safely
+    test "allows symlink with absolute target inside sandbox", %{tmp_dir: sandbox} do
+      # Symlinks with absolute paths inside sandbox ARE allowed
+      # We follow the symlink and verify the real path is within bounds
       inside_dir = Path.join(sandbox, "inside")
       File.mkdir_p!(inside_dir)
 
@@ -29,8 +112,8 @@ defmodule TrumanShell.Support.SandboxTest do
 
       result = Sandbox.validate_path("abs_link", sandbox)
 
-      # Rejected: absolute symlink targets are unverifiable
-      assert {:error, :outside_sandbox} = result
+      # Allowed: we follow symlinks and verify real destination
+      assert {:ok, ^inside_dir} = result
     end
 
     @tag :tmp_dir
@@ -118,6 +201,59 @@ defmodule TrumanShell.Support.SandboxTest do
       result = Sandbox.validate_path(path, sandbox)
 
       assert {:ok, "/tmp/truman-test"} = result
+    end
+  end
+
+  describe "validate_path/3 with current_dir" do
+    setup do
+      tmp_dir = System.tmp_dir!()
+      sandbox = Path.join(tmp_dir, "test_sandbox_#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox)
+      File.mkdir_p!(Path.join(sandbox, "lib"))
+      File.write!(Path.join(sandbox, "lib/foo.ex"), "# test file")
+
+      on_exit(fn -> File.rm_rf!(sandbox) end)
+
+      %{sandbox: sandbox}
+    end
+
+    test "resolves relative path within sandbox", %{sandbox: sandbox} do
+      relative_path = "lib/foo.ex"
+      current_dir = sandbox
+
+      result = Sandbox.validate_path(relative_path, sandbox, current_dir)
+
+      expected = Path.join(sandbox, "lib/foo.ex")
+      assert {:ok, ^expected} = result
+    end
+
+    test "rejects relative path that escapes via traversal", %{sandbox: sandbox} do
+      relative_path = "../../../etc/passwd"
+      current_dir = sandbox
+
+      result = Sandbox.validate_path(relative_path, sandbox, current_dir)
+
+      assert {:error, :outside_sandbox} = result
+    end
+
+    test "rejects symlink pointing outside sandbox", %{sandbox: sandbox} do
+      symlink_path = Path.join(sandbox, "escape_link")
+      File.ln_s("/etc", symlink_path)
+
+      result = Sandbox.validate_path(symlink_path, sandbox)
+
+      assert {:error, :outside_sandbox} = result
+    end
+
+    test "accepts symlink pointing within sandbox", %{sandbox: sandbox} do
+      target = Path.join(sandbox, "lib/foo.ex")
+      symlink_path = Path.join(sandbox, "foo_link.ex")
+      File.ln_s(target, symlink_path)
+
+      result = Sandbox.validate_path(symlink_path, sandbox)
+
+      assert {:ok, resolved} = result
+      assert resolved == target
     end
   end
 end
