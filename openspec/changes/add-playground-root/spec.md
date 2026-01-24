@@ -86,6 +86,32 @@ The system SHALL provide a function to validate whether a path is within the san
 - **WHEN** following a chain of symlinks that exceeds 10 levels
 - **THEN** returns `{:error, :eloop}` (prevents infinite loops)
 
+#### Scenario: Self-referential symlink
+- **WHEN** checking a symlink that points to itself (e.g., `loop -> loop`)
+- **THEN** returns `{:error, :eloop}` (detected by depth limit)
+
+### Requirement: Embedded environment variables rejected
+
+The system SHALL reject paths containing embedded `$VAR` references.
+
+#### Scenario: Embedded $VAR in path
+- **WHEN** checking `safe/$HOME/escape` against any sandbox
+- **THEN** returns `{:error, :outside_sandbox}`
+- **REASON** Embedded env vars could be used for path injection attacks
+
+### Requirement: current_dir validation
+
+The system SHALL validate that `current_dir` is within the sandbox before using it.
+
+#### Scenario: current_dir outside sandbox
+- **WHEN** `validate_path("file.txt", "/sandbox", "/tmp")` is called
+- **GIVEN** `/tmp` is outside `/sandbox`
+- **THEN** returns `{:error, :outside_sandbox}`
+
+#### Scenario: current_dir inside sandbox
+- **WHEN** `validate_path("file.txt", "/sandbox", "/sandbox/subdir")` is called
+- **THEN** returns `{:ok, "/sandbox/subdir/file.txt"}`
+
 ### Requirement: 404 Principle for outside paths
 
 The system SHALL NOT reveal that a path exists outside the sandbox boundary.
