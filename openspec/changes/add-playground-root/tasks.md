@@ -13,16 +13,17 @@
   - File: `lib/truman_shell/support/sandbox.ex:198-223`
   - Flagged by: Gemini, GPT, Claude
 
-- [ ] **Fix command injection in bin/truman-shell**
+- [x] **Fix command injection in bin/truman-shell** ✓ 47a7d0e
   - Shell script passes user input directly without escaping single quotes
   - Attack: `truman-shell execute "'; evil_code; '"`
   - Fix: Pass command via env var, not shell interpolation
   - File: `bin/truman-shell:47-48`
   - Flagged by: Claude
+  - Note: Original code was actually safe (argv), but env var is clearer
 
 ### P1 - Issues
 
-- [ ] **Update openspec to use TRUMAN_DOME**
+- [x] **Update openspec to use TRUMAN_DOME** ✓
   - Spec says `TRUMAN_PLAYGROUND_ROOT` / `playground_root`
   - Code uses `TRUMAN_DOME` / `sandbox_root`
   - File: `openspec/changes/add-playground-root/spec.md`
