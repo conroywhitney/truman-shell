@@ -1,20 +1,20 @@
 ## Tests: Playground Root
 
-**Location:** `test/truman_shell/boundaries_test.exs`
+**Location:** `test/truman_shell/support/sandbox_test.exs`
 
-**Run:** `mix test test/truman_shell/boundaries_test.exs`
+**Run:** `mix test test/truman_shell/support/sandbox_test.exs`
 
-**Status:** 18 tests, 0 failures
+**Status:** All tests pass (integrated into existing Sandbox tests)
 
 ---
 
-### Test Suites
+### New Test Suites
 
-#### `playground_root/0` (9 tests)
+#### `sandbox_root/0` (8 tests)
 
 | Test | Scenario |
 |------|----------|
-| env var set | `TRUMAN_PLAYGROUND_ROOT=/custom` → returns `/custom` |
+| env var set | `TRUMAN_DOME=/custom` → returns `/custom` |
 | env var not set | No env var → returns `File.cwd!()` |
 | env var empty | `""` → returns `File.cwd!()` |
 | tilde expansion | `~/foo` → `$HOME/foo` |
@@ -23,14 +23,11 @@
 | no $VAR expansion | `$HOME/x` → literal `$HOME/x` (security) |
 | trailing slashes | `/foo///` → `/foo` |
 
-#### `validate_path/2,3` (7 tests)
+#### `validate_path/3` with current_dir (4 tests)
 
 | Test | Scenario |
 |------|----------|
-| path inside | `/playground/lib/foo.ex` → `{:ok, path}` |
-| path outside | `/etc/passwd` → `{:error, :outside_playground}` |
-| traversal attack | `../../../etc/passwd` → blocked |
-| relative inside | `lib/foo.ex` → resolved to absolute |
+| relative inside | `lib/foo.ex` with current_dir → resolved |
 | relative escapes | `../../etc/passwd` → blocked |
 | symlink outside | link → `/etc` → blocked |
 | symlink inside | link → `lib/foo.ex` → allowed |
@@ -39,11 +36,12 @@
 
 | Test | Scenario |
 |------|----------|
-| has playground_root | Context map includes `:playground_root` |
-| current_dir matches | `current_dir == playground_root` |
+| has sandbox_root | Context map includes `:sandbox_root` |
+| current_dir matches | `current_dir == sandbox_root` |
 
-#### `error_message/1` (1 test)
+#### `error_message/1` (2 tests)
 
 | Test | Scenario |
 |------|----------|
-| 404 principle | `:outside_playground` → "No such file or directory" |
+| outside_sandbox | `:outside_sandbox` → "No such file or directory" |
+| enoent | `:enoent` → "No such file or directory" |

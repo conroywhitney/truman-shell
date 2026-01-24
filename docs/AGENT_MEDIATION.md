@@ -122,27 +122,33 @@ if (input.tool_name === 'Read') {
 6. **WebFetch** - Lower priority (network vs filesystem)
 7. **Task** - Complex (subagent sandboxing)
 
-## Known Issues
+## Configuration
 
-### Sandbox Root Mismatch
+### TRUMAN_DOME Environment Variable
 
-**Problem**: TrumanShell executes in `~/code/truman-shell`, not where Claude runs.
+Set `TRUMAN_DOME` to configure the sandbox root:
 
-**Cause**: `bin/truman-shell` does `cd "$SCRIPT_DIR"` before executing.
+```bash
+export TRUMAN_DOME=~/code/my-project
+```
 
-**Fix**: Pass sandbox root via environment variable:
+**Features:**
+- `~` expands to `$HOME`
+- `.` and `./path` expand relative to cwd
+- Trailing slashes normalized
+- Does NOT expand `$VAR` (security)
+
+**Without env var:** Falls back to `File.cwd!()`
+
+### Hook Integration
 
 ```typescript
 // In hook:
-const sandboxRoot = process.env.CLAUDE_PROJECT_DIR;
-const wrappedCommand = `SANDBOX_ROOT='${sandboxRoot}' ~/code/truman-shell/bin/truman-shell execute '${escapedCmd}'`;
+const dome = process.env.CLAUDE_PROJECT_DIR;
+const wrappedCommand = `TRUMAN_DOME='${dome}' ~/code/truman-shell/bin/truman-shell execute '${escapedCmd}'`;
 ```
 
-```bash
-# In bin/truman-shell:
-SANDBOX_ROOT="${SANDBOX_ROOT:-$SCRIPT_DIR}"
-cd "$SANDBOX_ROOT"
-```
+"You're not leaving the dome, Truman."
 
 ## The Agent Landscape
 
