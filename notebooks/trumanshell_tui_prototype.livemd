@@ -300,4 +300,4 @@ To run this as a standalone app:
 * [ ] URL paste → auto-fetch
 * [ ] `toilet --gay` aesthetic mode 🌈
 
-<!-- livebook:{"offset":8011,"stamp":{"token":"XCP.hseBKhI9EvMnObSWxuyJkVjccKae263o63kcdXBGAGBBgbTKCoxTkbJLB7GYJ3pU0i3rICv8DGjNzJK7Y7IiEbgirXa91ETVaCqgrKsfpEn679UIgKVi8yJs","version":2}} -->
+<!-- livebook:{"offset":8011,"stamp":{"token":"XCP.VZD4RrRSaJivU4S8jheFOEsH2zu12-NmdsUWhHrDBBuPQ7msopwfPuLkDlw6En73YUnMQZl_7qHfBN6AWa5iINwxELBjDACM4ciOa-0hPLWl5rfjpjq7_hY1","version":2}} -->

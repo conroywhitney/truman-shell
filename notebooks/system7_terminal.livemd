@@ -1,0 +1,635 @@
+<!-- livebook:{"app_settings":{"auto_shutdown_ms":3600000,"slug":"system7-terminal"}} -->
+
+# System 7 Terminal
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.18.0"}
+])
+```
+
+## The Aesthetic
+
+Classic Mac System 7 meets `toilet --gay`.
+
+1991 UI chrome running 2026 terminal chaos.
+
+## System 7 CSS + Window Manager
+
+```elixir
+defmodule System7 do
+  @moduledoc """
+  System 7 Macintosh UI components for Livebook.
+
+  Ugly-beautiful: chunky 1991 pixels running modern terminal output.
+  """
+
+  def css do
+    """
+    <style>
+      /* ===== FONTS ===== */
+      @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+      /* ===== DESKTOP ===== */
+      .system7-desktop {
+        background:
+          repeating-linear-gradient(
+            0deg,
+            #a8a8a8 0px,
+            #a8a8a8 2px,
+            #d8d8d8 2px,
+            #d8d8d8 4px
+          );
+        min-height: 400px;
+        position: relative;
+        font-family: 'VT323', 'Chicago', 'Geneva', monospace;
+        padding-top: 24px;
+      }
+
+      /* ===== MENU BAR ===== */
+      .system7-menubar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 20px;
+        background: #fff;
+        border-bottom: 1px solid #000;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        font-size: 14px;
+        z-index: 9999;
+      }
+
+      .system7-menubar .apple {
+        font-weight: bold;
+        margin-right: 16px;
+        cursor: pointer;
+      }
+
+      .system7-menu-item {
+        padding: 2px 12px;
+        cursor: pointer;
+        position: relative;
+      }
+
+      .system7-menu-item:hover {
+        background: #000;
+        color: #fff;
+      }
+
+      .system7-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: #fff;
+        border: 1px solid #000;
+        box-shadow: 2px 2px 0 #000;
+        min-width: 150px;
+        z-index: 10000;
+      }
+
+      .system7-menu-item:hover .system7-dropdown {
+        display: block;
+      }
+
+      .system7-dropdown-item {
+        padding: 4px 16px;
+        cursor: pointer;
+      }
+
+      .system7-dropdown-item:hover {
+        background: #000;
+        color: #fff;
+      }
+
+      /* ===== WINDOW ===== */
+      .system7-window {
+        position: absolute;
+        background: #fff;
+        border: 1px solid #000;
+        box-shadow: 2px 2px 0 #000;
+        min-width: 300px;
+        min-height: 150px;
+      }
+
+      /* ===== TITLE BAR (THE STRIPES!) ===== */
+      .system7-titlebar {
+        height: 20px;
+        background: linear-gradient(
+          to bottom,
+          #fff 0px, #fff 1px,
+          #000 1px, #000 2px,
+          #fff 2px, #fff 3px,
+          #000 3px, #000 4px,
+          #fff 4px, #fff 5px,
+          #000 5px, #000 6px,
+          #fff 6px, #fff 7px,
+          #000 7px, #000 8px,
+          #fff 8px, #fff 9px,
+          #000 9px, #000 10px,
+          #fff 10px, #fff 11px,
+          #000 11px, #000 12px,
+          #fff 12px, #fff 13px,
+          #000 13px, #000 14px,
+          #fff 14px, #fff 15px,
+          #000 15px, #000 16px,
+          #fff 16px, #fff 17px,
+          #000 17px, #000 18px,
+          #fff 18px, #fff 20px
+        );
+        display: flex;
+        align-items: center;
+        padding: 0 4px;
+        cursor: move;
+        user-select: none;
+      }
+
+      .system7-titlebar.inactive {
+        background: #fff;
+      }
+
+      .system7-close-box {
+        width: 12px;
+        height: 12px;
+        background: #fff;
+        border: 1px solid #000;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .system7-close-box:hover {
+        background: #000;
+      }
+
+      .system7-title {
+        flex: 1;
+        text-align: center;
+        font-size: 12px;
+        font-weight: bold;
+        background: #fff;
+        padding: 0 8px;
+        margin: 0 4px;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+
+      .system7-zoom-box {
+        width: 12px;
+        height: 12px;
+        background: #fff;
+        border: 1px solid #000;
+        cursor: pointer;
+        flex-shrink: 0;
+        position: relative;
+      }
+
+      .system7-zoom-box::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 6px;
+        height: 6px;
+        border: 1px solid #000;
+      }
+
+      /* ===== WINDOW CONTENT ===== */
+      .system7-content {
+        background: #000;
+        color: #0f0;
+        font-family: 'VT323', monospace;
+        font-size: 16px;
+        padding: 8px;
+        min-height: 200px;
+        overflow: auto;
+        white-space: pre;
+        line-height: 1.2;
+      }
+
+      /* ===== RESIZE HANDLE ===== */
+      .system7-resize {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 15px;
+        height: 15px;
+        cursor: se-resize;
+        background:
+          linear-gradient(135deg, transparent 50%, #000 50%, #000 60%, transparent 60%),
+          linear-gradient(135deg, transparent 70%, #000 70%, #000 80%, transparent 80%);
+      }
+
+      /* ===== ANSI COLORS ===== */
+      .ansi-black { color: #000; }
+      .ansi-red { color: #ff5f5f; }
+      .ansi-green { color: #5fff5f; }
+      .ansi-yellow { color: #ffff5f; }
+      .ansi-blue { color: #5f5fff; }
+      .ansi-magenta { color: #ff5fff; }
+      .ansi-cyan { color: #5fffff; }
+      .ansi-white { color: #ffffff; }
+      .ansi-bright-black { color: #808080; }
+      .ansi-bright-red { color: #ff0000; }
+      .ansi-bright-green { color: #00ff00; }
+      .ansi-bright-yellow { color: #ffff00; }
+      .ansi-bright-blue { color: #0000ff; }
+      .ansi-bright-magenta { color: #ff00ff; }
+      .ansi-bright-cyan { color: #00ffff; }
+      .ansi-bright-white { color: #ffffff; }
+      .ansi-bold { font-weight: bold; }
+    </style>
+    """
+  end
+
+  def window_manager_js do
+    """
+    <script>
+      (function() {
+        let windowCounter = 0;
+        let highestZ = 100;
+
+        window.System7 = {
+          createWindow: function(title, content, x, y) {
+            windowCounter++;
+            const id = 'window-' + windowCounter;
+
+            const win = document.createElement('div');
+            win.className = 'system7-window';
+            win.id = id;
+            win.style.left = (x || 50 + windowCounter * 20) + 'px';
+            win.style.top = (y || 50 + windowCounter * 20) + 'px';
+            win.style.zIndex = ++highestZ;
+            win.style.width = '500px';
+            win.style.height = '300px';
+
+            win.innerHTML = `
+              <div class="system7-titlebar">
+                <div class="system7-close-box" onclick="System7.closeWindow('${id}')"></div>
+                <div class="system7-title">${title}</div>
+                <div class="system7-zoom-box"></div>
+              </div>
+              <div class="system7-content">${content}</div>
+              <div class="system7-resize"></div>
+            `;
+
+            // Drag handling
+            const titlebar = win.querySelector('.system7-titlebar');
+            let isDragging = false;
+            let startX, startY, startLeft, startTop;
+
+            titlebar.addEventListener('mousedown', function(e) {
+              if (e.target.classList.contains('system7-close-box') ||
+                  e.target.classList.contains('system7-zoom-box')) return;
+              isDragging = true;
+              win.style.zIndex = ++highestZ;
+              startX = e.clientX;
+              startY = e.clientY;
+              startLeft = parseInt(win.style.left) || 0;
+              startTop = parseInt(win.style.top) || 0;
+              e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+              if (!isDragging) return;
+              win.style.left = (startLeft + e.clientX - startX) + 'px';
+              win.style.top = (startTop + e.clientY - startY) + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+              isDragging = false;
+            });
+
+            // Resize handling
+            const resizer = win.querySelector('.system7-resize');
+            let isResizing = false;
+            let startWidth, startHeight;
+
+            resizer.addEventListener('mousedown', function(e) {
+              isResizing = true;
+              win.style.zIndex = ++highestZ;
+              startX = e.clientX;
+              startY = e.clientY;
+              startWidth = parseInt(win.style.width) || 300;
+              startHeight = parseInt(win.style.height) || 150;
+              e.preventDefault();
+              e.stopPropagation();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+              if (!isResizing) return;
+              win.style.width = Math.max(200, startWidth + e.clientX - startX) + 'px';
+              win.style.height = Math.max(100, startHeight + e.clientY - startY) + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+              isResizing = false;
+            });
+
+            // Click to focus
+            win.addEventListener('mousedown', function() {
+              win.style.zIndex = ++highestZ;
+            });
+
+            document.querySelector('.system7-desktop').appendChild(win);
+            return id;
+          },
+
+          closeWindow: function(id) {
+            const win = document.getElementById(id);
+            if (win) win.remove();
+          },
+
+          runToilet: function(text) {
+            // Simulated toilet --gay output (we'll make this real later)
+            const colors = ['ansi-red', 'ansi-yellow', 'ansi-green', 'ansi-cyan', 'ansi-blue', 'ansi-magenta'];
+            let output = '';
+            let colorIndex = 0;
+            for (let char of text) {
+              if (char === ' ' || char === '\\n') {
+                output += char;
+              } else {
+                output += `<span class="${colors[colorIndex % colors.length]}">${char}</span>`;
+                colorIndex++;
+              }
+            }
+            return output;
+          }
+        };
+      })();
+    </script>
+    """
+  end
+end
+```
+
+## Create the Desktop
+
+```elixir
+desktop_html = """
+#{System7.css()}
+#{System7.window_manager_js()}
+
+<div class="system7-desktop" id="desktop">
+  <div class="system7-menubar">
+    <span class="apple">&#63743;</span>
+    <div class="system7-menu-item">
+      File
+      <div class="system7-dropdown">
+        <div class="system7-dropdown-item" onclick="System7.createWindow('Terminal', '<span class=\\'ansi-green\\'>$ _</span>', 100, 60)">
+          New Terminal
+        </div>
+        <div class="system7-dropdown-item" onclick="System7.createWindow('toilet --gay', System7.runToilet('Money me'), 150, 80)">
+          Money Me
+        </div>
+        <hr style="margin: 4px 0; border: none; border-top: 1px solid #000;">
+        <div class="system7-dropdown-item">Close</div>
+      </div>
+    </div>
+    <div class="system7-menu-item">
+      Edit
+      <div class="system7-dropdown">
+        <div class="system7-dropdown-item">Undo</div>
+        <div class="system7-dropdown-item">Cut</div>
+        <div class="system7-dropdown-item">Copy</div>
+        <div class="system7-dropdown-item">Paste</div>
+      </div>
+    </div>
+    <div class="system7-menu-item">
+      View
+      <div class="system7-dropdown">
+        <div class="system7-dropdown-item">by Icon</div>
+        <div class="system7-dropdown-item">by Name</div>
+        <div class="system7-dropdown-item">by Date</div>
+      </div>
+    </div>
+    <div class="system7-menu-item">
+      Special
+      <div class="system7-dropdown">
+        <div class="system7-dropdown-item" onclick="alert('Empty Trash?')">Empty Trash...</div>
+        <div class="system7-dropdown-item" onclick="alert('Restart?')">Restart</div>
+        <div class="system7-dropdown-item" onclick="alert('Shut Down?')">Shut Down</div>
+      </div>
+    </div>
+  </div>
+</div>
+"""
+
+Kino.HTML.new(desktop_html)
+```
+
+## Real toilet --gay Output
+
+Let's capture actual `toilet` output and render it with ANSI colors.
+
+```elixir
+defmodule AnsiToHtml do
+  @moduledoc """
+  Convert ANSI escape codes to HTML spans.
+
+  Handles the rainbow chaos of `toilet --gay`.
+  """
+
+  # ANSI color code mapping
+  @colors %{
+    "30" => "ansi-black",
+    "31" => "ansi-red",
+    "32" => "ansi-green",
+    "33" => "ansi-yellow",
+    "34" => "ansi-blue",
+    "35" => "ansi-magenta",
+    "36" => "ansi-cyan",
+    "37" => "ansi-white",
+    "90" => "ansi-bright-black",
+    "91" => "ansi-bright-red",
+    "92" => "ansi-bright-green",
+    "93" => "ansi-bright-yellow",
+    "94" => "ansi-bright-blue",
+    "95" => "ansi-bright-magenta",
+    "96" => "ansi-bright-cyan",
+    "97" => "ansi-bright-white"
+  }
+
+  def convert(ansi_string) do
+    # Pattern: ESC[<codes>m
+    # ESC is \e or \x1b (27)
+    regex = ~r/\x1b\[([0-9;]+)m/
+
+    parts = Regex.split(regex, ansi_string, include_captures: true)
+
+    {html, _} = Enum.reduce(parts, {"", []}, fn part, {acc, current_classes} ->
+      cond do
+        # ANSI escape sequence
+        Regex.match?(regex, part) ->
+          [_, codes] = Regex.run(regex, part)
+          new_classes = parse_codes(codes)
+          {acc, new_classes}
+
+        # Regular text
+        true ->
+          escaped = part
+            |> String.replace("&", "&amp;")
+            |> String.replace("<", "&lt;")
+            |> String.replace(">", "&gt;")
+
+          if current_classes == [] do
+            {acc <> escaped, current_classes}
+          else
+            class_str = Enum.join(current_classes, " ")
+            {acc <> "<span class=\"#{class_str}\">#{escaped}</span>", current_classes}
+          end
+      end
+    end)
+
+    html
+  end
+
+  defp parse_codes(codes_string) do
+    codes_string
+    |> String.split(";")
+    |> Enum.flat_map(fn code ->
+      cond do
+        code == "0" -> []  # Reset
+        code == "1" -> ["ansi-bold"]
+        Map.has_key?(@colors, code) -> [Map.get(@colors, code)]
+        true -> []
+      end
+    end)
+  end
+end
+```
+
+## Live Terminal Window
+
+```elixir
+# Run actual toilet command
+toilet_output = case System.cmd("toilet", ["-F", "gay", "-F", "border", "Money me"], stderr_to_stdout: true) do
+  {output, 0} -> output
+  {error, _} -> "toilet not installed: #{error}"
+end
+
+html_output = AnsiToHtml.convert(toilet_output)
+
+# Create a window with the output
+window_html = """
+#{System7.css()}
+#{System7.window_manager_js()}
+
+<div class="system7-desktop" id="desktop2" style="min-height: 350px;">
+  <div class="system7-menubar">
+    <span class="apple">&#63743;</span>
+    <div class="system7-menu-item">File</div>
+    <div class="system7-menu-item">Edit</div>
+    <div class="system7-menu-item">View</div>
+    <div class="system7-menu-item">Special</div>
+  </div>
+
+  <div class="system7-window" style="left: 30px; top: 40px; width: 600px; height: 280px;">
+    <div class="system7-titlebar">
+      <div class="system7-close-box"></div>
+      <div class="system7-title">toilet -F gay -F border "Money me"</div>
+      <div class="system7-zoom-box"></div>
+    </div>
+    <div class="system7-content">#{html_output}</div>
+    <div class="system7-resize"></div>
+  </div>
+</div>
+"""
+
+Kino.HTML.new(window_html)
+```
+
+## Interactive Terminal
+
+Now let's make it interactive - type a command and see rainbow ASCII art!
+
+```elixir
+# Input form
+form = Kino.Control.form(
+  [
+    text: Kino.Input.text("Text to render", default: "Hello")
+  ],
+  submit: "toilet --gay"
+)
+```
+
+```elixir
+# Output frame
+output_frame = Kino.Frame.new()
+
+Kino.listen(form, fn %{data: %{text: text}} ->
+  text = String.trim(text)
+
+  if text != "" do
+    case System.cmd("toilet", ["-F", "gay", text], stderr_to_stdout: true) do
+      {output, 0} ->
+        html_output = AnsiToHtml.convert(output)
+
+        window_html = """
+        #{System7.css()}
+        <div style="background: #000; padding: 16px; font-family: monospace; border: 2px solid #fff;">
+          <pre style="margin: 0; line-height: 1.1;">#{html_output}</pre>
+        </div>
+        """
+
+        Kino.Frame.render(output_frame, Kino.HTML.new(window_html))
+
+      {error, _} ->
+        Kino.Frame.render(output_frame, Kino.HTML.new("""
+        <div style="background: #300; color: #f00; padding: 16px; font-family: monospace;">
+          Error: #{error}
+        </div>
+        """))
+    end
+  end
+end)
+
+output_frame
+```
+
+## About This Shell
+
+```elixir
+about_html = """
+#{System7.css()}
+
+<div style="background: #d8d8d8; padding: 20px; border: 2px outset #fff; max-width: 400px; font-family: 'VT323', monospace;">
+  <div style="text-align: center; margin-bottom: 16px;">
+    <div style="font-size: 48px;">&#63743;</div>
+    <h2 style="margin: 8px 0;">About This Shell</h2>
+  </div>
+
+  <div style="background: #fff; border: 1px inset #888; padding: 12px; margin-bottom: 12px;">
+    <strong>TrumanShell</strong><br>
+    Version 0.6.0<br><br>
+
+    "We accept the reality of the world with which we are presented."<br><br>
+
+    A sandboxed shell for AI agents.<br>
+    Built with Elixir + Livebook + Kino.<br><br>
+
+    <span style="color: #888;">1991 aesthetics. 2026 capabilities.</span>
+  </div>
+
+  <div style="text-align: center;">
+    <button style="background: #fff; border: 2px outset #fff; padding: 4px 24px; font-family: inherit; cursor: pointer;">
+      OK
+    </button>
+  </div>
+</div>
+"""
+
+Kino.HTML.new(about_html)
+```
+
+## Next Steps
+
+* [ ] Wire up actual TrumanShell execution
+* [ ] Add Xterm.js for proper terminal emulation
+* [ ] System alert dialogs with the bomb icon
+* [ ] Save "files" to the desktop as icons
+* [ ] `toilet --gay` as a TrumanShell built-in command
+
+<!-- livebook:{"offset":17572,"stamp":{"token":"XCP.x7EYvK0XWu5Qv9AbY7aoIO41DXIzxa5ZEw6NcHEGdVdWiYp75wyO8v9Hl9Fqgq515yf57T4S31GrwaU9DVP5B9VMgIpmMAqxZcICUVhV3AqI5Bug00OnVGD0","version":2}} -->
