@@ -1,58 +1,49 @@
-## Test Plan: Playground Root
+## Tests: Playground Root
 
-Tests written BEFORE implementation (TDD red phase).
+**Location:** `test/truman_shell/boundaries_test.exs`
 
-## Test File Location
+**Run:** `mix test test/truman_shell/boundaries_test.exs`
 
-- **Artifact**: `tests/boundaries_test.exs`
-- **Runtime location**: `test/truman_shell/boundaries_test.exs`
-- **Run with**: `mix test test/truman_shell/boundaries_test.exs`
+**Status:** 18 tests, 0 failures
 
-## Test Cases
+---
 
-### playground_root/0
+### Test Suites
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Env var set | `TRUMAN_PLAYGROUND_ROOT=/custom` | `playground_root()` | Returns `/custom` |
-| Env var not set | No env var | `playground_root()` | Returns `File.cwd!()` |
-| Env var empty | `TRUMAN_PLAYGROUND_ROOT=""` | `playground_root()` | Returns `File.cwd!()` |
-| Tilde expansion | `TRUMAN_PLAYGROUND_ROOT=~/foo` | `playground_root()` | Returns `$HOME/foo` |
-| Dot expansion | `TRUMAN_PLAYGROUND_ROOT=.` | `playground_root()` | Returns `File.cwd!()` |
-| Relative expansion | `TRUMAN_PLAYGROUND_ROOT=./proj` | `playground_root()` | Returns `cwd/proj` |
-| No $VAR expansion | `TRUMAN_PLAYGROUND_ROOT=$HOME/x` | `playground_root()` | Returns literal `$HOME/x` |
-| Trailing slashes | `TRUMAN_PLAYGROUND_ROOT=/foo///` | `playground_root()` | Returns `/foo` |
+#### `playground_root/0` (9 tests)
 
-### validate_path/2
+| Test | Scenario |
+|------|----------|
+| env var set | `TRUMAN_PLAYGROUND_ROOT=/custom` → returns `/custom` |
+| env var not set | No env var → returns `File.cwd!()` |
+| env var empty | `""` → returns `File.cwd!()` |
+| tilde expansion | `~/foo` → `$HOME/foo` |
+| dot expansion | `.` → `File.cwd!()` |
+| relative expansion | `./proj` → `cwd/proj` |
+| no $VAR expansion | `$HOME/x` → literal `$HOME/x` (security) |
+| trailing slashes | `/foo///` → `/foo` |
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Path inside | `/playground/lib/foo.ex` | `validate_path(path, root)` | `{:ok, path}` |
-| Path outside | `/etc/passwd` | `validate_path(path, root)` | `{:error, :outside_playground}` |
-| Traversal attack | `../../../etc/passwd` | `validate_path(path, root)` | `{:error, :outside_playground}` |
-| Relative inside | `lib/foo.ex` | `validate_path(path, root, cwd)` | `{:ok, absolute_path}` |
-| Relative escapes | `../../etc/passwd` | `validate_path(path, root, cwd)` | `{:error, :outside_playground}` |
-| Symlink outside | Link to `/etc` | `validate_path(link, root)` | `{:error, :outside_playground}` |
-| Symlink inside | Link to `lib/foo.ex` | `validate_path(link, root)` | `{:ok, resolved_path}` |
+#### `validate_path/2,3` (7 tests)
 
-### build_context/0
+| Test | Scenario |
+|------|----------|
+| path inside | `/playground/lib/foo.ex` → `{:ok, path}` |
+| path outside | `/etc/passwd` → `{:error, :outside_playground}` |
+| traversal attack | `../../../etc/passwd` → blocked |
+| relative inside | `lib/foo.ex` → resolved to absolute |
+| relative escapes | `../../etc/passwd` → blocked |
+| symlink outside | link → `/etc` → blocked |
+| symlink inside | link → `lib/foo.ex` → allowed |
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Context keys | Default setup | `build_context()` | Has `:playground_root`, not `:sandbox_root` |
-| Default dirs | Default setup | `build_context()` | `current_dir == playground_root` |
+#### `build_context/0` (2 tests)
 
-### 404 Principle
+| Test | Scenario |
+|------|----------|
+| has playground_root | Context map includes `:playground_root` |
+| current_dir matches | `current_dir == playground_root` |
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Error message | `:outside_playground` error | `error_message(err)` | `"No such file or directory"` |
+#### `error_message/1` (1 test)
 
-## Expected Results (Red Phase)
-
-All tests should **FAIL** initially - no `TrumanShell.Boundaries` module exists yet.
-
-```bash
-$ mix test test/truman_shell/boundaries_test.exs
-** (UndefinedFunctionError) function TrumanShell.Boundaries.playground_root/0 is undefined
-```
+| Test | Scenario |
+|------|----------|
+| 404 principle | `:outside_playground` → "No such file or directory" |
