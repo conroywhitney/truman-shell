@@ -24,6 +24,7 @@ defmodule TrumanShell do
 
   """
 
+  alias TrumanShell.Boundaries
   alias TrumanShell.Stages.Executor
   alias TrumanShell.Stages.Expander
   alias TrumanShell.Stages.Parser
@@ -54,8 +55,7 @@ defmodule TrumanShell do
     # Pipeline: Tokenizer → Parser → Expander → Executor → Redirector
     # (Tokenizer is called by Parser, Redirector is called by Executor)
     with {:ok, command} <- parse(input) do
-      cwd = File.cwd!()
-      context = %{sandbox_root: cwd, current_dir: cwd}
+      context = Boundaries.build_context()
       expanded = Expander.expand(command, context)
       Executor.run(expanded)
     end
