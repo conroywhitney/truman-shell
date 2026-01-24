@@ -5,7 +5,7 @@ description: Archive a completed change in the experimental workflow. Use when t
 
 Archive a completed change in the experimental workflow.
 
-**Input**: Optionally specify a change name. If omitted, MUST prompt for available changes.
+**Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
@@ -44,38 +44,20 @@ Archive a completed change in the experimental workflow.
 
    **If no tasks file exists:** Proceed without task-related warning.
 
-4. **Check if delta specs need syncing**
+4. **Assess delta spec sync state**
 
-   Check if `specs/` directory exists in the change with spec files.
+   Check for delta specs at `openspec/changes/<name>/specs/`. If none exist, proceed without sync prompt.
 
-   **If delta specs exist, perform a quick sync check:**
+   **If delta specs exist:**
+   - Compare each delta spec with its corresponding main spec at `openspec/specs/<capability>/spec.md`
+   - Determine what changes would be applied (adds, modifications, removals, renames)
+   - Show a combined summary before prompting
 
-   a. **For each delta spec** at `openspec/changes/<name>/specs/<capability>/spec.md`:
-      - Extract requirement names (lines matching `### Requirement: <name>`)
-      - Note which sections exist (ADDED, MODIFIED, REMOVED)
+   **Prompt options:**
+   - If changes needed: "Sync now (recommended)", "Archive without syncing"
+   - If already synced: "Archive now", "Sync anyway", "Cancel"
 
-   b. **Check corresponding main spec** at `openspec/specs/<capability>/spec.md`:
-      - If main spec doesn't exist → needs sync
-      - If main spec exists, check if ADDED requirement names appear in it
-      - If any ADDED requirements are missing from main spec → needs sync
-
-   c. **Report findings:**
-
-      **If sync needed:**
-      ```
-      ⚠️ Delta specs may not be synced:
-      - specs/auth/spec.md → Main spec missing requirement "Token Refresh"
-      - specs/api/spec.md → Main spec doesn't exist yet
-
-      Would you like to sync now before archiving?
-      ```
-      - Use **AskUserQuestion tool** with options: "Sync now", "Archive without syncing"
-      - If user chooses sync, execute /opsx:sync logic (use the openspec-sync-specs skill)
-
-      **If already synced (all requirements found):**
-      - Proceed without prompting (specs appear to be in sync)
-
-   **If no delta specs exist:** Proceed without sync-related checks.
+   If user chooses sync, execute /opsx:sync logic (use the openspec-sync-specs skill). Proceed to archive regardless of choice.
 
 5. **Perform the archive**
 
@@ -111,7 +93,7 @@ Archive a completed change in the experimental workflow.
 **Change:** <change-name>
 **Schema:** <schema-name>
 **Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
-**Specs:** ✓ Synced to main specs (or "No delta specs" or "⚠️ Not synced")
+**Specs:** ✓ Synced to main specs (or "No delta specs" or "Sync skipped")
 
 All artifacts complete. All tasks complete.
 ```
@@ -123,4 +105,4 @@ All artifacts complete. All tasks complete.
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
-- Quick sync check: look for requirement names in delta specs, verify they exist in main specs
+- If delta specs exist, always run the sync assessment and show the combined summary before prompting

@@ -5,7 +5,7 @@ description: Continue working on an OpenSpec change by creating the next artifac
 
 Continue working on a change by creating the next artifact.
 
-**Input**: Optionally specify a change name. If omitted, MUST prompt for available changes.
+**Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
