@@ -1,10 +1,14 @@
-<!-- livebook:{"app_settings":{"auto_shutdown_ms":3600000,"slug":"system7-terminal"}} -->
+<!-- livebook:{"app_settings":{"auto_shutdown_ms":3600000,"slug":"system7-terminal"},"persist_outputs":true} -->
 
 # System 7 Terminal
 
 ```elixir
+# Note: Adjust this path if running from a different location
+truman_shell_path = Path.join(System.user_home!(), "code/truman-shell")
+
 Mix.install([
-  {:kino, "~> 0.18.0"}
+  {:kino, "~> 0.18.0"},
+  {:truman_shell, path: truman_shell_path}
 ])
 ```
 
@@ -60,18 +64,21 @@ defmodule System7 do
         padding: 0 8px;
         font-size: 14px;
         z-index: 9999;
+        color: #000;
       }
 
       .system7-menubar .apple {
         font-weight: bold;
         margin-right: 16px;
         cursor: pointer;
+        color: #000;
       }
 
       .system7-menu-item {
         padding: 2px 12px;
         cursor: pointer;
         position: relative;
+        color: #000;
       }
 
       .system7-menu-item:hover {
@@ -98,6 +105,7 @@ defmodule System7 do
       .system7-dropdown-item {
         padding: 4px 16px;
         cursor: pointer;
+        color: #000;
       }
 
       .system7-dropdown-item:hover {
@@ -365,6 +373,12 @@ defmodule System7 do
 end
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+{:module, System7, <<70, 79, 82, 49, 0, 0, 49, ...>>, ...}
+```
+
 ## Create the Desktop
 
 ```elixir
@@ -501,13 +515,25 @@ defmodule AnsiToHtml do
 end
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+{:module, AnsiToHtml, <<70, 79, 82, 49, 0, 0, 26, ...>>, ...}
+```
+
 ## Live Terminal Window
 
 ```elixir
-# Run actual toilet command
-toilet_output = case System.cmd("toilet", ["-F", "gay", "-F", "border", "Money me"], stderr_to_stdout: true) do
-  {output, 0} -> output
-  {error, _} -> "toilet not installed: #{error}"
+# Run actual toilet command (use absolute path for Livebook's BEAM process)
+toilet_path = "/opt/homebrew/bin/toilet"
+
+toilet_output = if File.exists?(toilet_path) do
+  case System.cmd(toilet_path, ["-F", "gay", "-F", "border", "Money me"], stderr_to_stdout: true) do
+    {output, 0} -> output
+    {error, _} -> "toilet error: #{error}"
+  end
+else
+  "toilet not found at #{toilet_path}\nInstall with: brew install toilet"
 end
 
 html_output = AnsiToHtml.convert(toilet_output)
@@ -541,52 +567,485 @@ window_html = """
 Kino.HTML.new(window_html)
 ```
 
-## Interactive Terminal
+## Interactive TrumanShell Terminal
 
-Now let's make it interactive - type a command and see rainbow ASCII art!
+A real terminal that executes commands through TrumanShell's sandbox.
 
 ```elixir
-# Input form
-form = Kino.Control.form(
-  [
-    text: Kino.Input.text("Text to render", default: "Hello")
-  ],
-  submit: "toilet --gay"
-)
+defmodule System7.Terminal do
+  use Kino.JS
+  use Kino.JS.Live
+
+  @impl true
+  def init(opts, ctx) do
+    {:ok, assign(ctx, history: [], cwd: opts[:cwd] || "~")}
+  end
+
+  @impl true
+  def handle_connect(ctx) do
+    {:ok, %{history: ctx.assigns.history, cwd: ctx.assigns.cwd}, ctx}
+  end
+
+  @impl true
+  def handle_event("execute", %{"command" => command}, ctx) do
+    # Execute through TrumanShell
+    result = case TrumanShell.execute(command) do
+      {:ok, output} -> %{status: "ok", output: output}
+      {:error, reason} -> %{status: "error", output: "Error: #{inspect(reason)}"}
+    end
+
+    # Add to history
+    entry = %{command: command, output: result.output, status: result.status}
+    new_history = ctx.assigns.history ++ [entry]
+
+    # Broadcast to all connected clients
+    broadcast_event(ctx, "output", entry)
+
+    {:noreply, assign(ctx, history: new_history)}
+  end
+
+  asset "main.js" do
+    """
+    export function init(ctx, {history, cwd}) {
+      // Inject System 7 CSS
+      const style = document.createElement('style');
+      style.textContent = `
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        .s7-term-window {
+          background: #fff;
+          border: 1px solid #000;
+          box-shadow: 2px 2px 0 #000;
+          width: 100%;
+          max-width: 700px;
+          font-family: 'VT323', monospace;
+        }
+
+        .s7-term-titlebar {
+          height: 20px;
+          background: linear-gradient(to bottom,
+            #fff 0px, #fff 1px, #000 1px, #000 2px,
+            #fff 2px, #fff 3px, #000 3px, #000 4px,
+            #fff 4px, #fff 5px, #000 5px, #000 6px,
+            #fff 6px, #fff 7px, #000 7px, #000 8px,
+            #fff 8px, #fff 9px, #000 9px, #000 10px,
+            #fff 10px, #fff 11px, #000 11px, #000 12px,
+            #fff 12px, #fff 13px, #000 13px, #000 14px,
+            #fff 14px, #fff 15px, #000 15px, #000 16px,
+            #fff 16px, #fff 17px, #000 17px, #000 18px,
+            #fff 18px, #fff 20px
+          );
+          display: flex;
+          align-items: center;
+          padding: 0 4px;
+        }
+
+        .s7-term-closebox {
+          width: 12px;
+          height: 12px;
+          background: #fff;
+          border: 1px solid #000;
+        }
+
+        .s7-term-title {
+          flex: 1;
+          text-align: center;
+          font-size: 12px;
+          font-weight: bold;
+          background: #fff;
+          padding: 0 8px;
+          margin: 0 4px;
+          color: #000;
+        }
+
+        .s7-term-zoombox {
+          width: 12px;
+          height: 12px;
+          background: #fff;
+          border: 1px solid #000;
+          position: relative;
+        }
+
+        .s7-term-zoombox::after {
+          content: '';
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          width: 6px;
+          height: 6px;
+          border: 1px solid #000;
+        }
+
+        .s7-term-content {
+          background: #000;
+          color: #0f0;
+          font-size: 16px;
+          padding: 8px;
+          min-height: 300px;
+          max-height: 400px;
+          overflow-y: auto;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+        }
+
+        .s7-term-line {
+          margin: 2px 0;
+        }
+
+        .s7-term-line.error {
+          color: #f55;
+        }
+
+        .s7-term-line.command {
+          color: #5f5;
+        }
+
+        .s7-term-input-line {
+          display: flex;
+          align-items: center;
+          margin-top: 4px;
+        }
+
+        .s7-term-prompt {
+          color: #5f5;
+          margin-right: 8px;
+        }
+
+        .s7-term-input {
+          flex: 1;
+          background: transparent;
+          border: none;
+          color: #0f0;
+          font-family: 'VT323', monospace;
+          font-size: 16px;
+          outline: none;
+          caret-color: #0f0;
+        }
+
+        .s7-term-cursor {
+          display: inline-block;
+          width: 8px;
+          height: 16px;
+          background: #0f0;
+          animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+          50% { opacity: 0; }
+        }
+      `;
+      ctx.root.appendChild(style);
+
+      // Build the terminal
+      ctx.root.innerHTML += `
+        <div class="s7-term-window">
+          <div class="s7-term-titlebar">
+            <div class="s7-term-closebox"></div>
+            <div class="s7-term-title">TrumanShell</div>
+            <div class="s7-term-zoombox"></div>
+          </div>
+          <div class="s7-term-content" id="terminal-output">
+            <div class="s7-term-line" style="color: #888;">TrumanShell v0.6.0 - "We accept the reality..."<br>Type 'help' for commands. Try 'ls', 'pwd', 'cat README.md'.</div>
+            <div class="s7-term-input-line">
+              <span class="s7-term-prompt">$</span>
+              <input type="text" class="s7-term-input" id="terminal-input" autofocus>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const output = ctx.root.querySelector('#terminal-output');
+      const input = ctx.root.querySelector('#terminal-input');
+
+      // Render existing history
+      history.forEach(entry => {
+        addOutput(entry);
+      });
+
+      // Handle Enter key
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const command = input.value.trim();
+          if (command) {
+            // Show the command
+            const cmdLine = document.createElement('div');
+            cmdLine.className = 's7-term-line command';
+            cmdLine.textContent = '$ ' + command;
+            output.insertBefore(cmdLine, output.lastElementChild);
+
+            // Send to Elixir
+            ctx.pushEvent('execute', {command: command});
+
+            input.value = '';
+          }
+        }
+      });
+
+      // Focus input when clicking terminal
+      output.addEventListener('click', () => {
+        input.focus();
+      });
+
+      // Handle output from Elixir
+      ctx.handleEvent('output', (entry) => {
+        addOutput(entry);
+        output.scrollTop = output.scrollHeight;
+      });
+
+      function addOutput(entry) {
+        if (entry.output && entry.output.trim()) {
+          const outLine = document.createElement('div');
+          outLine.className = 's7-term-line' + (entry.status === 'error' ? ' error' : '');
+          outLine.textContent = entry.output;
+          output.insertBefore(outLine, output.lastElementChild);
+        }
+      }
+
+      // Auto-scroll and focus
+      output.scrollTop = output.scrollHeight;
+      input.focus();
+    }
+    """
+  end
+
+  def new(opts \\ []) do
+    Kino.JS.Live.new(__MODULE__, opts)
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: outdented heredoc line. The contents inside the heredoc should be indented at the same level as the closing """. The following is forbidden:
+
+    def text do
+      """
+    contents
+      """
+    end
+
+Instead make sure the contents are indented as much as the heredoc closing:
+
+    def text do
+      """
+      contents
+      """
+    end
+
+The current heredoc line is indented too little
+└─ code/truman-shell/notebooks/system7_terminal.livemd#cell:rkjcwevhr22lkee3:175:5
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, System7.Terminal, <<70, 79, 82, 49, 0, 0, 24, ...>>, ...}
 ```
 
 ```elixir
-# Output frame
-output_frame = Kino.Frame.new()
+# Set the sandbox root (TRUMAN_DOME) for safety
+# This constrains all file operations to this directory
+System.put_env("TRUMAN_DOME", Path.expand("~/code/truman-shell"))
 
-Kino.listen(form, fn %{data: %{text: text}} ->
-  text = String.trim(text)
+# Create the terminal!
+System7.Terminal.new()
+```
 
-  if text != "" do
-    case System.cmd("toilet", ["-F", "gay", text], stderr_to_stdout: true) do
-      {output, 0} ->
-        html_output = AnsiToHtml.convert(output)
+## toilet --gay Generator
 
-        window_html = """
-        #{System7.css()}
-        <div style="background: #000; padding: 16px; font-family: monospace; border: 2px solid #fff;">
-          <pre style="margin: 0; line-height: 1.1;">#{html_output}</pre>
-        </div>
-        """
+Quick rainbow ASCII art generator.
 
-        Kino.Frame.render(output_frame, Kino.HTML.new(window_html))
+```elixir
+defmodule System7.ToiletWindow do
+  use Kino.JS
+  use Kino.JS.Live
 
-      {error, _} ->
-        Kino.Frame.render(output_frame, Kino.HTML.new("""
-        <div style="background: #300; color: #f00; padding: 16px; font-family: monospace;">
-          Error: #{error}
-        </div>
-        """))
-    end
+  @toilet_path "/opt/homebrew/bin/toilet"
+
+  @impl true
+  def init(_opts, ctx) do
+    {:ok, assign(ctx, output: "")}
   end
-end)
 
-output_frame
+  @impl true
+  def handle_connect(ctx) do
+    {:ok, %{output: ctx.assigns.output}, ctx}
+  end
+
+  @impl true
+  def handle_event("render", %{"text" => text}, ctx) do
+    output = if File.exists?(@toilet_path) do
+      case System.cmd(@toilet_path, ["-F", "gay", text], stderr_to_stdout: true) do
+        {out, 0} -> ansi_to_html(out)
+        {err, _} -> "<span style='color:#f55'>Error: #{err}</span>"
+      end
+    else
+      "<span style='color:#f55'>toilet not found. Install with: brew install toilet</span>"
+    end
+
+    broadcast_event(ctx, "rendered", %{output: output})
+    {:noreply, assign(ctx, output: output)}
+  end
+
+  defp ansi_to_html(str) do
+    colors = %{
+      "31" => "#f55", "91" => "#f55",
+      "32" => "#5f5", "92" => "#5f5",
+      "33" => "#ff5", "93" => "#ff5",
+      "34" => "#55f", "94" => "#55f",
+      "35" => "#f5f", "95" => "#f5f",
+      "36" => "#5ff", "96" => "#5ff"
+    }
+
+    str
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
+    |> then(fn s ->
+      Regex.replace(~r/\x1b\[([0-9;]+)m/, s, fn full_match, codes ->
+        code = codes |> String.split(";") |> List.last()
+        case Map.get(colors, code) do
+          nil -> ""
+          color -> "<span style='color:#{color}'>"
+        end
+      end)
+    end)
+    |> String.replace(~r/\x1b\[0m/, "</span>")
+  end
+
+  asset "main.js" do
+    """
+    export function init(ctx, {output}) {
+      ctx.root.innerHTML = `
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+          .toilet-window {
+            background: #fff;
+            border: 1px solid #000;
+            box-shadow: 2px 2px 0 #000;
+            max-width: 700px;
+            font-family: 'VT323', monospace;
+          }
+          .toilet-titlebar {
+            height: 20px;
+            background: linear-gradient(to bottom,
+              #fff 0px, #fff 1px, #000 1px, #000 2px,
+              #fff 2px, #fff 3px, #000 3px, #000 4px,
+              #fff 4px, #fff 5px, #000 5px, #000 6px,
+              #fff 6px, #fff 7px, #000 7px, #000 8px,
+              #fff 8px, #fff 9px, #000 9px, #000 10px,
+              #fff 10px, #fff 11px, #000 11px, #000 12px,
+              #fff 12px, #fff 20px
+            );
+            display: flex;
+            align-items: center;
+            padding: 0 4px;
+          }
+          .toilet-title {
+            flex: 1;
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+            background: #fff;
+            padding: 0 8px;
+            color: #000;
+          }
+          .toilet-content {
+            background: #000;
+            padding: 12px;
+            min-height: 150px;
+          }
+          .toilet-input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+          }
+          .toilet-input {
+            flex: 1;
+            background: #222;
+            border: 1px solid #444;
+            color: #0f0;
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+            padding: 8px;
+          }
+          .toilet-btn {
+            background: #333;
+            border: 2px outset #555;
+            color: #0f0;
+            font-family: 'VT323', monospace;
+            font-size: 16px;
+            padding: 8px 16px;
+            cursor: pointer;
+          }
+          .toilet-btn:hover {
+            background: #444;
+          }
+          .toilet-output {
+            white-space: pre;
+            font-size: 14px;
+            line-height: 1.1;
+            color: #0f0;
+          }
+        </style>
+        <div class="toilet-window">
+          <div class="toilet-titlebar">
+            <div style="width:12px;height:12px;background:#fff;border:1px solid #000"></div>
+            <div class="toilet-title">toilet --gay</div>
+            <div style="width:12px;height:12px;background:#fff;border:1px solid #000"></div>
+          </div>
+          <div class="toilet-content">
+            <div class="toilet-input-row">
+              <input type="text" class="toilet-input" id="toilet-text" value="Money me" placeholder="Enter text...">
+              <button class="toilet-btn" id="toilet-btn">Render</button>
+            </div>
+            <div class="toilet-output" id="toilet-output"></div>
+          </div>
+        </div>
+      `;
+
+      const input = ctx.root.querySelector('#toilet-text');
+      const btn = ctx.root.querySelector('#toilet-btn');
+      const outputEl = ctx.root.querySelector('#toilet-output');
+
+      function render() {
+        const text = input.value.trim();
+        if (text) {
+          ctx.pushEvent('render', {text: text});
+        }
+      }
+
+      btn.addEventListener('click', render);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') render();
+      });
+
+      ctx.handleEvent('rendered', ({output}) => {
+        outputEl.innerHTML = output;
+      });
+
+      // Initial render
+      render();
+    }
+    """
+  end
+
+  def new(opts \\ []) do
+    Kino.JS.Live.new(__MODULE__, opts)
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, System7.ToiletWindow, <<70, 79, 82, 49, 0, 0, 41, ...>>, ...}
+```
+
+```elixir
+System7.ToiletWindow.new()
 ```
 
 ## About This Shell
@@ -624,6 +1083,24 @@ about_html = """
 Kino.HTML.new(about_html)
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+
+17:10:58.830 [error] GenServer #PID<0.292.0> terminating
+** (FunctionClauseError) no function clause matching in String.replace/4
+    (elixir 1.19.3) lib/string.ex:1630: String.replace("                                                        \n \e[0;1;31;91mm\e[0m    \e[0;1;36;96mm\e[0m                                                 \n \e[0;1;33;93m#\e[0;1;32;92m#\e[0m  \e[0;1;36;96m#\e[0;1;34;94m#\e[0m  \e[0;1;35;95mm\e[0;1;31;91mmm\e[0m   \e[0;1;32;92mm\e[0m \e[0;1;36;96mm\e[0;1;34;94mm\e[0m    \e[0;1;31;91mm\e[0;1;33;93mmm\e[0m   \e[0;1;36;96mm\e[0m   \e[0;1;35;95mm\e[0m         \e[0;1;34;94mm\e[0;1;35;95mmm\e[0;1;31;91mmm\e[0m   \e[0;1;32;92mm\e[0;1;36;96mmm\e[0m  \n \e[0;1;32;92m#\e[0m \e[0;1;36;96m#\e[0;1;34;94m#\e[0m \e[0;1;35;95m#\e[0m \e[0;1;31;91m#\"\e[0m \e[0;1;33;93m\"\e[0;1;32;92m#\e[0m  \e[0;1;36;96m#\e[0;1;34;94m\"\e[0m  \e[0;1;35;95m#\e[0m  \e[0;1;33;93m#\"\e[0m  \e[0;1;36;96m#\e[0m  \e[0;1;34;94m\"\e[0;1;35;95mm\e[0m \e[0;1;31;91mm\"\e[0m         \e[0;1;35;95m#\e[0m \e[0;1;31;91m#\e[0m \e[0;1;33;93m#\e[0m  \e[0;1;36;96m#\"\e[0m  \e[0;1;35;95m#\e[0m \n \e[0;1;36;96m#\e[0m \e[0;1;34;94m\"\e[0;1;35;95m\"\e[0m \e[0;1;31;91m#\e[0m \e[0;1;33;93m#\e[0m   \e[0;1;36;96m#\e[0m  \e[0;1;34;94m#\e[0m   \e[0;1;31;91m#\e[0m  \e[0;1;32;92m#\"\e[0;1;36;96m\"\"\e[0;1;34;94m\"\e[0m   \e[0;1;31;91m#m\e[0;1;33;93m#\e[0m          \e[0;1;31;91m#\e[0m \e[0;1;33;93m#\e[0m \e[0;1;32;92m#\e[0m  \e[0;1;34;94m#\"\e[0;1;35;95m\"\"\e[0;1;31;91m\"\e[0m \n \e[0;1;34;94m#\e[0m    \e[0;1;33;93m#\e[0m \e[0;1;32;92m\"#\e[0;1;36;96mm#\e[0;1;34;94m\"\e[0m  \e[0;1;35;95m#\e[0m   \e[0;1;33;93m#\e[0m  \e[0;1;36;96m\"#\e[0;1;34;94mmm\e[0;1;35;95m\"\e[0m   \e[0;1;33;93m\"#\e[0m           \e[0;1;33;93m#\e[0m \e[0;1;32;92m#\e[0m \e[0;1;36;96m#\e[0m  \e[0;1;35;95m\"#\e[0;1;31;91mmm\e[0;1;33;93m\"\e[0m \n                              \e[0;1;32;92mm\"\e[0m                        \n                             \e[0;1;32;92m\"\e[0;1;36;96m\"\e[0m                         \n", ~r/\x1b\[([0-9;]+)m/, #Function<0.125357914/2 in System7.ToiletWindow.ansi_to_html/1>, [])
+    code/truman-shell/notebooks/system7_terminal.livemd#cell:vuklhi57ojfiseeb:46: System7.ToiletWindow.ansi_to_html/1
+    code/truman-shell/notebooks/system7_terminal.livemd#cell:vuklhi57ojfiseeb:21: System7.ToiletWindow.handle_event/3
+    (kino 0.18.0) lib/kino/js/live/server.ex:116: Kino.JS.Live.Server.call_handle_info/3
+    (kino 0.18.0) lib/kino/js/live/server.ex:71: Kino.JS.Live.Server.handle_info/2
+    (stdlib 7.1) gen_server.erl:2434: :gen_server.try_handle_info/3
+    (stdlib 7.1) gen_server.erl:2420: :gen_server.handle_msg/3
+    (stdlib 7.1) proc_lib.erl:333: :proc_lib.init_p_do_apply/3
+Last message: {:event, "render", %{"text" => "Money me"}, %{origin: "55dkdycrw3dseyom", ref: "g4fdca3rli566hmnp7td2czzylfygsb5"}}
+State: %{export: nil, module: System7.ToiletWindow, ctx: %Kino.JS.Live.Context{assigns: %{output: ""}, origin: nil, __private__: %{ref: "g4fdca3rli566hmnp7td2czzylfygsb5", client_ids_with_pid: %{"55dkdycrw3dseyom" => #PID<13711.1813.0>}, monitors_with_client_id: %{#Reference<0.1988357571.3727687684.111048> => "55dkdycrw3dseyom"}}}}
+```
+
 ## Next Steps
 
 * [ ] Wire up actual TrumanShell execution
@@ -632,4 +1109,4 @@ Kino.HTML.new(about_html)
 * [ ] Save "files" to the desktop as icons
 * [ ] `toilet --gay` as a TrumanShell built-in command
 
-<!-- livebook:{"offset":17572,"stamp":{"token":"XCP.x7EYvK0XWu5Qv9AbY7aoIO41DXIzxa5ZEw6NcHEGdVdWiYp75wyO8v9Hl9Fqgq515yf57T4S31GrwaU9DVP5B9VMgIpmMAqxZcICUVhV3AqI5Bug00OnVGD0","version":2}} -->
+<!-- livebook:{"offset":33426,"stamp":{"token":"XCP.9dqQ6ZI_5Hv7LVIbPM0yX85kfgGYb23npJchg_8yeqTR0Sq0pwN0k5Ih2u8Kyn64vLgt9B4MpFlo4MPPVNWXqxXXnpY4km9Qpjt9kwfPjUaBZHbSqn94kEVf","version":2}} -->
