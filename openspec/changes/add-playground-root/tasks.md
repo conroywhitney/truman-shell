@@ -6,7 +6,7 @@
 
 ### P0 - Security Blockers
 
-- [ ] **Fix symlink intermediate directory escape**
+- [x] **Fix symlink intermediate directory escape** ✓ d308a1d
   - `resolve_real_path/1` only checks final path, not parent symlinks
   - Attack: `ln -s /etc /sandbox/escape` → `validate_path("escape/passwd")` passes
   - Fix: Recursively resolve symlinks for each path component

@@ -34,25 +34,27 @@ case "${1:-}" in
       exit 1
     fi
 
-    CMD="$1"
+    # Pass command via environment variable for safety
+    # (avoids any potential shell/Elixir string interpolation issues)
+    export TRUMAN_CMD="$1"
 
     cd "$SCRIPT_DIR"
 
     # Run through Mix to ensure deps are loaded
-    elixir -S mix run --no-start -e "
+    elixir -S mix run --no-start -e '
       Application.ensure_all_started(:truman_shell)
 
-      cmd = System.argv() |> List.first()
+      cmd = System.get_env("TRUMAN_CMD") || ""
 
       case TrumanShell.execute(cmd) do
         {:ok, output} ->
           IO.write(output)
           System.halt(0)
         {:error, reason} ->
-          IO.puts(:stderr, \"Error: #{reason}\")
+          IO.puts(:stderr, "Error: #{reason}")
           System.halt(1)
       end
-    " -- "$CMD"
+    '
     ;;
 
   version)
