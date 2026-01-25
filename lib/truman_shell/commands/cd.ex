@@ -2,13 +2,9 @@ defmodule TrumanShell.Commands.Cd do
   @moduledoc """
   Handler for the `cd` command - change working directory.
 
-  Unlike most commands, `cd` returns `Behaviour.result_with_effects/0` because
-  it must communicate a side effect (updating the shell's working directory)
-  back to the executor. See `TrumanShell.Commands.Behaviour` for the effect
-  handling pattern documentation.
-
-  Returns `{:ok, "", set_cwd: path}` on success, which the executor
-  interprets and applies to update shell state.
+  Unlike most commands, `cd` returns an updated context because it changes
+  the shell's working directory. Returns `{:ok, "", ctx: new_ctx}` on success,
+  where `new_ctx` has the updated `current_path`.
   """
 
   @behaviour TrumanShell.Commands.Behaviour
@@ -20,8 +16,7 @@ defmodule TrumanShell.Commands.Cd do
   @doc """
   Changes the current working directory within the sandbox.
 
-  Returns `{:ok, "", set_cwd: new_path}` on success. The executor
-  applies the `set_cwd` side effect to update state.
+  Returns `{:ok, "", ctx: new_ctx}` on success with updated current_path.
 
   ## Examples
 
@@ -29,8 +24,8 @@ defmodule TrumanShell.Commands.Cd do
       iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
       iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
       iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
-      iex> {:ok, "", set_cwd: new_dir} = TrumanShell.Commands.Cd.handle(["lib"], ctx)
-      iex> String.ends_with?(new_dir, "/lib")
+      iex> {:ok, "", ctx: new_ctx} = TrumanShell.Commands.Cd.handle(["lib"], ctx)
+      iex> String.ends_with?(new_ctx.current_path, "/lib")
       true
 
       iex> alias TrumanShell.Commands.Context
@@ -41,7 +36,7 @@ defmodule TrumanShell.Commands.Cd do
       {:error, "bash: cd: nonexistent: No such file or directory\\n"}
 
   """
-  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result_with_effects()
+  @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result_with_ctx()
   @impl true
   # No args means go home
   def handle([], ctx), do: go_home(ctx)
@@ -53,7 +48,10 @@ defmodule TrumanShell.Commands.Cd do
   end
 
   # Home is sandbox_config.home_path
-  defp go_home(ctx), do: {:ok, "", set_cwd: ctx.sandbox_config.home_path}
+  defp go_home(ctx) do
+    new_ctx = %{ctx | current_path: ctx.sandbox_config.home_path}
+    {:ok, "", ctx: new_ctx}
+  end
 
   defp change_directory(path, ctx) do
     # Expand path relative to current_path, then validate
@@ -61,8 +59,9 @@ defmodule TrumanShell.Commands.Cd do
 
     with {:ok, safe_path} <- Sandbox.validate_path(absolute_path, ctx.sandbox_config),
          {:dir, true} <- {:dir, File.dir?(safe_path)} do
-      # Return success with the new cwd for executor to apply
-      {:ok, "", set_cwd: safe_path}
+      # Return success with updated ctx
+      new_ctx = %{ctx | current_path: safe_path}
+      {:ok, "", ctx: new_ctx}
     else
       {:error, :outside_sandbox} ->
         # 404 principle: don't reveal anything about paths outside sandbox

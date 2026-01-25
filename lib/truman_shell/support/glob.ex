@@ -6,6 +6,7 @@ defmodule TrumanShell.Support.Glob do
   Enforces a maximum depth limit of 100 levels for recursive patterns.
   """
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
@@ -16,84 +17,80 @@ defmodule TrumanShell.Support.Glob do
   @doc """
   Expands a glob pattern to matching file paths.
 
-  Returns a sorted list of matching file paths relative to current_dir,
+  Returns a sorted list of matching file paths relative to current_path,
   or the original pattern if no files match.
 
   Recursive patterns (`**`) are limited to #{@max_depth_limit} levels deep.
 
-  ## Config
+  ## Arguments
 
-  Accepts a `%Config.Sandbox{}` struct with:
-  - `allowed_paths` - List of allowed directories (all paths checked for sandbox constraint)
-  - `home_path` - Current working directory for relative patterns
+  - `pattern` - The glob pattern to expand
+  - `ctx` - `%Commands.Context{}` with current_path and sandbox_config
 
   ## Examples
 
       # No match returns original pattern
-      iex> config = %TrumanShell.Config.Sandbox{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
-      iex> TrumanShell.Support.Glob.expand("no_match_*.xyz", config)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}}
+      iex> TrumanShell.Support.Glob.expand("no_match_*.xyz", ctx)
       "no_match_*.xyz"
 
       # Matching files returns sorted list
-      iex> config = %TrumanShell.Config.Sandbox{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
-      iex> result = TrumanShell.Support.Glob.expand("mix.*", config)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}}
+      iex> result = TrumanShell.Support.Glob.expand("mix.*", ctx)
       iex> is_list(result) and "mix.exs" in result
       true
 
       # Outside sandbox returns original pattern
-      iex> config = %TrumanShell.Config.Sandbox{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
-      iex> TrumanShell.Support.Glob.expand("/etc/*", config)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}}
+      iex> TrumanShell.Support.Glob.expand("/etc/*", ctx)
       "/etc/*"
 
   """
-  @spec expand(String.t(), SandboxConfig.t() | map()) :: [String.t()] | String.t()
-  def expand(pattern, %SandboxConfig{home_path: current_dir} = config) do
-    # Defense-in-depth: validate current_dir is absolute and inside sandbox
-    # This prevents Path.wildcard from resolving relative patterns against process cwd
-    # (In normal operation, current_dir is always validated by cd command)
-    with :ok <- validate_current_dir_is_absolute(current_dir),
-         {:ok, validated_current_dir} <- Sandbox.validate_path(current_dir, config) do
-      do_expand_with_config(pattern, %{config | home_path: validated_current_dir})
+  @spec expand(String.t(), Context.t()) :: [String.t()] | String.t()
+  def expand(pattern, %Context{current_path: current_path, sandbox_config: config}) do
+    # current_path is @enforce_keys in Context - if nil, let it crash
+    do_expand_with_validation(pattern, current_path, config)
+  end
+
+  defp do_expand_with_validation(pattern, current_path, config) do
+    # Defense-in-depth: validate current_path is absolute and inside sandbox
+    with :ok <- validate_absolute(current_path),
+         {:ok, validated_path} <- Sandbox.validate_path(current_path, config) do
+      do_expand(pattern, validated_path, config)
     else
       _ ->
-        # Invalid current_dir - fail safe by returning original pattern
-        pattern
+        # Invalid current_path - fail loud (this is a bug, not user error)
+        raise ArgumentError, "current_path must be absolute and inside sandbox, got: #{inspect(current_path)}"
     end
   end
 
-  # Backward compatibility: convert legacy context map to Config.Sandbox struct
-  def expand(pattern, %{sandbox_root: sandbox_root} = context) do
-    current_dir = Map.get(context, :current_dir, sandbox_root)
-    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: current_dir}
-    expand(pattern, config)
+  defp validate_absolute(path) do
+    if DomePath.type(path) == :absolute, do: :ok, else: {:error, :relative}
   end
 
-  defp validate_current_dir_is_absolute(current_dir) do
-    if DomePath.type(current_dir) == :absolute do
-      :ok
-    else
-      {:error, :relative_current_dir}
-    end
-  end
-
-  defp do_expand_with_config(pattern, %SandboxConfig{home_path: current_dir} = config) do
+  defp do_expand(pattern, current_path, config) do
     is_absolute = String.starts_with?(pattern, "/")
-    full_pattern = resolve_pattern(pattern, is_absolute, current_dir)
+    full_pattern = resolve_pattern(pattern, is_absolute, current_path)
     base_dir = glob_base_dir(full_pattern)
 
     # Security: validate base path is in sandbox BEFORE calling DomePath.wildcard
-    # This prevents filesystem enumeration outside the sandbox
     if in_sandbox?(base_dir, config) do
-      do_expand(pattern, full_pattern, base_dir, is_absolute, config)
+      expand_glob(pattern, full_pattern, base_dir, is_absolute, current_path, config)
     else
       pattern
     end
   end
 
-  defp resolve_pattern(pattern, true, _current_dir), do: pattern
-  defp resolve_pattern(pattern, false, current_dir), do: DomePath.join(current_dir, pattern)
+  defp resolve_pattern(pattern, true, _current_path), do: pattern
+  defp resolve_pattern(pattern, false, current_path), do: DomePath.join(current_path, pattern)
 
-  defp do_expand(pattern, full_pattern, base_dir, is_absolute, %SandboxConfig{home_path: current_dir} = config) do
+  defp expand_glob(pattern, full_pattern, base_dir, is_absolute, current_path, config) do
     match_dot = pattern_matches_dotfiles?(pattern)
     has_dot_prefix = String.starts_with?(pattern, "./")
 
@@ -101,7 +98,7 @@ defmodule TrumanShell.Support.Glob do
       full_pattern
       |> DomePath.wildcard(match_dot: match_dot)
       |> Enum.filter(&(in_sandbox?(&1, config) and within_depth_limit?(&1, base_dir)))
-      |> normalize_paths(is_absolute, has_dot_prefix, current_dir)
+      |> normalize_paths(is_absolute, has_dot_prefix, current_path)
       |> Enum.sort()
 
     case matches do

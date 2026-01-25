@@ -24,6 +24,7 @@ defmodule TrumanShell do
 
   """
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Stages.Executor
   alias TrumanShell.Stages.Expander
   alias TrumanShell.Stages.Parser
@@ -56,8 +57,9 @@ defmodule TrumanShell do
     # (Tokenizer is called by Parser, Redirector is called by Executor)
     with {:ok, command} <- parse(input) do
       config = Sandbox.build_config()
-      expanded = Expander.expand(command, config)
-      Executor.run(expanded)
+      ctx = %Context{current_path: config.home_path, sandbox_config: config}
+      expanded = Expander.expand(command, ctx)
+      Executor.run(expanded, ctx)
     end
   end
 

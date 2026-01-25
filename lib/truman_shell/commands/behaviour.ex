@@ -13,17 +13,9 @@ defmodule TrumanShell.Commands.Behaviour do
 
   Most commands return `{:ok, output}` or `{:error, message}`.
 
-  Commands with **side effects** (like `cd`) return an extended 3-tuple:
-  `{:ok, output, side_effects}` where `side_effects` is a keyword list of
-  effect directives the executor should apply.
-
-  This pattern separates effect *description* from effect *execution*,
-  keeping command handlers pure while allowing them to request state changes.
-  The executor is responsible for interpreting and applying these effects.
-
-  ## Available Side Effects
-
-  - `{:set_cwd, path}` - Update the shell's current working directory
+  Commands that update context (like `cd`) return `{:ok, output, ctx: new_ctx}`
+  with the updated context. The executor passes the new context to subsequent
+  commands in a pipeline.
   """
 
   alias TrumanShell.Commands.Context
@@ -31,14 +23,11 @@ defmodule TrumanShell.Commands.Behaviour do
   @type args :: [String.t()]
   @type context :: Context.t()
 
-  @typedoc "Side effect directives that commands can request"
-  @type side_effect :: {:set_cwd, String.t()}
-
   @typedoc "Standard result for pure commands"
   @type result :: {:ok, String.t()} | {:error, String.t()}
 
-  @typedoc "Extended result for commands with side effects"
-  @type result_with_effects :: {:ok, String.t(), [side_effect()]} | {:error, String.t()}
+  @typedoc "Result for commands that update context (like cd)"
+  @type result_with_ctx :: {:ok, String.t(), [{:ctx, Context.t()}]} | {:error, String.t()}
 
   @doc """
   Execute the command with given arguments and context.

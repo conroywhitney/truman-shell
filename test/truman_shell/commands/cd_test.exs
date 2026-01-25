@@ -17,17 +17,17 @@ defmodule TrumanShell.Commands.CdTest do
     test "changes to subdirectory and returns set_cwd" do
       ctx = build_ctx(File.cwd!())
 
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["lib"], ctx)
+      {:ok, "", ctx: new_ctx} = Cd.handle(["lib"], ctx)
 
-      assert String.ends_with?(new_dir, "/lib")
+      assert String.ends_with?(new_ctx.current_path, "/lib")
     end
 
     test "changes to nested subdirectory" do
       ctx = build_ctx(File.cwd!())
 
-      {:ok, "", set_cwd: new_dir} = Cd.handle(["lib/truman_shell"], ctx)
+      {:ok, "", ctx: new_ctx} = Cd.handle(["lib/truman_shell"], ctx)
 
-      assert String.ends_with?(new_dir, "/lib/truman_shell")
+      assert String.ends_with?(new_ctx.current_path, "/lib/truman_shell")
     end
 
     test "returns to home_path with no args" do
@@ -35,9 +35,9 @@ defmodule TrumanShell.Commands.CdTest do
       current = Path.join(sandbox_root, "lib/truman_shell")
       ctx = build_ctx(current, sandbox_root)
 
-      {:ok, "", set_cwd: new_dir} = Cd.handle([], ctx)
+      {:ok, "", ctx: new_ctx} = Cd.handle([], ctx)
 
-      assert new_dir == sandbox_root
+      assert new_ctx.current_path == sandbox_root
     end
 
     # NOTE: Tilde expansion is now handled by Stages.Expander before Cd.handle.
@@ -49,9 +49,9 @@ defmodule TrumanShell.Commands.CdTest do
       ctx = build_ctx(current, sandbox_root)
 
       # ~ is expanded to home_path by Expander before reaching Cd
-      {:ok, "", set_cwd: new_dir} = Cd.handle([sandbox_root], ctx)
+      {:ok, "", ctx: new_ctx} = Cd.handle([sandbox_root], ctx)
 
-      assert new_dir == sandbox_root
+      assert new_ctx.current_path == sandbox_root
     end
 
     test "navigates to subdir (pre-expanded from ~/lib)" do
@@ -61,9 +61,9 @@ defmodule TrumanShell.Commands.CdTest do
 
       # ~/lib is expanded to sandbox_root/lib by Expander before reaching Cd
       expanded_path = Path.join(sandbox_root, "lib")
-      {:ok, "", set_cwd: new_dir} = Cd.handle([expanded_path], ctx)
+      {:ok, "", ctx: new_ctx} = Cd.handle([expanded_path], ctx)
 
-      assert new_dir == Path.join(sandbox_root, "lib")
+      assert new_ctx.current_path == Path.join(sandbox_root, "lib")
     end
 
     test "returns error for nonexistent path (pre-expanded from ~/nonexistent)" do
@@ -83,9 +83,9 @@ defmodule TrumanShell.Commands.CdTest do
       current = Path.join(sandbox_root, "lib/truman_shell")
       ctx = build_ctx(current, sandbox_root)
 
-      {:ok, "", set_cwd: new_dir} = Cd.handle([".."], ctx)
+      {:ok, "", ctx: new_ctx} = Cd.handle([".."], ctx)
 
-      assert new_dir == Path.join(sandbox_root, "lib")
+      assert new_ctx.current_path == Path.join(sandbox_root, "lib")
     end
 
     test "returns error when .. would escape sandbox" do
@@ -164,9 +164,9 @@ defmodule TrumanShell.Commands.CdTest do
 
       # Pre-expanded: ~/lib/../test becomes sandbox_root/lib/../test
       expanded_path = Path.join(sandbox_root, "lib/../test")
-      {:ok, "", set_cwd: new_dir} = Cd.handle([expanded_path], ctx)
+      {:ok, "", ctx: new_ctx} = Cd.handle([expanded_path], ctx)
 
-      assert new_dir == Path.join(sandbox_root, "test")
+      assert new_ctx.current_path == Path.join(sandbox_root, "test")
     end
   end
 end
