@@ -191,15 +191,9 @@ defmodule TrumanShell.Config do
   end
 
   defp parse_yaml(content) do
-    case Code.ensure_loaded(YamlElixir) do
-      {:module, YamlElixir} ->
-        case YamlElixir.read_from_string(content) do
-          {:ok, parsed} -> {:ok, parsed}
-          {:error, reason} -> {:error, "invalid YAML: #{inspect(reason)}"}
-        end
-
-      {:error, _} ->
-        {:error, "yaml_elixir not available - add to deps"}
+    case YamlElixir.read_from_string(content) do
+      {:ok, parsed} -> {:ok, parsed}
+      {:error, reason} -> {:error, "invalid YAML: #{inspect(reason)}"}
     end
   end
 
