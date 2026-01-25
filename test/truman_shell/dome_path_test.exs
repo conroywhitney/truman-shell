@@ -1,20 +1,22 @@
 defmodule TrumanShell.DomePathTest do
   @moduledoc """
-  Tests for DomePath - bounded path operations.
+  Tests for DomePath - THE path module for TrumanShell.
 
-  DomePath is the primitive layer for path operations. It provides:
-  - `within?/2` - pure string boundary checking (no filesystem access)
+  DomePath is the ONLY module that should use Path.* directly.
+  All other modules go through DomePath for path operations.
+
+  **Core functions:**
   - `validate/3` - expand + boundary check + symlink detection
-  - `expand/3` - bounded path expansion
-  - `join/3` - bounded path joining
-  - `relative/2` - safe relative path computation
+  - `within?/2` - pure string boundary checking
 
-  **Symlinks are denied by default.** If any path component is a symlink,
-  `validate/3` returns `{:error, :symlink}`. Use config allow_list to
-  whitelist known-good symlinks (resolved at config load time).
+  **Wrapper functions (delegate to Path.*):**
+  - `basename/1`, `type/1`, `split/1`
+  - `join/1`, `join/2`
+  - `expand/1`, `expand/2`
+  - `relative_to/2`
+  - `wildcard/1`, `wildcard/2`
 
-  Support.Sandbox uses DomePath for the actual path math, then adds
-  policy (404 principle, context building, etc.).
+  **Symlinks are denied.** Any symlink = `{:error, :symlink}`.
   """
   use ExUnit.Case, async: false
 
@@ -243,50 +245,190 @@ defmodule TrumanShell.DomePathTest do
   end
 
   # =============================================================================
-  # expand/3 - Bounded path expansion
+  # Wrapper functions - delegate to Path.* (DomePath is the ONLY Path.* user)
   # =============================================================================
 
-  describe "expand/3" do
-    @tag :skip
-    test "expands tilde to home directory within boundary" do
-      # Future work
+  describe "basename/1" do
+    test "returns filename from path" do
+      assert DomePath.basename("/foo/bar/baz.ex") == "baz.ex"
     end
 
-    @tag :skip
-    test "rejects tilde expansion that escapes boundary" do
-      # Future work
-    end
-  end
-
-  # =============================================================================
-  # join/3 - Bounded path joining
-  # =============================================================================
-
-  describe "join/3" do
-    @tag :skip
-    test "joins paths within boundary" do
-      # Future work
+    test "returns directory name for directory path" do
+      assert DomePath.basename("/foo/bar/") == "bar"
     end
 
-    @tag :skip
-    test "rejects join that would escape boundary" do
-      # Future work
+    test "handles root path" do
+      assert DomePath.basename("/") == ""
     end
   end
 
-  # =============================================================================
-  # relative/2 - Safe relative path computation
-  # =============================================================================
-
-  describe "relative/2" do
-    @tag :skip
-    test "computes relative path within boundary" do
-      # Future work
+  describe "type/1" do
+    test "returns :absolute for absolute path" do
+      assert DomePath.type("/foo/bar") == :absolute
     end
 
-    @tag :skip
-    test "rejects relative computation for path outside boundary" do
-      # Future work
+    test "returns :relative for relative path" do
+      assert DomePath.type("foo/bar") == :relative
+    end
+
+    test "returns :relative for dot path" do
+      assert DomePath.type("./foo") == :relative
+    end
+  end
+
+  describe "split/1" do
+    test "splits absolute path into components" do
+      assert DomePath.split("/foo/bar/baz") == ["/", "foo", "bar", "baz"]
+    end
+
+    test "splits relative path into components" do
+      assert DomePath.split("foo/bar/baz") == ["foo", "bar", "baz"]
+    end
+
+    test "handles single component" do
+      assert DomePath.split("foo") == ["foo"]
+    end
+  end
+
+  describe "join/2" do
+    test "joins two path segments" do
+      assert DomePath.join("/foo", "bar") == "/foo/bar"
+    end
+
+    test "handles trailing slash in first segment" do
+      assert DomePath.join("/foo/", "bar") == "/foo/bar"
+    end
+
+    test "second absolute path is appended (Elixir behavior)" do
+      # Note: Elixir Path.join does NOT replace first path with absolute second
+      # This differs from some other languages
+      assert DomePath.join("/foo", "/bar") == "/foo/bar"
+    end
+  end
+
+  describe "join/1" do
+    test "joins list of path segments" do
+      assert DomePath.join(["/foo", "bar", "baz"]) == "/foo/bar/baz"
+    end
+
+    test "handles empty list gracefully" do
+      # Path.join/1 crashes on empty list, but DomePath handles it
+      assert DomePath.join([]) == ""
+    end
+
+    test "handles single element list" do
+      assert DomePath.join(["foo"]) == "foo"
+    end
+  end
+
+  describe "expand/1" do
+    test "expands relative path to absolute" do
+      result = DomePath.expand("foo")
+      assert DomePath.type(result) == :absolute
+      assert String.ends_with?(result, "/foo")
+    end
+
+    test "expands tilde to home directory" do
+      result = DomePath.expand("~")
+      assert DomePath.type(result) == :absolute
+      assert result == System.user_home!()
+    end
+
+    test "returns absolute path unchanged (normalized)" do
+      result = DomePath.expand("/foo/bar")
+      assert result == "/foo/bar"
+    end
+  end
+
+  describe "expand/2" do
+    test "expands relative path from given base" do
+      result = DomePath.expand("bar", "/foo")
+      assert result == "/foo/bar"
+    end
+
+    test "ignores base for absolute path" do
+      result = DomePath.expand("/absolute", "/ignored")
+      assert result == "/absolute"
+    end
+
+    test "resolves .. in path" do
+      result = DomePath.expand("../baz", "/foo/bar")
+      assert result == "/foo/baz"
+    end
+  end
+
+  describe "relative_to/2" do
+    test "computes relative path from base" do
+      assert DomePath.relative_to("/foo/bar/baz", "/foo") == "bar/baz"
+    end
+
+    test "returns path unchanged if not under base" do
+      assert DomePath.relative_to("/other/path", "/foo") == "/other/path"
+    end
+
+    test "returns dot for same path" do
+      assert DomePath.relative_to("/foo", "/foo") == "."
+    end
+  end
+
+  describe "wildcard/1" do
+    setup do
+      cwd = File.cwd!()
+      sandbox = DomePath.join(cwd, ".test_wildcard_#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox)
+      File.write!(DomePath.join(sandbox, "a.txt"), "a")
+      File.write!(DomePath.join(sandbox, "b.txt"), "b")
+      File.mkdir_p!(DomePath.join(sandbox, "subdir"))
+      File.write!(DomePath.join(sandbox, "subdir/c.txt"), "c")
+
+      on_exit(fn -> File.rm_rf!(sandbox) end)
+
+      %{sandbox: sandbox}
+    end
+
+    test "matches files with pattern", %{sandbox: sandbox} do
+      pattern = DomePath.join(sandbox, "*.txt")
+      result = DomePath.wildcard(pattern)
+
+      assert length(result) == 2
+      assert Enum.all?(result, &String.ends_with?(&1, ".txt"))
+    end
+
+    test "returns empty list for no matches", %{sandbox: sandbox} do
+      pattern = DomePath.join(sandbox, "*.xyz")
+      assert DomePath.wildcard(pattern) == []
+    end
+  end
+
+  describe "wildcard/2" do
+    setup do
+      cwd = File.cwd!()
+      sandbox = DomePath.join(cwd, ".test_wildcard2_#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox)
+      File.write!(DomePath.join(sandbox, ".hidden"), "hidden")
+      File.write!(DomePath.join(sandbox, "visible.txt"), "visible")
+
+      on_exit(fn -> File.rm_rf!(sandbox) end)
+
+      %{sandbox: sandbox}
+    end
+
+    test "match_dot: true includes dotfiles", %{sandbox: sandbox} do
+      pattern = DomePath.join(sandbox, "*")
+      result = DomePath.wildcard(pattern, match_dot: true)
+
+      filenames = Enum.map(result, &DomePath.basename/1)
+      assert ".hidden" in filenames
+      assert "visible.txt" in filenames
+    end
+
+    test "match_dot: false excludes dotfiles", %{sandbox: sandbox} do
+      pattern = DomePath.join(sandbox, "*")
+      result = DomePath.wildcard(pattern, match_dot: false)
+
+      filenames = Enum.map(result, &DomePath.basename/1)
+      refute ".hidden" in filenames
+      assert "visible.txt" in filenames
     end
   end
 end
