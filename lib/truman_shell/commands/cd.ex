@@ -14,6 +14,7 @@ defmodule TrumanShell.Commands.Cd do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   @doc """
@@ -55,8 +56,8 @@ defmodule TrumanShell.Commands.Cd do
   defp change_directory(path, context) do
     # Compute target path relative to current working directory
     # Then make it relative to sandbox for validation
-    target_abs = Path.expand(path, context.current_dir)
-    target_rel = Path.relative_to(target_abs, context.sandbox_root)
+    target_abs = DomePath.expand(path, context.current_dir)
+    target_rel = DomePath.relative_to(target_abs, context.sandbox_root)
 
     with {:ok, safe_path} <- Sandbox.validate_path(target_rel, context.sandbox_root),
          {:dir, true} <- {:dir, File.dir?(safe_path)} do
@@ -69,7 +70,7 @@ defmodule TrumanShell.Commands.Cd do
 
       {:dir, false} ->
         # Path is inside sandbox but not a directory - check if it's a file
-        full_path = Path.expand(target_rel, context.sandbox_root)
+        full_path = DomePath.expand(target_rel, context.sandbox_root)
 
         if File.regular?(full_path) do
           {:error, "bash: cd: #{path}: Not a directory\n"}

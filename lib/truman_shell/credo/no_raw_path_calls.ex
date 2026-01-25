@@ -1,4 +1,6 @@
 defmodule TrumanShell.Credo.NoRawPathCalls do
+  # Dialyzer can't see Credo at compile time (dev dependency)
+  # Silence all warnings for this file
   @moduledoc """
   Custom Credo check that disallows direct use of Path.* functions.
 
@@ -24,6 +26,8 @@ defmodule TrumanShell.Credo.NoRawPathCalls do
     base_priority: :high,
     category: :warning,
     exit_status: 1
+
+  @dialyzer [:no_return, :no_match, :no_unused]
 
   @path_functions ~w(
     absname basename dirname expand extname join relative relative_to

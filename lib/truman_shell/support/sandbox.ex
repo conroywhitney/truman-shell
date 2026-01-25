@@ -25,6 +25,8 @@ defmodule TrumanShell.Support.Sandbox do
   OS-level isolation (containers, chroot, namespaces) in addition to this module.
   """
 
+  alias TrumanShell.DomePath
+
   @env_var "TRUMAN_DOME"
 
   @doc """
@@ -157,9 +159,9 @@ defmodule TrumanShell.Support.Sandbox do
     else
       # Resolve current_dir to handle symlinks (e.g., /var -> /private/var on macOS)
       resolved_current_dir =
-        case resolve_real_path(Path.expand(current_dir)) do
+        case resolve_real_path(DomePath.expand(current_dir)) do
           {:ok, resolved} -> resolved
-          {:error, _} -> Path.expand(current_dir)
+          {:error, _} -> DomePath.expand(current_dir)
         end
 
       if path_within_sandbox?(resolved_current_dir, sandbox_resolved) do
@@ -174,17 +176,17 @@ defmodule TrumanShell.Support.Sandbox do
 
   defp resolve_sandbox_root(sandbox_root) do
     # Resolve symlinks in sandbox_root too (e.g., /tmp -> /private/tmp on macOS)
-    case resolve_real_path(Path.expand(sandbox_root)) do
+    case resolve_real_path(DomePath.expand(sandbox_root)) do
       {:ok, resolved} -> resolved
-      {:error, _} -> Path.expand(sandbox_root)
+      {:error, _} -> DomePath.expand(sandbox_root)
     end
   end
 
   defp resolve_to_absolute(path, sandbox_resolved, current_dir) do
     cond do
-      Path.type(path) == :absolute -> path
-      current_dir != nil -> Path.join(current_dir, path)
-      true -> Path.join(sandbox_resolved, path)
+      DomePath.type(path) == :absolute -> path
+      current_dir != nil -> DomePath.join(current_dir, path)
+      true -> DomePath.join(sandbox_resolved, path)
     end
   end
 
@@ -200,7 +202,7 @@ defmodule TrumanShell.Support.Sandbox do
       {:error, _reason} ->
         # Path doesn't exist or other error - check if target would be valid
         # Let the actual file operation return the specific error
-        expanded = Path.expand(absolute_path)
+        expanded = DomePath.expand(absolute_path)
         check_path_within_sandbox(expanded, sandbox_resolved)
     end
   end
@@ -256,8 +258,8 @@ defmodule TrumanShell.Support.Sandbox do
       String.starts_with?(path, "$") ->
         path
 
-      Path.type(path) == :relative ->
-        Path.expand(path, File.cwd!())
+      DomePath.type(path) == :relative ->
+        DomePath.expand(path, File.cwd!())
 
       true ->
         path
@@ -280,7 +282,7 @@ defmodule TrumanShell.Support.Sandbox do
     # Resolve ALL symlinks in the path, not just the final component
     # This prevents intermediate directory symlink escapes
     # Returns {:ok, resolved_path} or {:error, reason}
-    case do_resolve_path(Path.expand(path), @max_symlink_depth) do
+    case do_resolve_path(DomePath.expand(path), @max_symlink_depth) do
       {:ok, resolved, _remaining_depth} -> {:ok, resolved}
       {:error, reason} -> {:error, reason}
     end
@@ -304,15 +306,15 @@ defmodule TrumanShell.Support.Sandbox do
       new_depth = depth - 1
 
       resolved =
-        if Path.type(target_path) == :absolute do
+        if DomePath.type(target_path) == :absolute do
           target_path
         else
-          Path.join(parent_dir, target_path)
+          DomePath.join(parent_dir, target_path)
         end
 
       # Recursively resolve the target (it might also have symlinks)
       # IMPORTANT: Use the remaining depth from do_resolve_path for continue
-      with {:ok, resolved_target, remaining_depth} <- do_resolve_path(Path.expand(resolved), new_depth) do
+      with {:ok, resolved_target, remaining_depth} <- do_resolve_path(DomePath.expand(resolved), new_depth) do
         continue_after_symlink(resolved_target, rest, remaining_depth)
       end
     end
@@ -323,7 +325,7 @@ defmodule TrumanShell.Support.Sandbox do
   end
 
   defp continue_after_symlink(resolved_target, rest, depth) do
-    remaining_path = Path.join([resolved_target | rest])
+    remaining_path = DomePath.join([resolved_target | rest])
     do_resolve_path(remaining_path, depth)
   end
 
@@ -332,7 +334,7 @@ defmodule TrumanShell.Support.Sandbox do
   end
 
   defp resolve_components([component | rest], current_path, depth) do
-    next_path = Path.join(current_path, component)
+    next_path = DomePath.join(current_path, component)
 
     case :file.read_link_all(next_path) do
       {:ok, target} when is_list(target) ->
@@ -342,8 +344,8 @@ defmodule TrumanShell.Support.Sandbox do
         resolve_components(rest, next_path, depth)
 
       {:error, :enoent} ->
-        full_path = Path.join([next_path | rest])
-        {:ok, Path.expand(full_path), depth}
+        full_path = DomePath.join([next_path | rest])
+        {:ok, DomePath.expand(full_path), depth}
 
       {:error, reason} ->
         {:error, reason}
@@ -353,7 +355,7 @@ defmodule TrumanShell.Support.Sandbox do
   defp do_resolve_path(_path, 0), do: {:error, :eloop}
 
   defp do_resolve_path(path, depth) do
-    components = Path.split(path)
+    components = DomePath.split(path)
     resolve_components(components, "/", depth)
   end
 
@@ -362,8 +364,8 @@ defmodule TrumanShell.Support.Sandbox do
   # "/tmp/sandbox2/file" is NOT within "/tmp/sandbox" (different directory!)
   defp path_within_sandbox?(path, sandbox) do
     # Expand both to canonical form
-    expanded_path = Path.expand(path)
-    expanded_sandbox = Path.expand(sandbox)
+    expanded_path = DomePath.expand(path)
+    expanded_sandbox = DomePath.expand(sandbox)
 
     # Check if path starts with sandbox
     String.starts_with?(expanded_path, expanded_sandbox <> "/") or

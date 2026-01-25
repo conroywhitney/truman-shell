@@ -8,6 +8,7 @@ defmodule TrumanShell.Commands.Mkdir do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   @doc """
@@ -39,8 +40,8 @@ defmodule TrumanShell.Commands.Mkdir do
   end
 
   defp create_directory(dir_name, context, parents: true) do
-    target = Path.expand(dir_name, context.current_dir)
-    target_rel = Path.relative_to(target, context.sandbox_root)
+    target = DomePath.expand(dir_name, context.current_dir)
+    target_rel = DomePath.relative_to(target, context.sandbox_root)
 
     case Sandbox.validate_path(target_rel, context.sandbox_root) do
       {:ok, safe_path} ->
@@ -54,8 +55,8 @@ defmodule TrumanShell.Commands.Mkdir do
   end
 
   defp create_directory(dir_name, context, parents: false) do
-    target = Path.expand(dir_name, context.current_dir)
-    target_rel = Path.relative_to(target, context.sandbox_root)
+    target = DomePath.expand(dir_name, context.current_dir)
+    target_rel = DomePath.relative_to(target, context.sandbox_root)
 
     case Sandbox.validate_path(target_rel, context.sandbox_root) do
       {:ok, safe_path} ->

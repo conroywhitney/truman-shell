@@ -19,6 +19,8 @@ defmodule TrumanShell.Support.TreeWalker do
   limit but cannot exceed this safety ceiling.
   """
 
+  alias TrumanShell.DomePath
+
   # Hard maximum depth to prevent stack overflow
   @max_depth_limit 100
 
@@ -75,7 +77,7 @@ defmodule TrumanShell.Support.TreeWalker do
   # Uses lstat (not stat) to prevent symlink traversal attacks.
   # File.dir?/File.regular? follow symlinks; lstat does not.
   defp process_entry(entry, dir, maxdepth, type_filter, current_depth) do
-    full_path = Path.join(dir, entry)
+    full_path = DomePath.join(dir, entry)
 
     case File.lstat(full_path) do
       {:ok, %File.Stat{type: :directory}} ->

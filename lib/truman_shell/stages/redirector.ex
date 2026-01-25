@@ -17,6 +17,7 @@ defmodule TrumanShell.Stages.Redirector do
   - Earlier redirects create/truncate the file with empty content
   """
 
+  alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
 
@@ -75,7 +76,7 @@ defmodule TrumanShell.Stages.Redirector do
       if String.starts_with?(path, "/") do
         path
       else
-        Path.join(current_dir, path)
+        DomePath.join(current_dir, path)
       end
 
     # Validate the resolved path against sandbox
