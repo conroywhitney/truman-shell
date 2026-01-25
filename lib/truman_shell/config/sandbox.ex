@@ -67,7 +67,8 @@ defmodule TrumanShell.Config.Sandbox do
   @doc """
   Checks if a path is within any of the sandbox roots.
 
-  Delegates to `DomePath.within?/2` for each root - pure string boundary check.
+  Canonicalizes the path first (resolving `..` segments) to prevent
+  path traversal attacks, then delegates to `DomePath.within?/2`.
   Symlink detection happens at the DomePath.validate level when accessing files.
 
   ## Examples
@@ -80,9 +81,15 @@ defmodule TrumanShell.Config.Sandbox do
       iex> TrumanShell.Config.Sandbox.path_allowed?(sandbox, "/etc/passwd")
       false
 
+      iex> sandbox = %TrumanShell.Config.Sandbox{roots: ["/project"], default_cwd: "/project"}
+      iex> TrumanShell.Config.Sandbox.path_allowed?(sandbox, "/project/../etc/passwd")
+      false
+
   """
   @spec path_allowed?(t(), String.t()) :: boolean()
   def path_allowed?(%__MODULE__{roots: roots}, path) do
-    Enum.any?(roots, &DomePath.within?(path, &1))
+    # Canonicalize path to resolve .. segments before boundary check
+    canonical_path = DomePath.expand(path)
+    Enum.any?(roots, &DomePath.within?(canonical_path, &1))
   end
 end

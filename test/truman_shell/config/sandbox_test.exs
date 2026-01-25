@@ -104,6 +104,38 @@ defmodule TrumanShell.Config.SandboxTest do
     end
   end
 
+  describe "path_allowed?/2 - path traversal attacks" do
+    setup do
+      {:ok, sandbox} = Sandbox.new(["/project"], "/project")
+      %{sandbox: sandbox}
+    end
+
+    test "rejects .. traversal that escapes sandbox", %{sandbox: sandbox} do
+      # /project/../etc/passwd should resolve to /etc/passwd - OUTSIDE sandbox
+      refute Sandbox.path_allowed?(sandbox, "/project/../etc/passwd")
+    end
+
+    test "rejects multiple .. traversals", %{sandbox: sandbox} do
+      # /project/src/../../etc/passwd -> /etc/passwd
+      refute Sandbox.path_allowed?(sandbox, "/project/src/../../etc/passwd")
+    end
+
+    test "allows .. that stays within sandbox", %{sandbox: sandbox} do
+      # /project/src/../lib/file.ex -> /project/lib/file.ex - still inside
+      assert Sandbox.path_allowed?(sandbox, "/project/src/../lib/file.ex")
+    end
+
+    test "rejects .. at end that escapes", %{sandbox: sandbox} do
+      # /project/.. -> / (parent of project)
+      refute Sandbox.path_allowed?(sandbox, "/project/..")
+    end
+
+    test "allows .. to root itself", %{sandbox: sandbox} do
+      # /project/src/.. -> /project - still valid (is root)
+      assert Sandbox.path_allowed?(sandbox, "/project/src/..")
+    end
+  end
+
   describe "validate/1" do
     test "returns ok for valid sandbox" do
       sandbox = %Sandbox{roots: ["/project"], default_cwd: "/project"}
