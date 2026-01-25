@@ -132,11 +132,9 @@ defmodule TrumanShell.Support.Sandbox do
       "/sandbox/lib/foo.ex"
 
   """
-  @spec validate_path(String.t(), String.t() | SandboxConfig.t(), String.t() | nil) ::
+  @spec validate_path(String.t(), SandboxConfig.t() | String.t()) ::
           {:ok, String.t()} | {:error, :outside_sandbox}
-  def validate_path(path, sandbox_root, current_dir \\ nil)
-
-  def validate_path(path, %SandboxConfig{} = config, _current_dir) do
+  def validate_path(path, %SandboxConfig{} = config) do
     # Try each root until one validates, or return error if none work
     %SandboxConfig{roots: roots, default_cwd: default_cwd} = config
 
@@ -148,6 +146,13 @@ defmodule TrumanShell.Support.Sandbox do
     end)
   end
 
+  def validate_path(path, sandbox_root) when is_binary(sandbox_root) do
+    do_validate_path(path, sandbox_root, nil)
+  end
+
+  @deprecated "Use validate_path/2 with %Config.Sandbox{} instead"
+  @spec validate_path(String.t(), String.t(), String.t() | nil) ::
+          {:ok, String.t()} | {:error, :outside_sandbox}
   def validate_path(path, sandbox_root, current_dir) when is_binary(sandbox_root) do
     do_validate_path(path, sandbox_root, current_dir)
   end
