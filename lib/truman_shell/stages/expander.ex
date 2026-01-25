@@ -35,8 +35,8 @@ defmodule TrumanShell.Stages.Expander do
   ## Config
 
   Accepts a `%Config.Sandbox{}` struct with:
-  - `roots` - List of allowed directories (first root used for tilde expansion)
-  - `default_cwd` - Working directory for glob expansion
+  - `allowed_paths` - List of allowed directories (first path used for tilde expansion)
+  - `home_path` - Working directory for glob expansion
 
   ## Examples
 
@@ -44,7 +44,7 @@ defmodule TrumanShell.Stages.Expander do
       iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
       iex> alias TrumanShell.Stages.Expander
       iex> cmd = %Command{name: "cat", args: ["~/file.txt"], redirects: [], pipes: []}
-      iex> config = %SandboxConfig{roots: ["/sandbox"], default_cwd: "/sandbox"}
+      iex> config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
       iex> Expander.expand(cmd, config)
       %Command{name: "cat", args: ["/sandbox/file.txt"], redirects: [], pipes: []}
 
@@ -52,7 +52,7 @@ defmodule TrumanShell.Stages.Expander do
       iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
       iex> alias TrumanShell.Stages.Expander
       iex> cmd = %Command{name: "echo", args: ["hi"], redirects: [{:stdout, "~/out.txt"}], pipes: []}
-      iex> config = %SandboxConfig{roots: ["/sandbox"], default_cwd: "/sandbox"}
+      iex> config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
       iex> Expander.expand(cmd, config)
       %Command{name: "echo", args: ["hi"], redirects: [{:stdout, "/sandbox/out.txt"}], pipes: []}
 
@@ -69,13 +69,13 @@ defmodule TrumanShell.Stages.Expander do
   # Backward compatibility: convert legacy context map to Config.Sandbox struct
   def expand(%Command{} = command, %{sandbox_root: sandbox_root} = context) do
     current_dir = Map.get(context, :current_dir, sandbox_root)
-    config = %SandboxConfig{roots: [sandbox_root], default_cwd: current_dir}
+    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: current_dir}
     expand(command, config)
   end
 
   # Expand a {:glob, pattern} argument - tilde expansion then glob expansion
   # Glob.expand/2 returns [String.t()] if matches found, or String.t() if no matches
-  defp expand_arg({:glob, pattern}, %SandboxConfig{roots: [root | _]} = config) do
+  defp expand_arg({:glob, pattern}, %SandboxConfig{allowed_paths: [root | _]} = config) do
     expanded = Tilde.expand(pattern, root)
 
     case Glob.expand(expanded, config) do
@@ -86,12 +86,12 @@ defmodule TrumanShell.Stages.Expander do
 
   # Expand a literal string argument - tilde expansion only, NO glob expansion
   # This handles quoted args like "*.txt" which should remain literal
-  defp expand_arg(arg, %SandboxConfig{roots: [root | _]}) when is_binary(arg) do
+  defp expand_arg(arg, %SandboxConfig{allowed_paths: [root | _]}) when is_binary(arg) do
     [Tilde.expand(arg, root)]
   end
 
   # Expand tilde in redirect path
-  defp expand_redirect({type, path}, %SandboxConfig{roots: [root | _]}) when is_binary(path) do
+  defp expand_redirect({type, path}, %SandboxConfig{allowed_paths: [root | _]}) when is_binary(path) do
     {type, Tilde.expand(path, root)}
   end
 end

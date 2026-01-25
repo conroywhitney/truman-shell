@@ -12,44 +12,44 @@ defmodule TrumanShell.Config.SandboxTest do
   alias TrumanShell.Config.Sandbox
 
   describe "new/2 - basic validation" do
-    test "succeeds when default_cwd equals root" do
+    test "succeeds when home_path equals allowed_path" do
       assert {:ok, sandbox} = Sandbox.new(["/project"], "/project")
-      assert sandbox.roots == ["/project"]
-      assert sandbox.default_cwd == "/project"
+      assert sandbox.allowed_paths == ["/project"]
+      assert sandbox.home_path == "/project"
     end
 
-    test "succeeds when default_cwd is subdirectory of root" do
+    test "succeeds when home_path is subdirectory of allowed_path" do
       assert {:ok, sandbox} = Sandbox.new(["/project"], "/project/src")
-      assert sandbox.default_cwd == "/project/src"
+      assert sandbox.home_path == "/project/src"
     end
 
-    test "fails when default_cwd is outside root" do
+    test "fails when home_path is outside allowed_paths" do
       assert {:error, msg} = Sandbox.new(["/project"], "/elsewhere")
-      assert msg =~ "default_cwd must be within one of the roots"
+      assert msg =~ "home_path must be within one of the allowed_paths"
     end
 
-    test "fails when roots list is empty" do
+    test "fails when allowed_paths list is empty" do
       assert {:error, msg} = Sandbox.new([], "/project")
-      assert msg =~ "at least one root"
+      assert msg =~ "sandbox must have at least one allowed_path"
     end
   end
 
-  describe "new/2 - multiple roots" do
-    test "succeeds when default_cwd is in any root" do
-      roots = ["/project", "/libs"]
-      assert {:ok, sandbox} = Sandbox.new(roots, "/libs")
-      assert sandbox.default_cwd == "/libs"
+  describe "new/2 - multiple allowed_paths" do
+    test "succeeds when home_path is in any allowed_path" do
+      allowed = ["/project", "/libs"]
+      assert {:ok, sandbox} = Sandbox.new(allowed, "/libs")
+      assert sandbox.home_path == "/libs"
     end
 
-    test "succeeds when default_cwd is subdirectory of second root" do
-      roots = ["/project", "/libs"]
-      assert {:ok, sandbox} = Sandbox.new(roots, "/libs/elixir")
-      assert sandbox.default_cwd == "/libs/elixir"
+    test "succeeds when home_path is subdirectory of second allowed_path" do
+      allowed = ["/project", "/libs"]
+      assert {:ok, sandbox} = Sandbox.new(allowed, "/libs/elixir")
+      assert sandbox.home_path == "/libs/elixir"
     end
 
-    test "fails when default_cwd is outside all roots" do
-      roots = ["/project", "/libs"]
-      assert {:error, _} = Sandbox.new(roots, "/tmp")
+    test "fails when home_path is outside all allowed_paths" do
+      allowed = ["/project", "/libs"]
+      assert {:error, _} = Sandbox.new(allowed, "/tmp")
     end
   end
 
@@ -67,7 +67,7 @@ defmodule TrumanShell.Config.SandboxTest do
 
     test "handles deeply nested paths" do
       assert {:ok, sandbox} = Sandbox.new(["/project"], "/project/a/b/c/d/e")
-      assert sandbox.default_cwd == "/project/a/b/c/d/e"
+      assert sandbox.home_path == "/project/a/b/c/d/e"
     end
   end
 
@@ -136,69 +136,70 @@ defmodule TrumanShell.Config.SandboxTest do
     end
   end
 
-  describe "path_allowed?/2 - relative paths" do
+  describe "path_allowed?/2 - caller must expand relative paths" do
+    # path_allowed? now requires absolute paths - callers expand relative paths
+    # using DomePath.expand(path, base) where base is home_path or current_path
+
     setup do
-      # default_cwd is a subdirectory of root
       {:ok, sandbox} = Sandbox.new(["/project"], "/project/src")
       %{sandbox: sandbox}
     end
 
-    test "relative path expands against default_cwd, not process cwd", %{sandbox: sandbox} do
-      # "file.ex" relative to default_cwd "/project/src" -> "/project/src/file.ex"
-      # This should be allowed (within /project)
-      assert Sandbox.path_allowed?(sandbox, "file.ex")
+    test "absolute path in sandbox is allowed", %{sandbox: sandbox} do
+      # Caller expanded "file.ex" against home_path "/project/src"
+      assert Sandbox.path_allowed?(sandbox, "/project/src/file.ex")
     end
 
-    test "relative path with subdir expands against default_cwd", %{sandbox: sandbox} do
-      # "lib/foo.ex" relative to default_cwd "/project/src" -> "/project/src/lib/foo.ex"
-      assert Sandbox.path_allowed?(sandbox, "lib/foo.ex")
+    test "absolute path with subdir is allowed", %{sandbox: sandbox} do
+      # Caller expanded "lib/foo.ex" against home_path "/project/src"
+      assert Sandbox.path_allowed?(sandbox, "/project/src/lib/foo.ex")
     end
 
-    test "relative .. that stays in sandbox is allowed", %{sandbox: sandbox} do
-      # "../README.md" relative to default_cwd "/project/src" -> "/project/README.md"
-      assert Sandbox.path_allowed?(sandbox, "../README.md")
+    test "absolute path at root level is allowed", %{sandbox: sandbox} do
+      # Caller expanded "../README.md" against "/project/src" -> "/project/README.md"
+      assert Sandbox.path_allowed?(sandbox, "/project/README.md")
     end
 
-    test "relative .. that escapes sandbox is rejected", %{sandbox: sandbox} do
-      # "../../etc/passwd" relative to default_cwd "/project/src" -> "/etc/passwd"
-      refute Sandbox.path_allowed?(sandbox, "../../etc/passwd")
+    test "absolute path outside sandbox is rejected", %{sandbox: sandbox} do
+      # Caller expanded "../../etc/passwd" against "/project/src" -> "/etc/passwd"
+      refute Sandbox.path_allowed?(sandbox, "/etc/passwd")
     end
   end
 
   describe "new/2 - path canonicalization" do
-    test "canonicalizes roots with .. segments" do
-      # Root with .. should be canonicalized
+    test "canonicalizes allowed_paths with .. segments" do
+      # Path with .. should be canonicalized
       {:ok, sandbox} = Sandbox.new(["/project/../project"], "/project")
-      # The stored root should be canonical
-      assert sandbox.roots == ["/project"]
+      # The stored allowed_path should be canonical
+      assert sandbox.allowed_paths == ["/project"]
     end
 
-    test "canonicalizes default_cwd with .. segments" do
+    test "canonicalizes home_path with .. segments" do
       {:ok, sandbox} = Sandbox.new(["/project"], "/project/src/../lib")
-      # The stored default_cwd should be canonical
-      assert sandbox.default_cwd == "/project/lib"
+      # The stored home_path should be canonical
+      assert sandbox.home_path == "/project/lib"
     end
 
-    test "canonicalizes multiple roots" do
+    test "canonicalizes multiple allowed_paths" do
       {:ok, sandbox} = Sandbox.new(["/a/../b", "/c/d/../e"], "/b")
-      assert "/b" in sandbox.roots
-      assert "/c/e" in sandbox.roots
+      assert "/b" in sandbox.allowed_paths
+      assert "/c/e" in sandbox.allowed_paths
     end
   end
 
   describe "validate/1" do
     test "returns ok for valid sandbox" do
-      sandbox = %Sandbox{roots: ["/project"], default_cwd: "/project"}
+      sandbox = %Sandbox{allowed_paths: ["/project"], home_path: "/project"}
       assert {:ok, ^sandbox} = Sandbox.validate(sandbox)
     end
 
-    test "returns error for empty roots" do
-      sandbox = %Sandbox{roots: [], default_cwd: "/project"}
+    test "returns error for empty allowed_paths" do
+      sandbox = %Sandbox{allowed_paths: [], home_path: "/project"}
       assert {:error, _} = Sandbox.validate(sandbox)
     end
 
-    test "returns error for cwd outside roots" do
-      sandbox = %Sandbox{roots: ["/project"], default_cwd: "/elsewhere"}
+    test "returns error for home_path outside allowed_paths" do
+      sandbox = %Sandbox{allowed_paths: ["/project"], home_path: "/elsewhere"}
       assert {:error, _} = Sandbox.validate(sandbox)
     end
   end

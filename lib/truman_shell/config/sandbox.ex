@@ -74,12 +74,12 @@ defmodule TrumanShell.Config.Sandbox do
   end
 
   @doc """
-  Checks if a path is within any of the allowed_paths.
+  Checks if an absolute path is within any of the allowed_paths.
 
   Canonicalizes the path first (resolving `..` segments) to prevent
-  path traversal attacks. Relative paths are expanded against `home_path`,
-  not the process CWD. Delegates to `DomePath.within?/2` for boundary check.
-  Symlink detection happens at the DomePath.validate level when accessing files.
+  path traversal attacks. Callers must expand relative paths before calling
+  this function - use `DomePath.expand(path, base)` where base is either
+  `home_path` or `current_path` depending on context.
 
   ## Examples
 
@@ -95,20 +95,10 @@ defmodule TrumanShell.Config.Sandbox do
       iex> TrumanShell.Config.Sandbox.path_allowed?(sandbox, "/project/../etc/passwd")
       false
 
-      iex> sandbox = %TrumanShell.Config.Sandbox{allowed_paths: ["/project"], home_path: "/project/src"}
-      iex> TrumanShell.Config.Sandbox.path_allowed?(sandbox, "file.ex")
-      true
-
   """
   @spec path_allowed?(t(), String.t()) :: boolean()
-  def path_allowed?(%__MODULE__{allowed_paths: allowed_paths, home_path: home_path}, path) do
-    # Canonicalize path, expanding relative paths against home_path
-    canonical_path =
-      case DomePath.type(path) do
-        :absolute -> DomePath.expand(path)
-        :relative -> DomePath.expand(path, home_path)
-      end
-
+  def path_allowed?(%__MODULE__{allowed_paths: allowed_paths}, path) do
+    canonical_path = DomePath.expand(path)
     Enum.any?(allowed_paths, &DomePath.within?(canonical_path, &1))
   end
 end

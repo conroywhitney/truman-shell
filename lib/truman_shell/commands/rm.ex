@@ -125,6 +125,6 @@ defmodule TrumanShell.Commands.Rm do
   # Convert legacy context map to SandboxConfig struct
   # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
   defp to_sandbox_config(%{sandbox_root: root}) do
-    %SandboxConfig{roots: [root], default_cwd: root}
+    %SandboxConfig{allowed_paths: [root], home_path: root}
   end
 end

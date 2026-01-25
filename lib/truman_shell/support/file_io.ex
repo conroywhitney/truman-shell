@@ -3,6 +3,7 @@ defmodule TrumanShell.Support.FileIO do
   Shared file I/O functions for command handlers.
   """
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
@@ -14,7 +15,7 @@ defmodule TrumanShell.Support.FileIO do
   @doc """
   Read a file with sandbox validation and size limit.
 
-  Resolves the path relative to current_dir, validates it's within
+  Resolves the path relative to current_path, validates it's within
   the sandbox, and returns the file contents (max 10MB).
 
   Uses `IO.binread/2` with a limit to prevent TOCTOU race conditions
@@ -22,28 +23,45 @@ defmodule TrumanShell.Support.FileIO do
 
   ## Examples
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> {:ok, content} = TrumanShell.Support.FileIO.read_file("mix.exs", context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> {:ok, content} = TrumanShell.Support.FileIO.read_file("mix.exs", ctx)
       iex> content =~ "defmodule TrumanShell.MixProject"
       true
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Support.FileIO.read_file("nonexistent.txt", context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Support.FileIO.read_file("nonexistent.txt", ctx)
       {:error, "nonexistent.txt: No such file or directory"}
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Support.FileIO.read_file("/etc/passwd", context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Support.FileIO.read_file("/etc/passwd", ctx)
       {:error, "/etc/passwd: No such file or directory"}
 
   """
-  @spec read_file(String.t(), map()) :: {:ok, String.t()} | {:error, String.t()}
-  def read_file(path, context) do
-    # Resolve path relative to current working directory
-    target = DomePath.expand(path, context.current_dir)
-    target_rel = DomePath.relative_to(target, context.sandbox_root)
-    config = to_sandbox_config(context)
+  @spec read_file(String.t(), Context.t() | map()) :: {:ok, String.t()} | {:error, String.t()}
+  def read_file(path, %Context{} = ctx) do
+    # Expand path to absolute using current_path, then validate against sandbox
+    absolute_path = DomePath.expand(path, ctx.current_path)
+    do_read_file(path, absolute_path, ctx.sandbox_config)
+  end
 
-    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, config),
+  # Backward compatibility: convert legacy context map
+  def read_file(path, %{sandbox_root: sandbox_root, current_dir: current_dir}) do
+    absolute_path = DomePath.expand(path, current_dir)
+    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: sandbox_root}
+    do_read_file(path, absolute_path, config)
+  end
+
+  defp do_read_file(path, absolute_path, config) do
+    with {:ok, safe_path} <- Sandbox.validate_path(absolute_path, config),
          {:ok, contents} <- read_with_limit(safe_path) do
       {:ok, contents}
     else
@@ -158,11 +176,5 @@ defmodule TrumanShell.Support.FileIO do
       {n, ""} when n > 0 -> {:ok, n}
       _ -> :error
     end
-  end
-
-  # Convert legacy context map to SandboxConfig struct
-  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
-  defp to_sandbox_config(%{sandbox_root: root}) do
-    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

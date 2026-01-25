@@ -1,58 +1,66 @@
 defmodule TrumanShell.Commands.LsTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Ls
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
+  # Helper to build context
+  defp build_ctx(current_path, sandbox_root \\ File.cwd!()) do
+    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: sandbox_root}
+    %Context{current_path: current_path, sandbox_config: config}
+  end
+
   describe "handle/2" do
     test "lists files in current directory" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      ctx = build_ctx(File.cwd!())
 
-      {:ok, output} = Ls.handle([], context)
+      {:ok, output} = Ls.handle([], ctx)
 
       assert output =~ "mix.exs"
     end
 
     test "lists files in specified directory" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      ctx = build_ctx(File.cwd!())
 
-      {:ok, output} = Ls.handle(["lib"], context)
+      {:ok, output} = Ls.handle(["lib"], ctx)
 
       assert output =~ "truman_shell.ex"
     end
 
     test "appends / to directory names" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      ctx = build_ctx(File.cwd!())
 
-      {:ok, output} = Ls.handle([], context)
+      {:ok, output} = Ls.handle([], ctx)
 
       assert output =~ "lib/"
       assert output =~ "test/"
     end
 
     test "returns error for non-existent directory" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      ctx = build_ctx(File.cwd!())
 
-      result = Ls.handle(["nonexistent_dir"], context)
+      result = Ls.handle(["nonexistent_dir"], ctx)
 
       assert {:error, message} = result
       assert message == "ls: nonexistent_dir: No such file or directory\n"
     end
 
     test "rejects unsupported flags" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      ctx = build_ctx(File.cwd!())
 
-      result = Ls.handle(["-la"], context)
+      result = Ls.handle(["-la"], ctx)
 
       assert {:error, message} = result
       assert message =~ "invalid option"
     end
 
     test "accepts multiple path arguments" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      ctx = build_ctx(File.cwd!())
 
-      result = Ls.handle(["lib", "test"], context)
+      result = Ls.handle(["lib", "test"], ctx)
 
       assert {:ok, output} = result
       # Should list contents of both directories
@@ -61,9 +69,9 @@ defmodule TrumanShell.Commands.LsTest do
     end
 
     test "rejects access to paths outside sandbox (404 principle)" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      ctx = build_ctx(File.cwd!())
 
-      result = Ls.handle(["/etc"], context)
+      result = Ls.handle(["/etc"], ctx)
 
       assert {:error, message} = result
       assert message =~ "No such file or directory"
@@ -83,8 +91,8 @@ defmodule TrumanShell.Commands.LsTest do
       end
 
       try do
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
-        {:ok, output} = Ls.handle(["."], context)
+        ctx = build_ctx(tmp_dir, tmp_dir)
+        {:ok, output} = Ls.handle(["."], ctx)
 
         assert output =~ "... (50 more entries, 250 total)"
 

@@ -85,15 +85,16 @@ defmodule TrumanShell.Support.SandboxTest do
       assert %SandboxConfig{} = config
     end
 
-    test "struct has roots containing sandbox_root" do
+    test "struct has allowed_paths containing sandbox_root" do
       config = Sandbox.build_config()
-      assert is_list(config.roots)
-      assert length(config.roots) == 1
+      assert is_list(config.allowed_paths)
+      assert length(config.allowed_paths) == 1
+      assert Sandbox.sandbox_root() in config.allowed_paths
     end
 
-    test "struct has default_cwd matching first root by default" do
+    test "struct has home_path set to sandbox_root" do
       config = Sandbox.build_config()
-      assert config.default_cwd == hd(config.roots)
+      assert config.home_path == Sandbox.sandbox_root()
     end
   end
 
@@ -379,15 +380,15 @@ defmodule TrumanShell.Support.SandboxTest do
       assert {:error, :outside_sandbox} = result
     end
 
-    test "rejects current_dir outside sandbox at config creation time", %{sandbox: sandbox} do
-      # SECURITY: If caller tries to create config with current_dir outside sandbox,
+    test "rejects home_path outside sandbox at config creation time", %{sandbox: sandbox} do
+      # SECURITY: If caller tries to create config with home_path outside sandbox,
       # SandboxConfig.new/2 rejects it at struct creation time
       outside_dir = "/tmp"
 
       result = SandboxConfig.new([sandbox], outside_dir)
 
-      # Should be rejected - default_cwd must be within roots
-      assert {:error, "default_cwd must be within one of the roots"} = result
+      # Should be rejected - home_path must be within allowed_paths
+      assert {:error, "home_path must be within one of the allowed_paths"} = result
     end
 
     test "allows current_dir inside sandbox", %{sandbox: sandbox} do

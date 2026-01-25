@@ -284,7 +284,7 @@ defmodule TrumanShell.Config do
 
   defp validate_default_cwd(default_cwd, roots) do
     # Build a temporary sandbox to check if cwd is within roots
-    sandbox = %Config.Sandbox{roots: roots, default_cwd: default_cwd}
+    sandbox = %Config.Sandbox{allowed_paths: roots, home_path: default_cwd}
 
     # Use File.stat for atomic check (avoids TOCTOU race)
     case File.stat(default_cwd) do
