@@ -16,36 +16,109 @@ defmodule TrumanShell.ConfigTest do
   describe "default_cwd resolution" do
     @describetag :default_cwd
 
-    @tag :skip
     test "default_cwd is resolved to absolute path at load time (not at use time)" do
       # This prevents TOCTOU: we don't check inherited cwd, we SET it
       # The resolved path should be stable regardless of shell cwd changes
+      config = Config.defaults()
+
+      # default_cwd should always be absolute
+      assert Path.type(config.default_cwd) == :absolute
+
+      # It should be the actual cwd, fully expanded
+      assert config.default_cwd == File.cwd!()
+
+      # No ~, no .., no relative components
+      refute String.contains?(config.default_cwd, "~")
+      refute String.contains?(config.default_cwd, "/../")
     end
 
-    @tag :skip
     test "default_cwd must be within one of the roots" do
       # Invalid: default_cwd outside all roots
-      # config = %{roots: ["/home/user/project"], default_cwd: "/tmp"}
-      # Should return {:error, "default_cwd must be within roots"}
+      # We'll test validation directly with a struct
+      config = %Config{
+        version: "0.1",
+        roots: [File.cwd!()],
+        default_cwd: "/tmp",
+        raw: %{}
+      }
+
+      assert {:error, msg} = Config.validate(config)
+      assert msg =~ "default_cwd must be within one of the roots"
     end
 
-    @tag :skip
     test "default_cwd can be relative to first root" do
-      # config = %{roots: ["/home/user/project"], default_cwd: "."}
-      # Should resolve to "/home/user/project"
+      # Create a temp config file with relative default_cwd
+      cwd = File.cwd!()
+
+      config_content = """
+      version: "0.1"
+      sandbox:
+        roots:
+          - "#{cwd}"
+        default_cwd: "."
+      """
+
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:ok, config} = Config.load(config_path)
+        # "." relative to first root should resolve to the root itself
+        assert config.default_cwd == cwd
+        assert Path.type(config.default_cwd) == :absolute
+      after
+        File.rm(config_path)
+      end
     end
 
-    @tag :skip
     test "default_cwd with ~ expands to home directory" do
-      # config = %{roots: ["~/code"], default_cwd: "~/code/my-project"}
-      # Should expand ~ before validation
+      # Use a directory we know exists under home
+      home = System.user_home!()
+
+      config_content = """
+      version: "0.1"
+      sandbox:
+        roots:
+          - "~"
+        default_cwd: "~"
+      """
+
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:ok, config} = Config.load(config_path)
+        # ~ should expand to home directory
+        assert config.default_cwd == home
+        assert home in config.roots
+        refute String.contains?(config.default_cwd, "~")
+      after
+        File.rm(config_path)
+      end
     end
 
-    @tag :skip
     test "default_cwd with non-existent path fails at load time" do
       # We want early failure, not runtime surprises
-      # config = %{roots: ["/home/user"], default_cwd: "/home/user/does-not-exist"}
-      # Should return {:error, "default_cwd path does not exist"}
+      cwd = File.cwd!()
+      nonexistent = Path.join(cwd, "this-directory-does-not-exist-#{:rand.uniform(10_000)}")
+
+      config_content = """
+      version: "0.1"
+      sandbox:
+        roots:
+          - "#{cwd}"
+        default_cwd: "#{nonexistent}"
+      """
+
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:error, msg} = Config.load(config_path)
+        assert msg =~ "default_cwd does not exist"
+      after
+        File.rm(config_path)
+      end
     end
   end
 
