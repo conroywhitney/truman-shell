@@ -283,20 +283,27 @@ defmodule TrumanShell.ConfigTest do
 
   describe "TOCTOU prevention" do
     @describetag :toctou
+    @describetag :integration
+
+    # These tests require Executor integration - Phase 2 of implementation
+    # See handoff: "Integrate Config with Executor (replace single sandbox_root)"
 
     @tag :skip
+    @tag :executor
     test "executor uses config default_cwd, not inherited shell cwd" do
       # This is the key test: even if shell cwd is /tmp,
       # commands should execute with cwd = default_cwd from config
     end
 
     @tag :skip
+    @tag :executor
     test "cd command updates in-memory cursor, not shell cwd" do
       # cd /subdir should update Process.get(:truman_cwd)
       # but NOT call System.cmd("cd", ...) or File.cd!()
     end
 
     @tag :skip
+    @tag :executor
     test "relative paths resolve against config default_cwd, not shell cwd" do
       # If shell cwd is /tmp but default_cwd is /home/user/project,
       # "cat README.md" should look in /home/user/project/README.md
@@ -517,8 +524,13 @@ defmodule TrumanShell.ConfigTest do
 
   describe "edge cases from real usage" do
     @describetag :edge_cases
+    @describetag :integration
+
+    # These tests require Executor/Harness integration - Phase 2-3 of implementation
+    # See handoff: "Integrate Config with Executor", "Integration tests for default_cwd behavior"
 
     @tag :skip
+    @tag :executor
     test "cd to another root, then relative path resolves correctly" do
       # roots: [~/studios/reification-labs, ~/code/truman-shell]
       # default_cwd: ~/studios/reification-labs
@@ -527,11 +539,13 @@ defmodule TrumanShell.ConfigTest do
     end
 
     @tag :skip
+    @tag :executor
     test "cd to path outside all roots fails" do
       # cd /tmp -> error, not within roots
     end
 
     @tag :skip
+    @tag :harness
     test "checkpoint creates files in default_cwd, not current cd location" do
       # This is the user's actual use case!
       # cd ~/code/truman-shell (for git work)
@@ -540,18 +554,21 @@ defmodule TrumanShell.ConfigTest do
     end
 
     @tag :skip
+    @tag :executor
     test "git -C works with paths in any root" do
       # git -C ~/code/truman-shell status
       # Should work because ~/code/truman-shell is in roots
     end
 
     @tag :skip
+    @tag :harness
     test "symlink from one root to another is followed" do
       # ~/studios/reification-labs/.vault/truman-shell -> ~/code/truman-shell
       # If both are roots, symlink should be allowed
     end
 
     @tag :skip
+    @tag :harness
     test "symlink from root to outside-root is denied" do
       # ~/code/escape -> /etc
       # Even though ~/code/* is a root, the symlink target is not
