@@ -54,7 +54,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "passes sandbox_root option to commands" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-sandbox-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-sandbox-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
       File.write!(Path.join(tmp_dir, "test.txt"), "content")
 
@@ -70,8 +70,8 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
     test "resets cwd when sandbox_root changes" do
       # Create two sandboxes
-      sandbox1 = Path.join(System.tmp_dir!(), "truman-sandbox1-#{:rand.uniform(100_000)}")
-      sandbox2 = Path.join(System.tmp_dir!(), "truman-sandbox2-#{:rand.uniform(100_000)}")
+      sandbox1 = Path.join(Path.join(File.cwd!(), "tmp"), "truman-sandbox1-#{:rand.uniform(100_000)}")
+      sandbox2 = Path.join(Path.join(File.cwd!(), "tmp"), "truman-sandbox2-#{:rand.uniform(100_000)}")
       File.mkdir_p!(sandbox1)
       File.mkdir_p!(sandbox2)
       subdir1 = Path.join(sandbox1, "subdir")
@@ -247,7 +247,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
   describe "redirects" do
     test "stdout redirect (>) writes output to file" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-redirect-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-redirect-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -273,7 +273,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "stdout append redirect (>>) appends to file" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-append-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-append-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -297,7 +297,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "redirect to path outside sandbox returns error (404 principle)" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-sandbox-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-sandbox-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -319,7 +319,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "redirect to directory returns error (not crash)" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-eisdir-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-eisdir-#{:rand.uniform(100_000)}")
       subdir = Path.join(tmp_dir, "subdir")
       File.mkdir_p!(subdir)
 
@@ -342,7 +342,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "redirect to nonexistent parent directory returns error (ENOENT)" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-enoent-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-enoent-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -364,7 +364,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "multiple redirects: last file gets output, earlier files truncated (bash behavior)" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-multi-redir-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-multi-redir-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -398,7 +398,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
   describe "piping" do
     test "ls | grep pattern filters directory output" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-ls-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-pipe-ls-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -429,7 +429,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "cat file.txt | head -5 returns first 5 lines" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-pipe-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -460,7 +460,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "3-stage pipe: cat | grep | head chains correctly" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-3-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-pipe-3-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -503,7 +503,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "pipe with tail: cat | tail -3 returns last 3 lines" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-tail-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-pipe-tail-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -533,7 +533,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "pipe with wc: cat | wc -l counts lines" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-wc-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-pipe-wc-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -561,7 +561,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "first command error stops pipeline" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-err-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-pipe-err-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -585,7 +585,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "middle command error stops pipeline" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-mid-err-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-pipe-mid-err-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -611,7 +611,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "middle command with no matches returns empty output" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-pipe-empty-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-pipe-empty-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do

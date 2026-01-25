@@ -7,7 +7,7 @@ defmodule TrumanShell.Commands.GrepTest do
 
   describe "handle/2" do
     test "finds lines matching pattern in file" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -30,7 +30,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "returns empty string when no matches" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-nomatch-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-nomatch-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -46,7 +46,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "returns error for missing file" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-missing-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-missing-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -61,7 +61,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "searches multiple files in order with filename prefix" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-multi-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-multi-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -87,7 +87,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "returns error for path outside sandbox (404 principle)" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-sandbox-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-sandbox-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -102,7 +102,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -r searches directory recursively" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-recursive-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-recursive-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -123,7 +123,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -r respects sandbox boundary" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-r-sandbox-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-r-sandbox-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -138,7 +138,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -n shows line numbers" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-n-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-n-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -154,7 +154,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -i matches case insensitively" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-i-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-i-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -170,7 +170,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -v inverts match" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-v-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-v-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -186,7 +186,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -A shows lines after match" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-A-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-A-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -202,7 +202,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -B shows lines before match" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-B-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-B-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -218,7 +218,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -C shows context both sides" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-C-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-C-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -234,7 +234,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -A rejects negative context values" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-neg-A-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-neg-A-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -250,7 +250,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -B rejects negative context values" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-neg-B-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-neg-B-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -266,7 +266,7 @@ defmodule TrumanShell.Commands.GrepTest do
     end
 
     test "grep -C rejects negative context values" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-grep-neg-C-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-neg-C-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do

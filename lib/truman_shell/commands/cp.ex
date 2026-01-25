@@ -17,7 +17,7 @@ defmodule TrumanShell.Commands.Cp do
 
   ## Examples
 
-      iex> sandbox = Path.join(System.tmp_dir!(), "cp_doctest_#{System.unique_integer([:positive])}")
+      iex> sandbox = Path.join([File.cwd!(), "tmp", "cp_doctest_#{System.unique_integer([:positive])}"])
       iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
       iex> File.write!(Path.join(sandbox, "src.txt"), "content")

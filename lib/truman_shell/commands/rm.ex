@@ -27,7 +27,7 @@ defmodule TrumanShell.Commands.Rm do
 
   ## Examples
 
-      iex> sandbox = Path.join(System.tmp_dir!(), "rm_doctest_#{System.unique_integer([:positive])}")
+      iex> sandbox = Path.join([File.cwd!(), "tmp", "rm_doctest_#{System.unique_integer([:positive])}"])
       iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
       iex> File.mkdir_p!(Path.join(sandbox, ".trash"))

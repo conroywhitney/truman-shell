@@ -193,7 +193,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
   describe "expand/2 glob expansion" do
     setup do
       # Create a unique temp directory for filesystem tests
-      tmp_dir = Path.join(System.tmp_dir!(), "expander_glob_#{:erlang.unique_integer([:positive])}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "expander_glob_#{:erlang.unique_integer([:positive])}")
       File.mkdir_p!(tmp_dir)
 
       on_exit(fn ->

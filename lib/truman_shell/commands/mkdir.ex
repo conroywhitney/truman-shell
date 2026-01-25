@@ -16,7 +16,7 @@ defmodule TrumanShell.Commands.Mkdir do
 
   ## Examples
 
-      iex> sandbox = Path.join(System.tmp_dir!(), "mkdir_doctest_#{System.unique_integer([:positive])}")
+      iex> sandbox = Path.join([File.cwd!(), "tmp", "mkdir_doctest_#{System.unique_integer([:positive])}"])
       iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
       iex> context = %{sandbox_root: sandbox, current_dir: sandbox}

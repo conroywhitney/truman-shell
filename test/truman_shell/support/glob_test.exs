@@ -8,7 +8,7 @@ defmodule TrumanShell.Support.GlobTest do
   # Use a temp directory for filesystem tests
   setup do
     # Create a unique temp directory for each test
-    tmp_dir = Path.join(System.tmp_dir!(), "glob_test_#{:erlang.unique_integer([:positive])}")
+    tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "glob_test_#{:erlang.unique_integer([:positive])}")
     File.mkdir_p!(tmp_dir)
 
     on_exit(fn ->
@@ -121,7 +121,7 @@ defmodule TrumanShell.Support.GlobTest do
       current_dir: _current_dir
     } do
       # Create nested sandbox structure
-      outer_dir = Path.join(System.tmp_dir!(), "glob_outer_#{:erlang.unique_integer([:positive])}")
+      outer_dir = Path.join(Path.join(File.cwd!(), "tmp"), "glob_outer_#{:erlang.unique_integer([:positive])}")
       inner_dir = Path.join(outer_dir, "sandbox")
       File.mkdir_p!(inner_dir)
 

@@ -114,9 +114,9 @@ defmodule TrumanShell.Support.SandboxTest do
     end
 
     @tag :tmp_dir
-    test "allows symlink with absolute target inside sandbox", %{tmp_dir: sandbox} do
-      # Symlinks with absolute paths inside sandbox ARE allowed
-      # We follow the symlink and verify the real path is within bounds
+    test "rejects symlink even with absolute target inside sandbox", %{tmp_dir: sandbox} do
+      # Symlinks are DENIED - even if target is inside sandbox
+      # "Symlinks denied. Period." - no allow-list, no complexity
       inside_dir = Path.join(sandbox, "inside")
       File.mkdir_p!(inside_dir)
 
@@ -125,8 +125,8 @@ defmodule TrumanShell.Support.SandboxTest do
 
       result = Sandbox.validate_path("abs_link", sandbox)
 
-      # Allowed: we follow symlinks and verify real destination
-      assert {:ok, ^inside_dir} = result
+      # Rejected: all symlinks denied
+      assert {:error, :outside_sandbox} = result
     end
 
     @tag :tmp_dir
@@ -142,8 +142,8 @@ defmodule TrumanShell.Support.SandboxTest do
     end
 
     @tag :tmp_dir
-    test "allows symlink with safe relative target", %{tmp_dir: sandbox} do
-      # Create target directory and symlink with relative path
+    test "rejects symlink even with safe relative target", %{tmp_dir: sandbox} do
+      # Symlinks are DENIED - even safe relative targets
       inside_dir = Path.join(sandbox, "inside")
       File.mkdir_p!(inside_dir)
 
@@ -152,23 +152,22 @@ defmodule TrumanShell.Support.SandboxTest do
 
       result = Sandbox.validate_path("safe_link", sandbox)
 
-      # Allowed: relative target stays within sandbox
-      assert {:ok, _} = result
+      # Rejected: all symlinks denied
+      assert {:error, :outside_sandbox} = result
     end
 
-    test "allows path within sandbox" do
-      sandbox = "/tmp/truman-test"
+    @tag :tmp_dir
+    test "allows path within sandbox", %{tmp_dir: sandbox} do
       path = "subdir/file.txt"
 
       result = Sandbox.validate_path(path, sandbox)
 
-      # Returns resolved path (may include /private/ on macOS)
       assert {:ok, resolved} = result
-      assert String.ends_with?(resolved, "/truman-test/subdir/file.txt")
+      assert String.ends_with?(resolved, "/subdir/file.txt")
     end
 
-    test "rejects path traversal attack" do
-      sandbox = "/tmp/truman-test"
+    @tag :tmp_dir
+    test "rejects path traversal attack", %{tmp_dir: sandbox} do
       path = "../../../etc/passwd"
 
       result = Sandbox.validate_path(path, sandbox)
@@ -176,10 +175,10 @@ defmodule TrumanShell.Support.SandboxTest do
       assert {:error, :outside_sandbox} = result
     end
 
-    test "rejects absolute path outside sandbox" do
+    @tag :tmp_dir
+    test "rejects absolute path outside sandbox", %{tmp_dir: sandbox} do
       # Absolute paths outside sandbox are rejected (AIITL transparency)
       # This is more honest than silently confining /etc -> sandbox/etc
-      sandbox = "/tmp/truman-test"
       path = "/etc/passwd"
 
       result = Sandbox.validate_path(path, sandbox)
@@ -188,44 +187,43 @@ defmodule TrumanShell.Support.SandboxTest do
       assert {:error, :outside_sandbox} = result
     end
 
-    test "allows absolute path within sandbox" do
+    @tag :tmp_dir
+    test "allows absolute path within sandbox", %{tmp_dir: sandbox} do
       # Absolute paths that are already within sandbox should work
-      sandbox = "/tmp/truman-test"
-      path = "/tmp/truman-test/subdir/file.txt"
+      path = Path.join(sandbox, "subdir/file.txt")
 
       result = Sandbox.validate_path(path, sandbox)
 
-      # Returns resolved path (may include /private/ on macOS)
       assert {:ok, resolved} = result
-      assert String.ends_with?(resolved, "/truman-test/subdir/file.txt")
+      assert String.ends_with?(resolved, "/subdir/file.txt")
     end
 
-    test "rejects path with sandbox prefix but different directory" do
-      # Security: /tmp/truman-test2 should NOT pass for sandbox /tmp/truman-test
-      # This catches the string prefix bug where "truman-test2" starts with "truman-test"
-      sandbox = "/tmp/truman-test"
-      path = "/tmp/truman-test2/secret"
+    @tag :tmp_dir
+    test "rejects path with sandbox prefix but different directory", %{tmp_dir: sandbox} do
+      # Security: /sandbox2 should NOT pass for /sandbox
+      # This catches the string prefix bug where "sandbox2" starts with "sandbox"
+      path = sandbox <> "2/secret"
 
       result = Sandbox.validate_path(path, sandbox)
 
       assert {:error, :outside_sandbox} = result
     end
 
-    test "allows current directory (.)" do
-      sandbox = "/tmp/truman-test"
+    @tag :tmp_dir
+    test "allows current directory (.)", %{tmp_dir: sandbox} do
       path = "."
 
       result = Sandbox.validate_path(path, sandbox)
 
-      # Returns resolved path (may include /private/ on macOS)
       assert {:ok, resolved} = result
-      assert String.ends_with?(resolved, "/truman-test")
+      assert resolved == sandbox
     end
   end
 
   describe "validate_path/3 with current_dir" do
     setup do
-      tmp_dir = System.tmp_dir!()
+      # Use project tmp/ to avoid symlinks (macOS /var -> /private/var)
+      tmp_dir = Path.join(File.cwd!(), "tmp")
       sandbox = Path.join(tmp_dir, "test_sandbox_#{:rand.uniform(100_000)}")
       File.mkdir_p!(sandbox)
       File.mkdir_p!(Path.join(sandbox, "lib"))
@@ -265,16 +263,16 @@ defmodule TrumanShell.Support.SandboxTest do
       assert {:error, :outside_sandbox} = result
     end
 
-    test "accepts symlink pointing within sandbox", %{sandbox: sandbox} do
+    test "rejects symlink even pointing within sandbox", %{sandbox: sandbox} do
+      # Symlinks are DENIED - even if target is inside sandbox
       target = Path.join(sandbox, "lib/foo.ex")
       symlink_path = Path.join(sandbox, "foo_link.ex")
       File.ln_s(target, symlink_path)
 
       result = Sandbox.validate_path(symlink_path, sandbox)
 
-      # Returns resolved path - should end with same suffix as target
-      assert {:ok, resolved} = result
-      assert String.ends_with?(resolved, "/lib/foo.ex")
+      # Rejected: all symlinks denied
+      assert {:error, :outside_sandbox} = result
     end
 
     test "rejects path through directory symlink pointing outside sandbox", %{sandbox: sandbox} do
@@ -304,7 +302,7 @@ defmodule TrumanShell.Support.SandboxTest do
       # link1 -> link2 -> /etc/passwd
 
       # Create a file outside sandbox to link to (use /tmp as it's more reliable)
-      outside_file = Path.join(System.tmp_dir!(), "outside_target_#{:rand.uniform(100_000)}")
+      outside_file = Path.join(Path.join(File.cwd!(), "tmp"), "outside_target_#{:rand.uniform(100_000)}")
       File.write!(outside_file, "secret")
       on_exit(fn -> File.rm(outside_file) end)
 
@@ -321,84 +319,33 @@ defmodule TrumanShell.Support.SandboxTest do
       assert {:error, :outside_sandbox} = result
     end
 
-    test "returns :eloop for self-referential symlinks", %{sandbox: sandbox} do
-      # SECURITY: Symlink that points to itself creates infinite loop
+    test "rejects self-referential symlinks", %{sandbox: sandbox} do
+      # Symlinks denied - even self-referential ones
       loop_link = Path.join(sandbox, "loop")
       File.ln_s("loop", loop_link)
 
       result = Sandbox.validate_path("loop", sandbox)
 
-      # Should return :eloop, not hang forever
-      assert {:error, :eloop} = result
+      # Rejected on first symlink detection
+      assert {:error, :outside_sandbox} = result
     end
 
-    test "returns :eloop for deeply nested symlink chains", %{sandbox: sandbox} do
-      # SECURITY: Very deep symlink chains should be rejected
-      # Create a chain of 15 symlinks (exceeds @max_symlink_depth of 10)
-      # link15 -> link14 -> ... -> link1 -> target
+    test "rejects symlink chains", %{sandbox: sandbox} do
+      # Symlinks denied - chains rejected on first symlink
       target = Path.join(sandbox, "target")
       File.write!(target, "content")
 
-      # Use Enum.reduce to build the chain properly
-      Enum.reduce(1..15, "target", fn i, prev_name ->
+      # Create a chain: link3 -> link2 -> link1 -> target
+      Enum.reduce(1..3, "target", fn i, prev_name ->
         link = Path.join(sandbox, "link#{i}")
         File.ln_s(prev_name, link)
         "link#{i}"
       end)
 
-      result = Sandbox.validate_path("link15", sandbox)
+      result = Sandbox.validate_path("link3", sandbox)
 
-      # Should return :eloop after hitting depth limit
-      assert {:error, :eloop} = result
-    end
-
-    test "tracks depth correctly when symlink target contains nested symlinks", %{sandbox: sandbox} do
-      # SECURITY: Depth must be tracked across nested symlink resolution
-      # Bug: resolve_symlink_target passes same depth to both do_resolve_path AND
-      # continue_after_symlink, so depth consumed inside do_resolve_path is lost.
-      #
-      # Setup: entry -> chain of 5 symlinks, then 5 more symlinks in remaining path
-      # Total = 1 (entry) + 5 (chain) + 5 (rem) = 11 > 10, should return :eloop
-      #
-      # Bug scenario:
-      # - entry uses 1 depth (10->9)
-      # - chain5 resolution: starts at 9, uses 5 internally (9->4), returns success
-      # - continue_after_symlink gets depth=9 (not 4!)
-      # - rem5 chain uses 5 (9->4 with bug, should be 4->-1 = fail)
-      # Result with bug: succeeds! Result correct: :eloop
-
-      # Create target directory structure
-      chain_dir = Path.join(sandbox, "chain")
-      File.mkdir_p!(chain_dir)
-
-      final_dir = Path.join(chain_dir, "final")
-      File.mkdir_p!(final_dir)
-
-      # Create chain inside chain_dir: chain5 -> chain4 -> ... -> chain1 -> final (5 hops)
-      Enum.reduce(1..5, "final", fn i, prev ->
-        link = Path.join(chain_dir, "chain#{i}")
-        File.ln_s(prev, link)
-        "chain#{i}"
-      end)
-
-      # Create entry symlink that points to chain5 (resolving it internally uses 5 depth)
-      entry_link = Path.join(sandbox, "entry")
-      File.ln_s(Path.join(chain_dir, "chain5"), entry_link)
-
-      # Create 5 remaining symlinks in final dir: rem5 -> rem4 -> ... -> rem1 -> target
-      File.write!(Path.join(final_dir, "target"), "content")
-
-      Enum.reduce(1..5, "target", fn i, prev ->
-        link = Path.join(final_dir, "rem#{i}")
-        File.ln_s(prev, link)
-        "rem#{i}"
-      end)
-
-      # Total depth: entry(1) + chain5->final(5) + rem5->target(5) = 11 > 10
-      result = Sandbox.validate_path("entry/rem5", sandbox)
-
-      # Should return :eloop - total depth exceeds limit of 10
-      assert {:error, :eloop} = result
+      # Rejected on first symlink (link3)
+      assert {:error, :outside_sandbox} = result
     end
 
     test "rejects path with embedded $VAR", %{sandbox: sandbox} do
@@ -435,9 +382,8 @@ defmodule TrumanShell.Support.SandboxTest do
       assert String.ends_with?(resolved, "/lib/foo.ex")
     end
 
-    test "uses resolved current_dir for path resolution", %{sandbox: sandbox} do
-      # When current_dir is a symlink, the resolved path should use the canonical form
-      # Create: sandbox/link_dir -> sandbox/real_dir
+    test "rejects symlink as current_dir", %{sandbox: sandbox} do
+      # Symlinks are DENIED - even in current_dir
       real_dir = Path.join(sandbox, "real_dir")
       File.mkdir_p!(real_dir)
       File.write!(Path.join(real_dir, "file.txt"), "content")
@@ -445,13 +391,11 @@ defmodule TrumanShell.Support.SandboxTest do
       link_dir = Path.join(sandbox, "link_dir")
       File.ln_s(real_dir, link_dir)
 
-      # Pass symlink as current_dir, resolve relative path
+      # Pass symlink as current_dir
       result = Sandbox.validate_path("file.txt", sandbox, link_dir)
 
-      # Result should use the canonical path (real_dir), not the symlink path
-      assert {:ok, resolved} = result
-      assert String.contains?(resolved, "real_dir/file.txt")
-      refute String.contains?(resolved, "link_dir")
+      # Rejected: symlink in current_dir is not allowed
+      assert {:error, :outside_sandbox} = result
     end
 
     test "rejects current_dir with embedded $VAR", %{sandbox: sandbox} do

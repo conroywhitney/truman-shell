@@ -73,7 +73,7 @@ defmodule TrumanShell.Commands.LsTest do
 
     test "truncates output for large directories" do
       tmp_dir =
-        Path.join(System.tmp_dir!(), "truman-test-ls-truncation-#{:rand.uniform(100_000)}")
+        Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-ls-truncation-#{:rand.uniform(100_000)}")
 
       File.mkdir_p!(tmp_dir)
 

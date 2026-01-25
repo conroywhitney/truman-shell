@@ -8,7 +8,7 @@ defmodule TrumanShell.Commands.RmTest do
   describe "handle/2" do
     setup do
       # Create a temp sandbox for each test
-      sandbox = Path.join(System.tmp_dir!(), "rm_test_#{:rand.uniform(100_000)}")
+      sandbox = Path.join(Path.join(File.cwd!(), "tmp"), "rm_test_#{:rand.uniform(100_000)}")
       File.mkdir_p!(sandbox)
       # Create .trash directory
       trash_dir = Path.join(sandbox, ".trash")
