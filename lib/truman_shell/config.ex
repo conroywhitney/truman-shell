@@ -206,10 +206,16 @@ defmodule TrumanShell.Config do
   defp build_config(parsed) when is_map(parsed) do
     sandbox = Map.get(parsed, "sandbox", %{})
     raw_roots = Map.get(sandbox, "roots", ["."])
-    raw_default_cwd = Map.get(sandbox, "default_cwd", List.first(raw_roots, "."))
 
-    # Expand ~ and globs in roots
+    # Expand ~ and globs in roots FIRST
     expanded_roots = expand_roots(raw_roots)
+
+    # Default to first EXPANDED root (not raw glob pattern)
+    raw_default_cwd =
+      case Map.get(sandbox, "default_cwd") do
+        nil -> List.first(expanded_roots, File.cwd!())
+        explicit -> explicit
+      end
 
     # Expand ~ in default_cwd (resolve relative to first root)
     default_cwd = expand_default_cwd(raw_default_cwd, expanded_roots)

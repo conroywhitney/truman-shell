@@ -200,6 +200,44 @@ defmodule TrumanShell.ConfigTest do
       end
     end
 
+    test "default_cwd defaults to first expanded root when omitted with glob" do
+      # This is P1: if roots contain globs and default_cwd is omitted,
+      # default_cwd should be the first EXPANDED root, not the raw glob pattern
+      base_dir = Path.join(System.tmp_dir!(), "test_glob_cwd_#{:rand.uniform(10_000)}")
+      # Will be first after sort
+      proj1 = Path.join(base_dir, "alpha")
+      proj2 = Path.join(base_dir, "beta")
+      File.mkdir_p!(proj1)
+      File.mkdir_p!(proj2)
+
+      # Omit default_cwd - should default to first expanded root
+      config_content = """
+      version: "0.1"
+      sandbox:
+        roots:
+          - "#{base_dir}/*"
+      """
+
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:ok, config} = Config.load(config_path)
+        # default_cwd should be an actual directory, not a glob pattern
+        refute String.contains?(config.default_cwd, "*"),
+               "default_cwd should not contain glob pattern: #{config.default_cwd}"
+
+        assert File.dir?(config.default_cwd),
+               "default_cwd should be an existing directory"
+
+        # Should be the first expanded root (alpha comes before beta alphabetically)
+        assert config.default_cwd == proj1
+      after
+        File.rm(config_path)
+        File.rm_rf!(base_dir)
+      end
+    end
+
     test "path validation checks against ALL roots" do
       # Create two separate root directories
       base_dir = Path.join(System.tmp_dir!(), "test_roots_#{:rand.uniform(10_000)}")
