@@ -89,6 +89,24 @@ defmodule TrumanShell.Support.SandboxTest do
     end
   end
 
+  describe "build_config/0" do
+    test "returns Config.Sandbox struct" do
+      config = Sandbox.build_config()
+      assert %SandboxConfig{} = config
+    end
+
+    test "struct has roots containing sandbox_root" do
+      config = Sandbox.build_config()
+      assert is_list(config.roots)
+      assert length(config.roots) == 1
+    end
+
+    test "struct has default_cwd matching first root by default" do
+      config = Sandbox.build_config()
+      assert config.default_cwd == hd(config.roots)
+    end
+  end
+
   describe "error_message/1" do
     test "outside_sandbox error converts to 'No such file or directory'" do
       message = Sandbox.error_message({:error, :outside_sandbox})

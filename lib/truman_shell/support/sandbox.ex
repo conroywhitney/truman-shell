@@ -48,10 +48,32 @@ defmodule TrumanShell.Support.Sandbox do
       true
 
   """
+  @deprecated "Use build_config/0 which returns %Config.Sandbox{} instead"
   @spec build_context() :: %{sandbox_root: String.t(), current_dir: String.t()}
   def build_context do
     root = sandbox_root()
     %{sandbox_root: root, current_dir: root}
+  end
+
+  @doc """
+  Builds a sandbox configuration struct.
+
+  Returns a `%Config.Sandbox{}` struct with `roots` and `default_cwd` fields.
+  This is the preferred way to get sandbox configuration for use with `validate_path/2`.
+
+  ## Examples
+
+      iex> config = TrumanShell.Support.Sandbox.build_config()
+      iex> %TrumanShell.Config.Sandbox{} = config
+      iex> is_list(config.roots)
+      true
+
+  """
+  @spec build_config() :: SandboxConfig.t()
+  def build_config do
+    root = sandbox_root()
+    # Use struct! directly since we know root is valid (no validation needed)
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 
   @doc """
