@@ -110,8 +110,9 @@ defmodule TrumanShell.DomePathTest do
       assert {:error, :outside_boundary} = result
     end
 
+    @tag :skip_on_linux
     test "rejects system symlink path (/etc on macOS)", %{sandbox: sandbox} do
-      # /etc is a symlink to /private/etc on macOS
+      # /etc is a symlink to /private/etc on macOS (but not on Linux)
       # We reject symlinks, so this returns :symlink (not :outside_boundary)
       result = DomePath.validate("/etc/passwd", sandbox)
       assert {:error, :symlink} = result
