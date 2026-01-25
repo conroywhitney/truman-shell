@@ -56,8 +56,8 @@ defmodule TrumanShell.Config.Sandbox do
     {:error, "sandbox must have at least one root"}
   end
 
-  def validate(%__MODULE__{roots: roots, default_cwd: cwd} = sandbox) do
-    if within_any_root?(cwd, roots) do
+  def validate(%__MODULE__{default_cwd: cwd} = sandbox) do
+    if path_allowed?(sandbox, cwd) do
       {:ok, sandbox}
     else
       {:error, "default_cwd must be within one of the roots"}
@@ -67,7 +67,8 @@ defmodule TrumanShell.Config.Sandbox do
   @doc """
   Checks if a path is within any of the sandbox roots.
 
-  Resolves symlinks before checking to prevent escape attacks.
+  Delegates to `DomePath.within?/2` for each root - pure string boundary check.
+  Symlink detection happens at the DomePath.validate level when accessing files.
 
   ## Examples
 
@@ -82,34 +83,6 @@ defmodule TrumanShell.Config.Sandbox do
   """
   @spec path_allowed?(t(), String.t()) :: boolean()
   def path_allowed?(%__MODULE__{roots: roots}, path) do
-    within_any_root?(path, roots)
-  end
-
-  # --- Private ---
-
-  defp within_any_root?(path, roots) do
-    resolved_path = resolve_real_path(path)
-
-    Enum.any?(roots, fn root ->
-      resolved_root = resolve_real_path(root)
-
-      String.starts_with?(resolved_path, resolved_root <> "/") or
-        resolved_path == resolved_root
-    end)
-  end
-
-  # Resolve symlinks to get real path
-  defp resolve_real_path(path) do
-    case File.read_link(path) do
-      {:ok, target} ->
-        if DomePath.type(target) == :absolute do
-          resolve_real_path(target)
-        else
-          path |> DomePath.dirname() |> DomePath.join(target) |> resolve_real_path()
-        end
-
-      {:error, _} ->
-        DomePath.expand(path)
-    end
+    Enum.any?(roots, &DomePath.within?(path, &1))
   end
 end

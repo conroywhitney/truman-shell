@@ -42,6 +42,7 @@ defmodule TrumanShell.Config do
   # expand_user_home/2 expands ~ to sandbox_root (agent's home).
   # For config loading, we expand ~ to the user's actual home.
 
+  alias TrumanShell.Config
   alias TrumanShell.DomePath
 
   @type t :: %__MODULE__{
@@ -277,6 +278,9 @@ defmodule TrumanShell.Config do
   end
 
   defp validate_default_cwd(default_cwd, roots) do
+    # Build a temporary sandbox to check if cwd is within roots
+    sandbox = %Config.Sandbox{roots: roots, default_cwd: default_cwd}
+
     cond do
       not File.exists?(default_cwd) ->
         {:error, "default_cwd does not exist: #{default_cwd}"}
@@ -284,7 +288,7 @@ defmodule TrumanShell.Config do
       not File.dir?(default_cwd) ->
         {:error, "default_cwd is not a directory: #{default_cwd}"}
 
-      not within_any_root?(default_cwd, roots) ->
+      not Config.Sandbox.path_allowed?(sandbox, default_cwd) ->
         {:error, "default_cwd must be within one of the roots: #{default_cwd}"}
 
       true ->
@@ -292,34 +296,8 @@ defmodule TrumanShell.Config do
     end
   end
 
-  defp within_any_root?(path, roots) do
-    resolved_path = resolve_real_path(path)
-
-    Enum.any?(roots, fn root ->
-      resolved_root = resolve_real_path(root)
-      String.starts_with?(resolved_path, resolved_root <> "/") or resolved_path == resolved_root
-    end)
-  end
-
   # Expand ~ to user's home directory (for config paths, not agent paths)
   defp expand_user_home("~"), do: System.user_home!()
   defp expand_user_home("~/" <> rest), do: DomePath.join(System.user_home!(), rest)
   defp expand_user_home(path), do: path
-
-  # Resolve symlinks to get real path
-  defp resolve_real_path(path) do
-    case File.read_link(path) do
-      {:ok, target} ->
-        # Symlink - resolve it
-        if DomePath.type(target) == :absolute do
-          resolve_real_path(target)
-        else
-          path |> DomePath.dirname() |> DomePath.join(target) |> resolve_real_path()
-        end
-
-      {:error, _} ->
-        # Not a symlink, just expand
-        DomePath.expand(path)
-    end
-  end
 end
