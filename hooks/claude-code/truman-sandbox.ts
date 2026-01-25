@@ -19,7 +19,8 @@
  */
 
 import * as readline from "readline";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
+import { accessSync, existsSync, constants } from "fs";
 
 // --- Interfaces ---
 
@@ -49,14 +50,34 @@ if (!TRUMAN_SHELL_PATH) {
   process.exit(2); // exit 2 = blocking error shown to Claude
 }
 
+try {
+  accessSync(TRUMAN_SHELL_PATH, constants.X_OK);
+} catch {
+  console.error(
+    `[TrumanShell] TRUMAN_SHELL_PATH not found or not executable: ${TRUMAN_SHELL_PATH}`
+  );
+  process.exit(2);
+}
+
+const explicitDome = process.env.TRUMAN_DOME;
+if (explicitDome && !existsSync(explicitDome)) {
+  console.error(
+    `[TrumanShell] TRUMAN_DOME directory does not exist: ${explicitDome}`
+  );
+  process.exit(2);
+}
+
 // --- Tool Handlers ---
 
 type ToolHandler = (input: PreToolUseInput) => HookOutput;
 
 function handleBash(input: PreToolUseInput): HookOutput {
-  const command = input.tool_input.command as string | undefined;
+  const command = input.tool_input.command;
   if (!command) {
     return allow();
+  }
+  if (typeof command !== "string") {
+    return deny("Expected string for command");
   }
 
   const dome = getDome(input.cwd);
@@ -76,9 +97,12 @@ function handleBash(input: PreToolUseInput): HookOutput {
 
 function makeFileToolHandler(pathField: string): ToolHandler {
   return (input: PreToolUseInput): HookOutput => {
-    const filePath = input.tool_input[pathField] as string | undefined;
+    const filePath = input.tool_input[pathField];
     if (!filePath) {
       return allow();
+    }
+    if (typeof filePath !== "string") {
+      return deny(`Expected string for ${pathField}, got ${typeof filePath}`);
     }
 
     const resolved = validatePath(filePath, input.cwd);
@@ -100,10 +124,17 @@ function makeFileToolHandler(pathField: string): ToolHandler {
 
 function makeSearchToolHandler(pathField: string): ToolHandler {
   return (input: PreToolUseInput): HookOutput => {
-    const searchPath = input.tool_input[pathField] as string | undefined;
+    const searchPath = input.tool_input[pathField];
     if (!searchPath) {
-      // No path = search cwd (should be inside dome already)
+      // No path = search cwd — validate cwd is inside sandbox
+      const cwdResolved = validatePath(".", input.cwd);
+      if (cwdResolved === null) {
+        return deny("Working directory is outside sandbox");
+      }
       return allow();
+    }
+    if (typeof searchPath !== "string") {
+      return deny(`Expected string for ${pathField}, got ${typeof searchPath}`);
     }
 
     const resolved = validatePath(searchPath, input.cwd);
@@ -138,18 +169,24 @@ function validatePath(path: string, cwd: string): string | null {
   const dome = getDome(cwd);
 
   try {
-    const result = execSync(
-      `TRUMAN_DOME=${shellEscape(dome)} ${shellEscape(TRUMAN_SHELL_PATH!)} validate-path ${shellEscape(path)} ${shellEscape(cwd)}`,
+    const result = execFileSync(
+      TRUMAN_SHELL_PATH!,
+      ["validate-path", path, cwd],
       {
         encoding: "utf-8",
         timeout: 5000,
         stdio: ["pipe", "pipe", "pipe"],
+        env: { ...process.env, TRUMAN_DOME: dome },
       }
     );
     // Exit 0 + stdout = resolved path
     return result.trim() || null;
-  } catch {
+  } catch (err) {
     // Exit 1 = outside sandbox (or error)
+    console.error(
+      "[TrumanShell] validatePath failed:",
+      err instanceof Error ? err.message : err
+    );
     return null;
   }
 }

@@ -39,83 +39,14 @@ usage() {
   echo "  TRUMAN_DOME=/tmp truman-shell validate-path './test.txt'"
 }
 
+# Delegate all subcommands to TrumanShell.CLI.main/1
+# This ensures the fallback path exercises the same code as the escript.
+# Arguments after -- are passed to System.argv().
+
 case "${1:-}" in
-  execute)
-    shift
-    if [ -z "${1:-}" ]; then
-      echo "Error: No command provided" >&2
-      echo "Usage: truman-shell execute <shell-command>" >&2
-      exit 1
-    fi
-
-    # Pass command via environment variable for safety
-    # (avoids any potential shell/Elixir string interpolation issues)
-    export TRUMAN_CMD="$1"
-
+  execute|validate-path|version)
     cd "$SCRIPT_DIR"
-
-    # Run through Mix to ensure deps are loaded
-    elixir -S mix run --no-start -e '
-      Application.ensure_all_started(:truman_shell)
-
-      cmd = System.get_env("TRUMAN_CMD") || ""
-
-      case TrumanShell.execute(cmd) do
-        {:ok, output} ->
-          IO.write(output)
-          System.halt(0)
-        {:error, reason} ->
-          IO.puts(:stderr, "Error: #{reason}")
-          System.halt(1)
-      end
-    '
-    ;;
-
-  validate-path)
-    shift
-    if [ -z "${1:-}" ]; then
-      echo "Error: No path provided" >&2
-      echo "Usage: truman-shell validate-path <path> [<current_dir>]" >&2
-      exit 1
-    fi
-
-    # Pass path via environment variable for safety
-    export TRUMAN_VALIDATE_PATH="$1"
-    export TRUMAN_CURRENT_DIR="${2:-}"
-
-    cd "$SCRIPT_DIR"
-
-    elixir -S mix run --no-start -e '
-      alias TrumanShell.Support.Sandbox
-
-      path = System.get_env("TRUMAN_VALIDATE_PATH") || ""
-      current_dir = case System.get_env("TRUMAN_CURRENT_DIR") do
-        nil -> nil
-        "" -> nil
-        dir -> dir
-      end
-
-      sandbox_root = Sandbox.sandbox_root()
-
-      case Sandbox.validate_path(path, sandbox_root, current_dir) do
-        {:ok, resolved} ->
-          IO.write(resolved)
-          System.halt(0)
-        {:error, :eloop} ->
-          IO.puts(:stderr, "Too many levels of symbolic links")
-          System.halt(1)
-        {:error, _} ->
-          System.halt(1)
-      end
-    '
-    ;;
-
-  version)
-    cd "$SCRIPT_DIR"
-    elixir -S mix run --no-start -e "
-      {:ok, vsn} = :application.get_key(:truman_shell, :vsn)
-      IO.puts(List.to_string(vsn))
-    "
+    elixir -S mix run --no-start -e 'TrumanShell.CLI.main(System.argv())' -- "$@"
     ;;
 
   -h|--help|help)

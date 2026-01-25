@@ -87,7 +87,7 @@ defmodule TrumanShell.CLI do
 
     case Sandbox.validate_path(path, sandbox_root, current_dir) do
       {:ok, resolved_path} ->
-        IO.write(resolved_path)
+        IO.puts(resolved_path)
         System.halt(0)
 
       {:error, :eloop} ->
