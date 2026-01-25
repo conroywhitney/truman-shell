@@ -306,20 +306,135 @@ defmodule TrumanShell.ConfigTest do
   describe "config file discovery" do
     @describetag :discovery
 
-    @tag :skip
     test "finds agents.yaml in current directory" do
+      # Create agents.yaml in cwd temporarily
+      cwd = File.cwd!()
+      config_file = Path.join(cwd, "agents.yaml")
+
+      # Skip if agents.yaml already exists (don't overwrite user config)
+      if File.exists?(config_file) do
+        flunk("agents.yaml already exists in cwd - can't test discovery")
+      end
+
+      config_content = """
+      version: "0.1"
+      sandbox:
+        roots:
+          - "#{cwd}"
+        default_cwd: "#{cwd}"
+      """
+
+      File.write!(config_file, config_content)
+
+      try do
+        assert {:ok, config} = Config.discover()
+        assert config.version == "0.1"
+        assert cwd in config.roots
+      after
+        File.rm!(config_file)
+      end
     end
 
-    @tag :skip
     test "finds .agents.yaml (hidden variant)" do
+      cwd = File.cwd!()
+      config_file = Path.join(cwd, ".agents.yaml")
+      visible_config = Path.join(cwd, "agents.yaml")
+
+      # Skip if either config already exists
+      if File.exists?(config_file) or File.exists?(visible_config) do
+        flunk("agents.yaml or .agents.yaml already exists - can't test discovery")
+      end
+
+      config_content = """
+      version: "0.1"
+      sandbox:
+        roots:
+          - "#{cwd}"
+        default_cwd: "#{cwd}"
+      """
+
+      File.write!(config_file, config_content)
+
+      try do
+        assert {:ok, config} = Config.discover()
+        assert config.version == "0.1"
+      after
+        File.rm!(config_file)
+      end
     end
 
-    @tag :skip
     test "prefers agents.yaml over .agents.yaml" do
+      cwd = File.cwd!()
+      visible_config = Path.join(cwd, "agents.yaml")
+      hidden_config = Path.join(cwd, ".agents.yaml")
+
+      if File.exists?(visible_config) or File.exists?(hidden_config) do
+        flunk("config files already exist - can't test preference")
+      end
+
+      # Create both with different versions to distinguish them
+      File.write!(visible_config, """
+      version: "visible"
+      sandbox:
+        roots:
+          - "#{cwd}"
+        default_cwd: "#{cwd}"
+      """)
+
+      File.write!(hidden_config, """
+      version: "hidden"
+      sandbox:
+        roots:
+          - "#{cwd}"
+        default_cwd: "#{cwd}"
+      """)
+
+      try do
+        assert {:ok, config} = Config.discover()
+        # agents.yaml (visible) should be preferred over .agents.yaml
+        assert config.version == "visible"
+      after
+        File.rm!(visible_config)
+        File.rm!(hidden_config)
+      end
     end
 
-    @tag :skip
     test "falls back to ~/.config/truman/agents.yaml" do
+      cwd = File.cwd!()
+      visible_config = Path.join(cwd, "agents.yaml")
+      hidden_config = Path.join(cwd, ".agents.yaml")
+      fallback_dir = Path.expand("~/.config/truman")
+      fallback_config = Path.join(fallback_dir, "agents.yaml")
+
+      if File.exists?(visible_config) or File.exists?(hidden_config) do
+        flunk("config files already exist in cwd - can't test fallback")
+      end
+
+      # Track if we need to restore original fallback
+      original_existed = File.exists?(fallback_config)
+      original_content = if original_existed, do: File.read!(fallback_config)
+
+      # Create fallback directory and config
+      File.mkdir_p!(fallback_dir)
+
+      File.write!(fallback_config, """
+      version: "fallback"
+      sandbox:
+        roots:
+          - "#{cwd}"
+        default_cwd: "#{cwd}"
+      """)
+
+      try do
+        assert {:ok, config} = Config.discover()
+        assert config.version == "fallback"
+      after
+        if original_existed do
+          File.write!(fallback_config, original_content)
+        else
+          File.rm!(fallback_config)
+        end
+      end
     end
 
     test "returns sensible defaults when no config found" do
