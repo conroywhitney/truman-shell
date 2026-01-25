@@ -575,4 +575,76 @@ defmodule TrumanShell.Support.GlobTest do
              "at_limit.md not found - depth limit too strict!"
     end
   end
+
+  describe "expand/2 current_dir validation (defense-in-depth)" do
+    # These tests verify that Glob.expand validates current_dir before use,
+    # preventing Path.wildcard from resolving against the wrong directory.
+    # In normal operation, current_dir is always validated by the cd command,
+    # but this provides defense-in-depth against programming errors.
+
+    test "rejects glob when current_dir is relative", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create a file so we know matching would work with valid context
+      File.write!(Path.join(current_dir, "test.md"), "content")
+
+      # Pass relative current_dir - should fail validation and return pattern
+      bad_context = %{sandbox_root: sandbox, current_dir: "."}
+      result = Glob.expand("*.md", bad_context)
+
+      # Should return original pattern (failed current_dir validation)
+      assert result == "*.md"
+    end
+
+    test "rejects glob when current_dir is outside sandbox", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create a file so we know matching would work with valid context
+      File.write!(Path.join(current_dir, "test.md"), "content")
+
+      # Pass current_dir outside sandbox - should fail validation
+      bad_context = %{sandbox_root: sandbox, current_dir: "/tmp"}
+      result = Glob.expand("*.md", bad_context)
+
+      # Should return original pattern (failed current_dir validation)
+      assert result == "*.md"
+    end
+
+    test "rejects glob when current_dir contains symlink", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create a symlink directory
+      real_dir = Path.join(current_dir, "real")
+      File.mkdir_p!(real_dir)
+      File.write!(Path.join(real_dir, "test.md"), "content")
+
+      link_dir = Path.join(current_dir, "link")
+      File.ln_s!(real_dir, link_dir)
+
+      # Pass symlinked current_dir - should fail validation
+      bad_context = %{sandbox_root: sandbox, current_dir: link_dir}
+      result = Glob.expand("*.md", bad_context)
+
+      # Should return original pattern (symlink in current_dir)
+      assert result == "*.md"
+    end
+
+    test "accepts glob with valid absolute current_dir", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create a file
+      File.write!(Path.join(current_dir, "valid.md"), "content")
+
+      # Valid context - should work normally
+      good_context = %{sandbox_root: sandbox, current_dir: current_dir}
+      result = Glob.expand("*.md", good_context)
+
+      assert is_list(result)
+      assert "valid.md" in result
+    end
+  end
 end

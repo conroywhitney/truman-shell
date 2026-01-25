@@ -47,6 +47,28 @@ defmodule TrumanShell.Support.Glob do
   """
   @spec expand(String.t(), map()) :: [String.t()] | String.t()
   def expand(pattern, context) do
+    # Defense-in-depth: validate current_dir is absolute and inside sandbox
+    # This prevents Path.wildcard from resolving relative patterns against process cwd
+    # (In normal operation, current_dir is always validated by cd command)
+    with :ok <- validate_current_dir_is_absolute(context.current_dir),
+         {:ok, validated_current_dir} <- Sandbox.validate_path(context.current_dir, context.sandbox_root) do
+      do_expand_with_context(pattern, %{context | current_dir: validated_current_dir})
+    else
+      _ ->
+        # Invalid current_dir - fail safe by returning original pattern
+        pattern
+    end
+  end
+
+  defp validate_current_dir_is_absolute(current_dir) do
+    if DomePath.type(current_dir) == :absolute do
+      :ok
+    else
+      {:error, :relative_current_dir}
+    end
+  end
+
+  defp do_expand_with_context(pattern, context) do
     is_absolute = String.starts_with?(pattern, "/")
     full_pattern = resolve_pattern(pattern, is_absolute, context.current_dir)
     base_dir = glob_base_dir(full_pattern)
