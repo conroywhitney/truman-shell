@@ -491,4 +491,89 @@ defmodule TrumanShell.Support.GlobTest do
                (is_list(result) and Enum.empty?(result))
     end
   end
+
+  describe "expand/2 root wildcard patterns (edge cases)" do
+    # These tests verify that absolute patterns with wildcards at the root level
+    # are rejected BEFORE calling Path.wildcard, preventing filesystem enumeration
+    # outside the sandbox. The glob_base_dir/1 function correctly extracts "/"
+    # as the base, which fails the in_sandbox? check.
+
+    test "rejects /* pattern (wildcard immediately after root)", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Base would be "/" which is outside any sandbox
+      assert Glob.expand("/*", context) == "/*"
+    end
+
+    test "rejects /**/* pattern (recursive from root)", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Base would be "/" - rejected before enumeration
+      assert Glob.expand("/**/*", context) == "/**/*"
+    end
+
+    test "rejects /*/*.conf pattern (nested wildcard from root)", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Base would be "/" - rejected before enumeration
+      assert Glob.expand("/*/*.conf", context) == "/*/*.conf"
+    end
+  end
+
+  describe "expand/2 depth limit enforcement" do
+    # The depth limit (100 levels) prevents DoS via deeply nested glob patterns.
+    # This test verifies files beyond the limit are actually filtered out.
+
+    test "filters out matches beyond max depth (100 levels)", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Build 101 directories deep
+      deep_dirs = Enum.map(1..101, fn i -> "d#{i}" end)
+      deep_path = Path.join([current_dir | deep_dirs])
+      File.mkdir_p!(deep_path)
+      File.write!(Path.join(deep_path, "too_deep.md"), "should not appear")
+
+      # File at root level (depth 0)
+      File.write!(Path.join(current_dir, "ok.md"), "ok")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+      result = Glob.expand("**/*.md", context)
+
+      assert is_list(result)
+      assert "ok.md" in result
+      # The file 101 levels deep should be filtered out
+      refute Enum.any?(result, &String.contains?(&1, "too_deep.md")),
+             "Found too_deep.md - depth limit not enforced!"
+    end
+
+    test "includes matches at exactly max depth (100 levels)", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Depth is counted as: number of path components from base_dir
+      # So 99 directories + 1 filename = depth 100
+      deep_dirs = Enum.map(1..99, fn i -> "d#{i}" end)
+      deep_path = Path.join([current_dir | deep_dirs])
+      File.mkdir_p!(deep_path)
+      File.write!(Path.join(deep_path, "at_limit.md"), "should appear")
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+      result = Glob.expand("**/*.md", context)
+
+      assert is_list(result)
+      # File at exactly depth 100 (99 dirs + filename) should be included
+      assert Enum.any?(result, &String.contains?(&1, "at_limit.md")),
+             "at_limit.md not found - depth limit too strict!"
+    end
+  end
 end
