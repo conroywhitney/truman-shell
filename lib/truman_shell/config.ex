@@ -236,10 +236,11 @@ defmodule TrumanShell.Config do
     expanded = expand_user_home(root)
 
     if String.contains?(expanded, "*") do
-      # Glob expansion
+      # Glob expansion - ensure results are absolute paths
       expanded
       |> DomePath.wildcard()
       |> Enum.filter(&File.dir?/1)
+      |> Enum.map(&DomePath.expand/1)
     else
       [DomePath.expand(expanded)]
     end

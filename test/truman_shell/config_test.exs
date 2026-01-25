@@ -157,6 +157,49 @@ defmodule TrumanShell.ConfigTest do
       end
     end
 
+    test "relative glob roots expand to absolute paths" do
+      # This is P1: relative globs like "./*" should return absolute paths
+      # Create test directories in current directory
+      cwd = File.cwd!()
+      test_id = :rand.uniform(10_000)
+      rel_base = "test_rel_glob_#{test_id}"
+      base_dir = Path.join(cwd, rel_base)
+      proj1 = Path.join(base_dir, "proj1")
+      proj2 = Path.join(base_dir, "proj2")
+      File.mkdir_p!(proj1)
+      File.mkdir_p!(proj2)
+
+      # Use a TRULY RELATIVE glob pattern (starting with ./)
+      # This is the pattern that causes issues
+      config_content = """
+      version: "0.1"
+      sandbox:
+        roots:
+          - "./#{rel_base}/*"
+        default_cwd: "#{proj1}"
+      """
+
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{test_id}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:ok, config} = Config.load(config_path)
+
+        # ALL roots must be absolute paths (this catches the bug!)
+        for root <- config.roots do
+          assert Path.type(root) == :absolute,
+                 "Root #{root} should be absolute, not relative (started with ./)"
+        end
+
+        # Should contain our test dirs as absolute paths
+        assert proj1 in config.roots
+        assert proj2 in config.roots
+      after
+        File.rm(config_path)
+        File.rm_rf!(base_dir)
+      end
+    end
+
     test "path validation checks against ALL roots" do
       # Create two separate root directories
       base_dir = Path.join(System.tmp_dir!(), "test_roots_#{:rand.uniform(10_000)}")
