@@ -136,6 +136,56 @@ defmodule TrumanShell.Config.SandboxTest do
     end
   end
 
+  describe "path_allowed?/2 - relative paths" do
+    setup do
+      # default_cwd is a subdirectory of root
+      {:ok, sandbox} = Sandbox.new(["/project"], "/project/src")
+      %{sandbox: sandbox}
+    end
+
+    test "relative path expands against default_cwd, not process cwd", %{sandbox: sandbox} do
+      # "file.ex" relative to default_cwd "/project/src" -> "/project/src/file.ex"
+      # This should be allowed (within /project)
+      assert Sandbox.path_allowed?(sandbox, "file.ex")
+    end
+
+    test "relative path with subdir expands against default_cwd", %{sandbox: sandbox} do
+      # "lib/foo.ex" relative to default_cwd "/project/src" -> "/project/src/lib/foo.ex"
+      assert Sandbox.path_allowed?(sandbox, "lib/foo.ex")
+    end
+
+    test "relative .. that stays in sandbox is allowed", %{sandbox: sandbox} do
+      # "../README.md" relative to default_cwd "/project/src" -> "/project/README.md"
+      assert Sandbox.path_allowed?(sandbox, "../README.md")
+    end
+
+    test "relative .. that escapes sandbox is rejected", %{sandbox: sandbox} do
+      # "../../etc/passwd" relative to default_cwd "/project/src" -> "/etc/passwd"
+      refute Sandbox.path_allowed?(sandbox, "../../etc/passwd")
+    end
+  end
+
+  describe "new/2 - path canonicalization" do
+    test "canonicalizes roots with .. segments" do
+      # Root with .. should be canonicalized
+      {:ok, sandbox} = Sandbox.new(["/project/../project"], "/project")
+      # The stored root should be canonical
+      assert sandbox.roots == ["/project"]
+    end
+
+    test "canonicalizes default_cwd with .. segments" do
+      {:ok, sandbox} = Sandbox.new(["/project"], "/project/src/../lib")
+      # The stored default_cwd should be canonical
+      assert sandbox.default_cwd == "/project/lib"
+    end
+
+    test "canonicalizes multiple roots" do
+      {:ok, sandbox} = Sandbox.new(["/a/../b", "/c/d/../e"], "/b")
+      assert "/b" in sandbox.roots
+      assert "/c/e" in sandbox.roots
+    end
+  end
+
   describe "validate/1" do
     test "returns ok for valid sandbox" do
       sandbox = %Sandbox{roots: ["/project"], default_cwd: "/project"}
