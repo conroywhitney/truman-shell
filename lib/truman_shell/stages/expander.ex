@@ -22,6 +22,7 @@ defmodule TrumanShell.Stages.Expander do
   """
 
   alias TrumanShell.Command
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.Support.Glob
   alias TrumanShell.Support.Tilde
@@ -57,7 +58,19 @@ defmodule TrumanShell.Stages.Expander do
       %Command{name: "echo", args: ["hi"], redirects: [{:stdout, "/sandbox/out.txt"}], pipes: []}
 
   """
-  @spec expand(Command.t(), SandboxConfig.t() | map()) :: Command.t()
+  @spec expand(Command.t(), Context.t() | SandboxConfig.t() | map()) :: Command.t()
+  def expand(%Command{args: args, redirects: redirects, pipes: pipes} = command, %Context{} = ctx) do
+    # Use home_path for tilde expansion, current_path for glob expansion
+    home = ctx.sandbox_config.home_path
+    glob_config = %{ctx.sandbox_config | home_path: ctx.current_path}
+
+    expanded_args = Enum.flat_map(args, &expand_arg_with_context(&1, home, glob_config))
+    expanded_redirects = Enum.map(redirects, &expand_redirect_with_home(&1, home))
+    expanded_pipes = Enum.map(pipes, &expand(&1, ctx))
+
+    %{command | args: expanded_args, redirects: expanded_redirects, pipes: expanded_pipes}
+  end
+
   def expand(%Command{args: args, redirects: redirects, pipes: pipes} = command, %SandboxConfig{} = config) do
     expanded_args = Enum.flat_map(args, &expand_arg(&1, config))
     expanded_redirects = Enum.map(redirects, &expand_redirect(&1, config))
@@ -71,6 +84,24 @@ defmodule TrumanShell.Stages.Expander do
     current_dir = Map.get(context, :current_dir, sandbox_root)
     config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: current_dir}
     expand(command, config)
+  end
+
+  # Context-based expansion: separate home (for tilde) from glob_config (for globs)
+  defp expand_arg_with_context({:glob, pattern}, home, glob_config) do
+    expanded = Tilde.expand(pattern, home)
+
+    case Glob.expand(expanded, glob_config) do
+      files when is_list(files) -> files
+      pattern when is_binary(pattern) -> [pattern]
+    end
+  end
+
+  defp expand_arg_with_context(arg, home, _glob_config) when is_binary(arg) do
+    [Tilde.expand(arg, home)]
+  end
+
+  defp expand_redirect_with_home({type, path}, home) when is_binary(path) do
+    {type, Tilde.expand(path, home)}
   end
 
   # Expand a {:glob, pattern} argument - tilde expansion then glob expansion

@@ -282,4 +282,58 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert hd(result.pipes).args == ["pattern"]
     end
   end
+
+  describe "expand/2 with Context struct" do
+    alias TrumanShell.Commands.Context
+    alias TrumanShell.Config.Sandbox, as: SandboxConfig
+
+    setup do
+      # Create a unique temp directory for filesystem tests
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "expander_ctx_#{:erlang.unique_integer([:positive])}")
+      File.mkdir_p!(tmp_dir)
+      subdir = Path.join(tmp_dir, "subdir")
+      File.mkdir_p!(subdir)
+
+      on_exit(fn ->
+        File.rm_rf!(tmp_dir)
+      end)
+
+      {:ok, sandbox_root: tmp_dir, subdir: subdir}
+    end
+
+    test "glob expands relative to current_path, not home_path", %{sandbox_root: sandbox, subdir: subdir} do
+      # Create files in subdir only
+      File.write!(Path.join(subdir, "found.txt"), "in subdir")
+
+      # Create file in sandbox root (should NOT match since we're in subdir)
+      File.write!(Path.join(sandbox, "root.txt"), "at root")
+
+      # Simulate: cd subdir && ls *.txt
+      # current_path = subdir (where we cd'd to)
+      # home_path = sandbox (static, for ~ expansion)
+      config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+
+      command = Command.new(:cmd_ls, [{:glob, "*.txt"}])
+      result = Expander.expand(command, ctx)
+
+      # Should find subdir/found.txt, NOT sandbox/root.txt
+      assert result.args == ["found.txt"]
+    end
+
+    test "tilde still expands to home_path when current_path differs", %{sandbox_root: sandbox, subdir: subdir} do
+      # Create file at sandbox root
+      File.write!(Path.join(sandbox, "home.txt"), "at home")
+
+      # Simulate: cd subdir && cat ~/home.txt
+      config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+
+      command = Command.new(:cmd_cat, ["~/home.txt"])
+      result = Expander.expand(command, ctx)
+
+      # Tilde should expand to home_path (sandbox), not current_path (subdir)
+      assert result.args == ["#{sandbox}/home.txt"]
+    end
+  end
 end
