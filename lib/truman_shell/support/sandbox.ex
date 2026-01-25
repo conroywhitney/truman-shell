@@ -29,6 +29,7 @@ defmodule TrumanShell.Support.Sandbox do
   OS-level isolation (containers, chroot, namespaces) in addition to this module.
   """
 
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
 
   @env_var "TRUMAN_DOME"
@@ -131,11 +132,27 @@ defmodule TrumanShell.Support.Sandbox do
       "/sandbox/lib/foo.ex"
 
   """
-  @spec validate_path(String.t(), String.t(), String.t() | nil) ::
+  @spec validate_path(String.t(), String.t() | SandboxConfig.t(), String.t() | nil) ::
           {:ok, String.t()} | {:error, :outside_sandbox}
   def validate_path(path, sandbox_root, current_dir \\ nil)
 
-  def validate_path(path, sandbox_root, current_dir) do
+  def validate_path(path, %SandboxConfig{} = config, _current_dir) do
+    # Try each root until one validates, or return error if none work
+    %SandboxConfig{roots: roots, default_cwd: default_cwd} = config
+
+    Enum.reduce_while(roots, {:error, :outside_sandbox}, fn root, _acc ->
+      case do_validate_path(path, root, default_cwd) do
+        {:ok, validated_path} -> {:halt, {:ok, validated_path}}
+        {:error, _} -> {:cont, {:error, :outside_sandbox}}
+      end
+    end)
+  end
+
+  def validate_path(path, sandbox_root, current_dir) when is_binary(sandbox_root) do
+    do_validate_path(path, sandbox_root, current_dir)
+  end
+
+  defp do_validate_path(path, sandbox_root, current_dir) do
     # Delegate to DomePath.validate which enforces:
     # - No $VAR references
     # - No symlinks (symlinks denied, period)

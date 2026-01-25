@@ -2,6 +2,7 @@ defmodule TrumanShell.Support.SandboxTest do
   # async: false because sandbox_root/0 tests mutate TRUMAN_DOME env var
   use ExUnit.Case, async: false
 
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.Support.Sandbox
 
   # Save and restore TRUMAN_DOME around tests that mutate it
@@ -419,6 +420,31 @@ defmodule TrumanShell.Support.SandboxTest do
 
       # Should be rejected - embedded $VAR in current_dir is not allowed
       assert {:error, :outside_sandbox} = result
+    end
+  end
+
+  describe "validate_path/2 with Config.Sandbox struct" do
+    setup do
+      # Use project tmp/ to avoid symlinks (macOS /var -> /private/var)
+      tmp_dir = Path.join(File.cwd!(), "tmp")
+      sandbox = Path.join(tmp_dir, "test_sandbox_#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox)
+      File.mkdir_p!(Path.join(sandbox, "lib"))
+      File.write!(Path.join(sandbox, "lib/foo.ex"), "# test file")
+
+      on_exit(fn -> File.rm_rf!(sandbox) end)
+
+      %{sandbox: sandbox}
+    end
+
+    test "validates path within sandbox using Config.Sandbox struct", %{sandbox: sandbox} do
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      relative_path = "lib/foo.ex"
+
+      result = Sandbox.validate_path(relative_path, config)
+
+      assert {:ok, resolved} = result
+      assert String.ends_with?(resolved, "/lib/foo.ex")
     end
   end
 end
