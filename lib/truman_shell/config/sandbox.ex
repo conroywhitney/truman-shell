@@ -97,8 +97,12 @@ defmodule TrumanShell.Config.Sandbox do
 
   """
   @spec path_allowed?(t(), String.t()) :: boolean()
-  def path_allowed?(%__MODULE__{allowed_paths: allowed_paths}, path) do
+  def path_allowed?(%__MODULE__{allowed_paths: allowed_paths}, "/" <> _ = path) do
     canonical_path = DomePath.expand(path)
     Enum.any?(allowed_paths, &DomePath.within?(canonical_path, &1))
+  end
+
+  def path_allowed?(%__MODULE__{}, path) when is_binary(path) do
+    raise ArgumentError, "path must be absolute, got: #{inspect(path)}"
   end
 end

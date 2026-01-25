@@ -145,6 +145,26 @@ defmodule TrumanShell.Config.SandboxTest do
       %{sandbox: sandbox}
     end
 
+    test "raises ArgumentError for relative path", %{sandbox: sandbox} do
+      # Relative paths must be expanded by caller BEFORE calling path_allowed?
+      # Silently accepting them would expand against CWD which may be outside sandbox
+      assert_raise ArgumentError, ~r/path must be absolute/, fn ->
+        Sandbox.path_allowed?(sandbox, "file.ex")
+      end
+    end
+
+    test "raises ArgumentError for dot-relative path", %{sandbox: sandbox} do
+      assert_raise ArgumentError, ~r/path must be absolute/, fn ->
+        Sandbox.path_allowed?(sandbox, "./file.ex")
+      end
+    end
+
+    test "raises ArgumentError for parent-relative path", %{sandbox: sandbox} do
+      assert_raise ArgumentError, ~r/path must be absolute/, fn ->
+        Sandbox.path_allowed?(sandbox, "../etc/passwd")
+      end
+    end
+
     test "absolute path in sandbox is allowed", %{sandbox: sandbox} do
       # Caller expanded "file.ex" against home_path "/project/src"
       assert Sandbox.path_allowed?(sandbox, "/project/src/file.ex")
