@@ -35,27 +35,6 @@ defmodule TrumanShell.Support.Sandbox do
   @env_var "TRUMAN_DOME"
 
   @doc """
-  Builds the execution context with sandbox boundaries.
-
-  Returns a map with `:sandbox_root` and `:current_dir` keys.
-
-  ## Examples
-
-      iex> context = TrumanShell.Support.Sandbox.build_context()
-      iex> Map.has_key?(context, :sandbox_root)
-      true
-      iex> Map.has_key?(context, :current_dir)
-      true
-
-  """
-  @deprecated "Use build_config/0 which returns %Config.Sandbox{} instead"
-  @spec build_context() :: %{sandbox_root: String.t(), current_dir: String.t()}
-  def build_context do
-    root = sandbox_root()
-    %{sandbox_root: root, current_dir: root}
-  end
-
-  @doc """
   Builds a sandbox configuration struct.
 
   Returns a `%Config.Sandbox{}` struct with `roots` and `default_cwd` fields.
@@ -148,11 +127,6 @@ defmodule TrumanShell.Support.Sandbox do
       iex> path
       "/sandbox/file"
 
-      # With current_dir context
-      iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("lib/foo.ex", "/sandbox", "/sandbox")
-      iex> path
-      "/sandbox/lib/foo.ex"
-
   """
   @spec validate_path(String.t(), SandboxConfig.t() | String.t()) ::
           {:ok, String.t()} | {:error, :outside_sandbox}
@@ -170,13 +144,6 @@ defmodule TrumanShell.Support.Sandbox do
 
   def validate_path(path, sandbox_root) when is_binary(sandbox_root) do
     do_validate_path(path, sandbox_root, nil)
-  end
-
-  @deprecated "Use validate_path/2 with %Config.Sandbox{} instead"
-  @spec validate_path(String.t(), String.t(), String.t() | nil) ::
-          {:ok, String.t()} | {:error, :outside_sandbox}
-  def validate_path(path, sandbox_root, current_dir) when is_binary(sandbox_root) do
-    do_validate_path(path, sandbox_root, current_dir)
   end
 
   defp do_validate_path(path, sandbox_root, current_dir) do

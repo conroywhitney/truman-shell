@@ -76,18 +76,8 @@ defmodule TrumanShell.Support.SandboxTest do
     # This allows testing with mock paths while production should use real dirs
   end
 
-  describe "build_context/0" do
-    test "returns context map with sandbox_root key" do
-      context = Sandbox.build_context()
-      assert Map.has_key?(context, :sandbox_root)
-      assert Map.has_key?(context, :current_dir)
-    end
-
-    test "context includes current_dir matching sandbox_root by default" do
-      context = Sandbox.build_context()
-      assert context.current_dir == context.sandbox_root
-    end
-  end
+  # build_context/0 tests removed - deprecated function removed in Phase 3
+  # Use build_config/0 instead which returns %Config.Sandbox{}
 
   describe "build_config/0" do
     test "returns Config.Sandbox struct" do
@@ -250,7 +240,7 @@ defmodule TrumanShell.Support.SandboxTest do
     end
   end
 
-  describe "validate_path/3 with current_dir" do
+  describe "validate_path/2 with current_dir via Config.Sandbox" do
     setup do
       # Use project tmp/ to avoid symlinks (macOS /var -> /private/var)
       tmp_dir = Path.join(File.cwd!(), "tmp")
@@ -266,9 +256,9 @@ defmodule TrumanShell.Support.SandboxTest do
 
     test "resolves relative path within sandbox", %{sandbox: sandbox} do
       relative_path = "lib/foo.ex"
-      current_dir = sandbox
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
 
-      result = Sandbox.validate_path(relative_path, sandbox, current_dir)
+      result = Sandbox.validate_path(relative_path, config)
 
       # Returns resolved path - check it ends with expected suffix
       assert {:ok, resolved} = result
@@ -277,9 +267,9 @@ defmodule TrumanShell.Support.SandboxTest do
 
     test "rejects relative path that escapes via traversal", %{sandbox: sandbox} do
       relative_path = "../../../etc/passwd"
-      current_dir = sandbox
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
 
-      result = Sandbox.validate_path(relative_path, sandbox, current_dir)
+      result = Sandbox.validate_path(relative_path, config)
 
       assert {:error, :outside_sandbox} = result
     end
@@ -389,24 +379,24 @@ defmodule TrumanShell.Support.SandboxTest do
       assert {:error, :outside_sandbox} = result
     end
 
-    test "rejects current_dir outside sandbox", %{sandbox: sandbox} do
-      # SECURITY: If caller passes current_dir outside sandbox,
-      # relative paths should still be validated
+    test "rejects current_dir outside sandbox at config creation time", %{sandbox: sandbox} do
+      # SECURITY: If caller tries to create config with current_dir outside sandbox,
+      # SandboxConfig.new/2 rejects it at struct creation time
       outside_dir = "/tmp"
-      relative_path = "passwd"
 
-      result = Sandbox.validate_path(relative_path, sandbox, outside_dir)
+      result = SandboxConfig.new([sandbox], outside_dir)
 
-      # Should be rejected - current_dir is outside sandbox
-      assert {:error, :outside_sandbox} = result
+      # Should be rejected - default_cwd must be within roots
+      assert {:error, "default_cwd must be within one of the roots"} = result
     end
 
     test "allows current_dir inside sandbox", %{sandbox: sandbox} do
       subdir = Path.join(sandbox, "lib")
       File.mkdir_p!(subdir)
       relative_path = "foo.ex"
+      {:ok, config} = SandboxConfig.new([sandbox], subdir)
 
-      result = Sandbox.validate_path(relative_path, sandbox, subdir)
+      result = Sandbox.validate_path(relative_path, config)
 
       assert {:ok, resolved} = result
       assert String.ends_with?(resolved, "/lib/foo.ex")
@@ -422,7 +412,8 @@ defmodule TrumanShell.Support.SandboxTest do
       File.ln_s(real_dir, link_dir)
 
       # Pass symlink as current_dir
-      result = Sandbox.validate_path("file.txt", sandbox, link_dir)
+      {:ok, config} = SandboxConfig.new([sandbox], link_dir)
+      result = Sandbox.validate_path("file.txt", config)
 
       # Rejected: symlink in current_dir is not allowed
       assert {:error, :outside_sandbox} = result
@@ -433,8 +424,9 @@ defmodule TrumanShell.Support.SandboxTest do
       # e.g., current_dir = "/sandbox/$HOME" could expand unexpectedly
       path = "file.txt"
       current_dir = Path.join(sandbox, "$HOME/subdir")
+      {:ok, config} = SandboxConfig.new([sandbox], current_dir)
 
-      result = Sandbox.validate_path(path, sandbox, current_dir)
+      result = Sandbox.validate_path(path, config)
 
       # Should be rejected - embedded $VAR in current_dir is not allowed
       assert {:error, :outside_sandbox} = result
