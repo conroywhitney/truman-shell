@@ -14,6 +14,7 @@ defmodule TrumanShell.CLI do
   - `1` — Error (message on stderr, or silent for validate-path deny)
   """
 
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.Support.Sandbox
 
   # All private functions call System.halt/1, which is no_return
@@ -81,11 +82,14 @@ defmodule TrumanShell.CLI do
   end
 
   defp validate(path, current_dir) do
-    # Normalize empty string to nil
+    # Normalize empty string to nil for current_dir fallback
     current_dir = if current_dir in [nil, ""], do: nil, else: current_dir
     sandbox_root = Sandbox.sandbox_root()
+    # Build struct-based config for validate_path/2
+    default_cwd = current_dir || sandbox_root
+    config = %SandboxConfig{roots: [sandbox_root], default_cwd: default_cwd}
 
-    case Sandbox.validate_path(path, sandbox_root, current_dir) do
+    case Sandbox.validate_path(path, config) do
       {:ok, resolved_path} ->
         IO.puts(resolved_path)
         System.halt(0)
