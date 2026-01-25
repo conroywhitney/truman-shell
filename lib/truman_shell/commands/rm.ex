@@ -19,7 +19,7 @@ defmodule TrumanShell.Commands.Rm do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
+  alias TrumanShell.Commands.Context
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -28,60 +28,62 @@ defmodule TrumanShell.Commands.Rm do
 
   ## Examples
 
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
       iex> sandbox = Path.join([File.cwd!(), "tmp", "rm_doctest_#{System.unique_integer([:positive])}"])
       iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
       iex> File.mkdir_p!(Path.join(sandbox, ".trash"))
       iex> File.write!(Path.join(sandbox, "test.txt"), "content")
-      iex> context = %{sandbox_root: sandbox, current_dir: sandbox}
-      iex> {:ok, ""} = TrumanShell.Commands.Rm.handle(["test.txt"], context)
+      iex> config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+      iex> ctx = %Context{current_path: sandbox, sandbox_config: config}
+      iex> {:ok, ""} = TrumanShell.Commands.Rm.handle(["test.txt"], ctx)
       iex> File.exists?(Path.join(sandbox, "test.txt"))
       false
 
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle(["-f" | rest], context) do
+  def handle(["-f" | rest], ctx) do
     # -f flag: don't error on missing files
-    handle_rm(rest, context, force: true)
+    handle_rm(rest, ctx, force: true)
   end
 
-  def handle(["-r" | rest], context) do
+  def handle(["-r" | rest], ctx) do
     # -r flag: recursive (for directories)
-    handle_rm(rest, context, recursive: true)
+    handle_rm(rest, ctx, recursive: true)
   end
 
-  def handle(["-rf" | rest], context) do
-    handle_rm(rest, context, force: true, recursive: true)
+  def handle(["-rf" | rest], ctx) do
+    handle_rm(rest, ctx, force: true, recursive: true)
   end
 
-  def handle(["-fr" | rest], context) do
-    handle_rm(rest, context, force: true, recursive: true)
+  def handle(["-fr" | rest], ctx) do
+    handle_rm(rest, ctx, force: true, recursive: true)
   end
 
-  def handle([file_name | _rest], context) do
-    handle_rm([file_name], context, [])
+  def handle([file_name | _rest], ctx) do
+    handle_rm([file_name], ctx, [])
   end
 
-  def handle([], _context) do
+  def handle([], _ctx) do
     {:error, "rm: missing operand\n"}
   end
 
-  defp handle_rm([file_name | _], context, opts) do
-    target = DomePath.expand(file_name, context.current_dir)
-    target_rel = DomePath.relative_to(target, context.sandbox_root)
-    config = to_sandbox_config(context)
+  defp handle_rm([file_name | _], %Context{} = ctx, opts) do
+    target = DomePath.expand(file_name, ctx.current_path)
+    target_rel = DomePath.relative_to(target, ctx.sandbox_config.home_path)
 
-    case Sandbox.validate_path(target_rel, config) do
+    case Sandbox.validate_path(target_rel, ctx.sandbox_config) do
       {:ok, safe_path} ->
-        soft_delete(safe_path, file_name, context.sandbox_root, opts)
+        soft_delete(safe_path, file_name, ctx.sandbox_config.home_path, opts)
 
       {:error, :outside_sandbox} ->
         {:error, "rm: #{file_name}: No such file or directory\n"}
     end
   end
 
-  defp handle_rm([], _context, _opts) do
+  defp handle_rm([], _ctx, _opts) do
     {:error, "rm: missing operand\n"}
   end
 
@@ -120,11 +122,5 @@ defmodule TrumanShell.Commands.Rm do
       :ok -> {:ok, ""}
       {:error, _} -> {:error, "rm: #{file_name}: No such file or directory\n"}
     end
-  end
-
-  # Convert legacy context map to SandboxConfig struct
-  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
-  defp to_sandbox_config(%{sandbox_root: root}) do
-    %SandboxConfig{allowed_paths: [root], home_path: root}
   end
 end

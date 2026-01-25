@@ -1,7 +1,9 @@
 defmodule TrumanShell.Commands.FindTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Find
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
@@ -17,9 +19,10 @@ defmodule TrumanShell.Commands.FindTest do
         File.write!(Path.join(tmp_dir, "README.md"), "")
         File.write!(Path.join([tmp_dir, "src", "app.ex"]), "")
         File.write!(Path.join([tmp_dir, "src", "helper.ex"]), "")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Find.handle([".", "-name", "*.ex"], context)
+        {:ok, output} = Find.handle([".", "-name", "*.ex"], ctx)
 
         # Should find .ex files (not .exs - glob is exact)
         assert output =~ "src/app.ex"
@@ -37,9 +40,10 @@ defmodule TrumanShell.Commands.FindTest do
       File.mkdir_p!(tmp_dir)
 
       try do
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:error, msg} = Find.handle(["/etc", "-name", "*.conf"], context)
+        {:error, msg} = Find.handle(["/etc", "-name", "*.conf"], ctx)
 
         assert msg == "find: /etc: No such file or directory\n"
       after
@@ -48,9 +52,12 @@ defmodule TrumanShell.Commands.FindTest do
     end
 
     test "find with missing -name returns error" do
-      context = %{sandbox_root: "/tmp", current_dir: "/tmp"}
+      sandbox = Path.join(File.cwd!(), "tmp")
+      File.mkdir_p!(sandbox)
+      config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+      ctx = %Context{current_path: sandbox, sandbox_config: config}
 
-      {:error, msg} = Find.handle([".", "-name"], context)
+      {:error, msg} = Find.handle([".", "-name"], ctx)
 
       assert msg =~ "missing argument"
     end
@@ -63,9 +70,10 @@ defmodule TrumanShell.Commands.FindTest do
         File.mkdir_p!(Path.join(tmp_dir, "subdir"))
         File.write!(Path.join(tmp_dir, "file.txt"), "")
         File.write!(Path.join([tmp_dir, "subdir", "nested.txt"]), "")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Find.handle([".", "-type", "f"], context)
+        {:ok, output} = Find.handle([".", "-type", "f"], ctx)
 
         assert output =~ "file.txt"
         assert output =~ "nested.txt"
@@ -83,9 +91,10 @@ defmodule TrumanShell.Commands.FindTest do
         File.mkdir_p!(Path.join(tmp_dir, "subdir"))
         File.mkdir_p!(Path.join([tmp_dir, "subdir", "nested"]))
         File.write!(Path.join(tmp_dir, "file.txt"), "")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Find.handle([".", "-type", "d"], context)
+        {:ok, output} = Find.handle([".", "-type", "d"], ctx)
 
         assert output =~ "subdir"
         assert output =~ "nested"
@@ -105,9 +114,10 @@ defmodule TrumanShell.Commands.FindTest do
         File.write!(Path.join([tmp_dir, "a", "level1.txt"]), "")
         File.write!(Path.join([tmp_dir, "a", "b", "level2.txt"]), "")
         File.write!(Path.join([tmp_dir, "a", "b", "c", "level3.txt"]), "")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Find.handle([".", "-maxdepth", "2", "-name", "*.txt"], context)
+        {:ok, output} = Find.handle([".", "-maxdepth", "2", "-name", "*.txt"], ctx)
 
         assert output =~ "root.txt"
         assert output =~ "level1.txt"
@@ -126,9 +136,10 @@ defmodule TrumanShell.Commands.FindTest do
       try do
         File.mkdir_p!(Path.join(tmp_dir, "subdir"))
         File.write!(Path.join(tmp_dir, "file.txt"), "")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Find.handle([".", "-maxdepth", "0"], context)
+        {:ok, output} = Find.handle([".", "-maxdepth", "0"], ctx)
 
         # With maxdepth 0, should only return "." (the start point)
         # Should NOT descend into any children

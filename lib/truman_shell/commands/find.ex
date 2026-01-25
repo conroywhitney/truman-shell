@@ -6,7 +6,7 @@ defmodule TrumanShell.Commands.Find do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
+  alias TrumanShell.Commands.Context
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
   alias TrumanShell.Support.TreeWalker
@@ -28,22 +28,28 @@ defmodule TrumanShell.Commands.Find do
 
   ## Examples
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> {:ok, output} = TrumanShell.Commands.Find.handle([".", "-name", "*.exs"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> {:ok, output} = TrumanShell.Commands.Find.handle([".", "-name", "*.exs"], ctx)
       iex> output =~ "mix.exs"
       true
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.Find.handle(["/etc", "-name", "*.conf"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Commands.Find.handle(["/etc", "-name", "*.conf"], ctx)
       {:error, "find: /etc: No such file or directory\\n"}
 
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle(args, context) do
+  def handle(args, ctx) do
     case parse_args(args) do
       {:ok, path, opts} ->
-        find_files(path, opts, context)
+        find_files(path, opts, ctx)
 
       {:error, msg} ->
         {:error, msg}
@@ -94,10 +100,8 @@ defmodule TrumanShell.Commands.Find do
     {:error, "find: unknown predicate '#{unknown}'\n"}
   end
 
-  defp find_files(path, opts, context) do
-    config = to_sandbox_config(context)
-
-    case Sandbox.validate_path(path, config) do
+  defp find_files(path, opts, %Context{} = ctx) do
+    case Sandbox.validate_path(path, ctx.sandbox_config) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
           do_find(safe_path, path, opts)
@@ -169,11 +173,5 @@ defmodule TrumanShell.Commands.Find do
   defp format_entry(file, base_path, original_path) do
     relative = DomePath.relative_to(file, base_path)
     if original_path == ".", do: "./#{relative}", else: DomePath.join(original_path, relative)
-  end
-
-  # Convert legacy context map to SandboxConfig struct
-  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
-  defp to_sandbox_config(%{sandbox_root: root}) do
-    %SandboxConfig{allowed_paths: [root], home_path: root}
   end
 end

@@ -1,7 +1,9 @@
 defmodule TrumanShell.Commands.TouchTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Touch
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
@@ -13,12 +15,13 @@ defmodule TrumanShell.Commands.TouchTest do
 
       on_exit(fn -> File.rm_rf!(sandbox) end)
 
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
-      {:ok, context: context, sandbox: sandbox}
+      config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+      ctx = %Context{current_path: sandbox, sandbox_config: config}
+      {:ok, ctx: ctx, sandbox: sandbox}
     end
 
-    test "creates a new empty file", %{context: context, sandbox: sandbox} do
-      result = Touch.handle(["newfile.txt"], context)
+    test "creates a new empty file", %{ctx: ctx, sandbox: sandbox} do
+      result = Touch.handle(["newfile.txt"], ctx)
 
       assert {:ok, ""} = result
       file_path = Path.join(sandbox, "newfile.txt")
@@ -26,7 +29,7 @@ defmodule TrumanShell.Commands.TouchTest do
       assert File.read!(file_path) == ""
     end
 
-    test "updates timestamp on existing file", %{context: context, sandbox: sandbox} do
+    test "updates timestamp on existing file", %{ctx: ctx, sandbox: sandbox} do
       # Create file with content
       file_path = Path.join(sandbox, "existing.txt")
       File.write!(file_path, "original content")
@@ -35,7 +38,7 @@ defmodule TrumanShell.Commands.TouchTest do
       # Small delay to ensure timestamp difference
       Process.sleep(10)
 
-      result = Touch.handle(["existing.txt"], context)
+      result = Touch.handle(["existing.txt"], ctx)
 
       assert {:ok, ""} = result
       # File still exists with same content
@@ -45,19 +48,19 @@ defmodule TrumanShell.Commands.TouchTest do
       assert new_stat.mtime >= original_stat.mtime
     end
 
-    test "blocks touch outside sandbox (404 principle)", %{context: context} do
-      result = Touch.handle(["/etc/hacked.txt"], context)
+    test "blocks touch outside sandbox (404 principle)", %{ctx: ctx} do
+      result = Touch.handle(["/etc/hacked.txt"], ctx)
 
       assert {:error, "touch: /etc/hacked.txt: No such file or directory\n"} = result
     end
 
-    test "touch through file (not directory) returns ENOTDIR error", %{context: context, sandbox: sandbox} do
+    test "touch through file (not directory) returns ENOTDIR error", %{ctx: ctx, sandbox: sandbox} do
       # Create a regular file
       File.write!(Path.join(sandbox, "afile.txt"), "content")
 
       # Try to touch a path where parent is a file, not a directory
       # File.touch will fail with :enotdir
-      result = Touch.handle(["afile.txt/impossible.txt"], context)
+      result = Touch.handle(["afile.txt/impossible.txt"], ctx)
 
       assert {:error, "touch: afile.txt/impossible.txt: Not a directory\n"} = result
     end

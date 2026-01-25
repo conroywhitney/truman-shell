@@ -6,7 +6,7 @@ defmodule TrumanShell.Commands.Grep do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
+  alias TrumanShell.Commands.Context
   alias TrumanShell.DomePath
   alias TrumanShell.Support.FileIO
   alias TrumanShell.Support.Sandbox
@@ -35,27 +35,33 @@ defmodule TrumanShell.Commands.Grep do
 
   ## Examples
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> {:ok, output} = TrumanShell.Commands.Grep.handle(["defmodule", "mix.exs"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> {:ok, output} = TrumanShell.Commands.Grep.handle(["defmodule", "mix.exs"], ctx)
       iex> output =~ "defmodule TrumanShell.MixProject"
       true
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.Grep.handle(["pattern", "nonexistent.txt"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Commands.Grep.handle(["pattern", "nonexistent.txt"], ctx)
       {:error, "grep: nonexistent.txt: No such file or directory\\n"}
 
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle(args, context) do
+  def handle(args, ctx) do
     case parse_args(args) do
       {:ok, opts, pattern, paths} when paths != [] ->
-        do_search(opts, pattern, paths, context)
+        do_search(opts, pattern, paths, ctx)
 
       {:ok, opts, pattern, []} ->
         # No paths - check for stdin (piped input)
-        case context do
-          %{stdin: stdin} when is_binary(stdin) ->
+        case ctx do
+          %Context{stdin: stdin} when is_binary(stdin) ->
             result = search_content(opts, pattern, stdin, "(standard input)", false)
             {:ok, result}
 
@@ -138,26 +144,24 @@ defmodule TrumanShell.Commands.Grep do
   end
 
   # Main search dispatcher
-  defp do_search(%{recursive: true} = opts, pattern, [path], context) do
-    search_recursive(opts, pattern, path, context)
+  defp do_search(%{recursive: true} = opts, pattern, [path], ctx) do
+    search_recursive(opts, pattern, path, ctx)
   end
 
-  defp do_search(opts, pattern, paths, context) do
+  defp do_search(opts, pattern, paths, ctx) do
     show_filename = length(paths) > 1
-    search_files(opts, pattern, paths, context, show_filename)
+    search_files(opts, pattern, paths, ctx, show_filename)
   end
 
   # Recursive search in directory
-  defp search_recursive(opts, pattern, path, context) do
-    config = to_sandbox_config(context)
-
-    case Sandbox.validate_path(path, config) do
+  defp search_recursive(opts, pattern, path, %Context{} = ctx) do
+    case Sandbox.validate_path(path, ctx.sandbox_config) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
           files = collect_files(safe_path)
-          search_files_with_prefix(opts, pattern, files, safe_path, path, context)
+          search_files_with_prefix(opts, pattern, files, safe_path, path, ctx)
         else
-          search_files(opts, pattern, [path], context, _show_filename = true)
+          search_files(opts, pattern, [path], ctx, _show_filename = true)
         end
 
       {:error, :outside_sandbox} ->
@@ -174,7 +178,7 @@ defmodule TrumanShell.Commands.Grep do
   end
 
   # Search files and prefix with relative path (for -r)
-  defp search_files_with_prefix(opts, pattern, files, base_path, original_path, context) do
+  defp search_files_with_prefix(opts, pattern, files, base_path, original_path, ctx) do
     results =
       Enum.map(files, fn file ->
         relative = DomePath.relative_to(file, base_path)
@@ -186,7 +190,7 @@ defmodule TrumanShell.Commands.Grep do
             DomePath.join(original_path, relative)
           end
 
-        case FileIO.read_file(file, context) do
+        case FileIO.read_file(file, ctx) do
           {:ok, contents} ->
             {:ok, search_content(opts, pattern, contents, display_path, true)}
 
@@ -199,9 +203,9 @@ defmodule TrumanShell.Commands.Grep do
     {:ok, combined}
   end
 
-  defp search_files(opts, pattern, paths, context, show_filename) do
+  defp search_files(opts, pattern, paths, ctx, show_filename) do
     Enum.reduce_while(paths, {:ok, ""}, fn path, {:ok, acc} ->
-      case FileIO.read_file(path, context) do
+      case FileIO.read_file(path, ctx) do
         {:ok, contents} ->
           result = search_content(opts, pattern, contents, path, show_filename)
           {:cont, {:ok, acc <> result}}
@@ -273,11 +277,5 @@ defmodule TrumanShell.Commands.Grep do
       end
 
     "#{prefix}#{line}\n"
-  end
-
-  # Convert legacy context map to SandboxConfig struct
-  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
-  defp to_sandbox_config(%{sandbox_root: root}) do
-    %SandboxConfig{allowed_paths: [root], home_path: root}
   end
 end
