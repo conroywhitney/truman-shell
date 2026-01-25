@@ -24,6 +24,8 @@ defmodule TrumanShell.Stages.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
+  alias TrumanShell.Commands.Context
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Stages.Redirector
 
@@ -64,7 +66,7 @@ defmodule TrumanShell.Stages.Executor do
       set_sandbox_root(DomePath.expand(root))
     end
 
-    context = %{sandbox_root: sandbox_root(), current_dir: current_dir()}
+    ctx = build_context([])
 
     # Get redirects from the LAST command in pipeline (most common: cmd1 | cmd2 > file.txt)
     final_command = if pipes == [], do: command, else: List.last(pipes)
@@ -72,7 +74,7 @@ defmodule TrumanShell.Stages.Executor do
     with :ok <- validate_depth(command),
          {:ok, output} <- execute(command, opts),
          {:ok, piped_output} <- run_pipeline(output, pipes) do
-      Redirector.apply(piped_output, final_command.redirects, context)
+      Redirector.apply(piped_output, final_command.redirects, ctx)
     end
   end
 
@@ -157,16 +159,16 @@ defmodule TrumanShell.Stages.Executor do
 
   # Context for command handlers
   defp build_context(opts) do
-    base = %{
-      sandbox_root: sandbox_root(),
-      current_dir: current_dir()
+    config = %SandboxConfig{
+      allowed_paths: [sandbox_root()],
+      home_path: sandbox_root()
     }
 
-    # Add stdin to context if provided (for piped commands)
-    case Keyword.get(opts, :stdin) do
-      nil -> base
-      stdin -> Map.put(base, :stdin, stdin)
-    end
+    %Context{
+      current_path: current_dir(),
+      sandbox_config: config,
+      stdin: Keyword.get(opts, :stdin)
+    }
   end
 
   # Depth validation for pipelines

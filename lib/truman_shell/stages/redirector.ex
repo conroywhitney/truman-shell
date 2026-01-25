@@ -17,7 +17,7 @@ defmodule TrumanShell.Stages.Redirector do
   - Earlier redirects create/truncate the file with empty content
   """
 
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
+  alias TrumanShell.Commands.Context
   alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
@@ -31,35 +31,35 @@ defmodule TrumanShell.Stages.Redirector do
 
   ## Context
 
-  Requires a context map with:
-  - `:sandbox_root` - Root directory for sandbox confinement
-  - `:current_dir` - Current working directory for relative paths
+  Requires a `%Commands.Context{}` struct with:
+  - `:current_path` - Current working directory for relative paths
+  - `:sandbox_config` - Sandbox configuration for validation
   """
-  @spec apply(String.t(), [{atom(), String.t()}], map()) ::
+  @spec apply(String.t(), [{atom(), String.t()}], Context.t()) ::
           {:ok, String.t()} | {:error, String.t()}
-  def apply(output, redirects, context) do
-    do_apply(output, redirects, context)
+  def apply(output, redirects, ctx) do
+    do_apply(output, redirects, ctx)
   end
 
   # No redirects - pass output through unchanged
-  defp do_apply(output, [], _context), do: {:ok, output}
+  defp do_apply(output, [], _ctx), do: {:ok, output}
 
   # Write redirect (>)
-  defp do_apply(output, [{:stdout, path} | rest], context) do
-    write_redirect(output, path, [], rest, context)
+  defp do_apply(output, [{:stdout, path} | rest], ctx) do
+    write_redirect(output, path, [], rest, ctx)
   end
 
   # Append redirect (>>)
-  defp do_apply(output, [{:stdout_append, path} | rest], context) do
-    write_redirect(output, path, [:append], rest, context)
+  defp do_apply(output, [{:stdout_append, path} | rest], ctx) do
+    write_redirect(output, path, [:append], rest, ctx)
   end
 
   # Skip unsupported redirect types (stdin, stderr)
-  defp do_apply(output, [_unsupported | rest], context) do
-    do_apply(output, rest, context)
+  defp do_apply(output, [_unsupported | rest], ctx) do
+    do_apply(output, rest, ctx)
   end
 
-  defp write_redirect(output, path, write_opts, rest, context) do
+  defp write_redirect(output, path, write_opts, rest, ctx) do
     # Bash behavior: for multiple redirects, only LAST one gets output
     # Earlier redirects are truncated/created with empty content
     {content_to_write, next_output} =
@@ -69,21 +69,13 @@ defmodule TrumanShell.Stages.Redirector do
         {"", output}
       end
 
-    current_dir = context.current_dir
-    config = to_sandbox_config(context)
-
-    # Resolve path: absolute paths stay as-is, relative paths join with current_dir
-    target_path =
-      if String.starts_with?(path, "/") do
-        path
-      else
-        DomePath.join(current_dir, path)
-      end
+    # Expand path relative to current_path, then validate
+    absolute_path = DomePath.expand(path, ctx.current_path)
 
     # Validate the resolved path against sandbox
-    with {:ok, safe_path} <- Sandbox.validate_path(target_path, config),
+    with {:ok, safe_path} <- Sandbox.validate_path(absolute_path, ctx.sandbox_config),
          :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
-      do_apply(next_output, rest, context)
+      do_apply(next_output, rest, ctx)
     else
       {:error, :outside_sandbox} ->
         {:error, "bash: #{path}: No such file or directory\n"}
@@ -99,11 +91,5 @@ defmodule TrumanShell.Stages.Redirector do
       :ok -> :ok
       {:error, reason} -> {:error, "bash: #{original_path}: #{Errors.to_message(reason)}\n"}
     end
-  end
-
-  # Convert legacy context map to SandboxConfig struct
-  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
-  defp to_sandbox_config(%{sandbox_root: root}) do
-    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

@@ -86,8 +86,9 @@ defmodule TrumanShell.CLI do
     current_dir = if current_dir in [nil, ""], do: nil, else: current_dir
     sandbox_root = Sandbox.sandbox_root()
     # Build struct-based config for validate_path/2
-    default_cwd = current_dir || sandbox_root
-    config = %SandboxConfig{roots: [sandbox_root], default_cwd: default_cwd}
+    # Use current_dir as home_path for relative path expansion
+    home_path = current_dir || sandbox_root
+    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: home_path}
 
     case Sandbox.validate_path(path, config) do
       {:ok, resolved_path} ->

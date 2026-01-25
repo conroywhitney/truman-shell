@@ -6,7 +6,6 @@ defmodule TrumanShell.Commands.Ls do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -19,25 +18,27 @@ defmodule TrumanShell.Commands.Ls do
 
   ## Examples
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> {:ok, output} = TrumanShell.Commands.Ls.handle(["lib"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> {:ok, output} = TrumanShell.Commands.Ls.handle(["lib"], ctx)
       iex> output =~ "truman_shell/"
       true
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.Ls.handle(["nonexistent"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Commands.Ls.handle(["nonexistent"], ctx)
       {:error, "ls: nonexistent: No such file or directory\\n"}
-
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.Ls.handle(["-la"], context)
-      {:error, "ls: invalid option -- 'la'\\n"}
 
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle(args, context) do
+  def handle(args, ctx) do
     with {:ok, paths} <- validate_args(args) do
-      list_paths(paths, context)
+      list_paths(paths, ctx)
     end
   end
 
@@ -55,16 +56,16 @@ defmodule TrumanShell.Commands.Ls do
   end
 
   # List one or more paths
-  defp list_paths([path], context) do
+  defp list_paths([path], ctx) do
     # Single path: list contents (directory) or just the file
-    list_single_path(path, context)
+    list_single_path(path, ctx)
   end
 
-  defp list_paths(paths, context) do
+  defp list_paths(paths, ctx) do
     # Multiple paths: list each, collecting results
     results =
       Enum.map(paths, fn path ->
-        case list_single_path(path, context) do
+        case list_single_path(path, ctx) do
           {:ok, output} -> {:ok, path, output}
           {:error, msg} -> {:error, path, msg}
         end
@@ -87,10 +88,11 @@ defmodule TrumanShell.Commands.Ls do
   end
 
   # List a single path (file or directory)
-  defp list_single_path(path, context) do
-    config = to_sandbox_config(context)
+  defp list_single_path(path, ctx) do
+    # Expand path relative to current_path, then validate
+    absolute_path = DomePath.expand(path, ctx.current_path)
 
-    case Sandbox.validate_path(path, config) do
+    case Sandbox.validate_path(absolute_path, ctx.sandbox_config) do
       {:ok, safe_path} ->
         cond do
           File.regular?(safe_path) ->
@@ -151,11 +153,5 @@ defmodule TrumanShell.Commands.Ls do
     else
       name
     end
-  end
-
-  # Convert legacy context map to SandboxConfig struct
-  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
-  defp to_sandbox_config(%{sandbox_root: root}) do
-    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

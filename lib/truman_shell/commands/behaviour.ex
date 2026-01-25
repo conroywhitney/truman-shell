@@ -4,9 +4,10 @@ defmodule TrumanShell.Commands.Behaviour do
 
   Each command module implements `handle/2` which receives:
   - `args` - List of command arguments (already parsed)
-  - `context` - Map containing execution context:
-    - `:sandbox_root` - Absolute path to sandbox directory
-    - `:current_dir` - Current working directory (absolute)
+  - `context` - A `%Commands.Context{}` struct containing:
+    - `:current_path` - Current working directory (absolute)
+    - `:sandbox_config` - Immutable `%Config.Sandbox{}` with boundaries and home
+    - `:stdin` - Optional input from piped commands
 
   ## Return Types
 
@@ -25,11 +26,10 @@ defmodule TrumanShell.Commands.Behaviour do
   - `{:set_cwd, path}` - Update the shell's current working directory
   """
 
+  alias TrumanShell.Commands.Context
+
   @type args :: [String.t()]
-  @type context :: %{
-          sandbox_root: String.t(),
-          current_dir: String.t()
-        }
+  @type context :: Context.t()
 
   @typedoc "Side effect directives that commands can request"
   @type side_effect :: {:set_cwd, String.t()}

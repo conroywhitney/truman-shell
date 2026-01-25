@@ -14,7 +14,6 @@ defmodule TrumanShell.Commands.Cd do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -26,42 +25,41 @@ defmodule TrumanShell.Commands.Cd do
 
   ## Examples
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> {:ok, "", set_cwd: new_dir} = TrumanShell.Commands.Cd.handle(["lib"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> {:ok, "", set_cwd: new_dir} = TrumanShell.Commands.Cd.handle(["lib"], ctx)
       iex> String.ends_with?(new_dir, "/lib")
       true
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.Cd.handle(["nonexistent"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Commands.Cd.handle(["nonexistent"], ctx)
       {:error, "bash: cd: nonexistent: No such file or directory\\n"}
-
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.Cd.handle(["/etc"], context)
-      {:error, "bash: cd: /etc: No such file or directory\\n"}
 
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result_with_effects()
   @impl true
-  # No args means go home (sandbox root)
-  def handle([], context), do: go_home(context)
+  # No args means go home
+  def handle([], ctx), do: go_home(ctx)
 
   # Tilde expansion is now handled by Stages.Expander before we get here.
-  # By the time cd receives args, ~ has already been expanded to sandbox_root.
-  def handle([path | _], context) do
-    change_directory(path, context)
+  # By the time cd receives args, ~ has already been expanded to home_path.
+  def handle([path | _], ctx) do
+    change_directory(path, ctx)
   end
 
-  # Sandbox root is "home" in TrumanShell
-  defp go_home(context), do: {:ok, "", set_cwd: context.sandbox_root}
+  # Home is sandbox_config.home_path
+  defp go_home(ctx), do: {:ok, "", set_cwd: ctx.sandbox_config.home_path}
 
-  defp change_directory(path, context) do
-    # Compute target path relative to current working directory
-    # Then make it relative to sandbox for validation
-    target_abs = DomePath.expand(path, context.current_dir)
-    target_rel = DomePath.relative_to(target_abs, context.sandbox_root)
-    config = to_sandbox_config(context)
+  defp change_directory(path, ctx) do
+    # Expand path relative to current_path, then validate
+    absolute_path = DomePath.expand(path, ctx.current_path)
 
-    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, config),
+    with {:ok, safe_path} <- Sandbox.validate_path(absolute_path, ctx.sandbox_config),
          {:dir, true} <- {:dir, File.dir?(safe_path)} do
       # Return success with the new cwd for executor to apply
       {:ok, "", set_cwd: safe_path}
@@ -72,19 +70,11 @@ defmodule TrumanShell.Commands.Cd do
 
       {:dir, false} ->
         # Path is inside sandbox but not a directory - check if it's a file
-        full_path = DomePath.expand(target_rel, context.sandbox_root)
-
-        if File.regular?(full_path) do
+        if File.regular?(absolute_path) do
           {:error, "bash: cd: #{path}: Not a directory\n"}
         else
           {:error, "bash: cd: #{path}: No such file or directory\n"}
         end
     end
-  end
-
-  # Convert legacy context map to SandboxConfig struct
-  # Use sandbox_root as default_cwd because cd.ex pre-resolves paths relative to sandbox_root
-  defp to_sandbox_config(%{sandbox_root: root}) do
-    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

@@ -37,14 +37,14 @@ defmodule TrumanShell.Support.Sandbox do
   @doc """
   Builds a sandbox configuration struct.
 
-  Returns a `%Config.Sandbox{}` struct with `roots` and `default_cwd` fields.
+  Returns a `%Config.Sandbox{}` struct with `allowed_paths` and `home_path` fields.
   This is the preferred way to get sandbox configuration for use with `validate_path/2`.
 
   ## Examples
 
       iex> config = TrumanShell.Support.Sandbox.build_config()
       iex> %TrumanShell.Config.Sandbox{} = config
-      iex> is_list(config.roots)
+      iex> is_list(config.allowed_paths)
       true
 
   """
@@ -52,7 +52,7 @@ defmodule TrumanShell.Support.Sandbox do
   def build_config do
     root = sandbox_root()
     # Use struct! directly since we know root is valid (no validation needed)
-    %SandboxConfig{roots: [root], default_cwd: root}
+    %SandboxConfig{allowed_paths: [root], home_path: root}
   end
 
   @doc """
@@ -131,11 +131,11 @@ defmodule TrumanShell.Support.Sandbox do
   @spec validate_path(String.t(), SandboxConfig.t() | String.t()) ::
           {:ok, String.t()} | {:error, :outside_sandbox}
   def validate_path(path, %SandboxConfig{} = config) do
-    # Try each root until one validates, or return error if none work
-    %SandboxConfig{roots: roots, default_cwd: default_cwd} = config
+    # Try each allowed_path until one validates, or return error if none work
+    %SandboxConfig{allowed_paths: allowed_paths, home_path: home_path} = config
 
-    Enum.reduce_while(roots, {:error, :outside_sandbox}, fn root, _acc ->
-      case do_validate_path(path, root, default_cwd) do
+    Enum.reduce_while(allowed_paths, {:error, :outside_sandbox}, fn boundary, _acc ->
+      case do_validate_path(path, boundary, home_path) do
         {:ok, validated_path} -> {:halt, {:ok, validated_path}}
         {:error, _} -> {:cont, {:error, :outside_sandbox}}
       end
