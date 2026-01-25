@@ -451,27 +451,65 @@ defmodule TrumanShell.ConfigTest do
   describe "config validation" do
     @describetag :validation
 
-    @tag :skip
     test "rejects config with no roots" do
+      config = %Config{
+        version: "0.1",
+        roots: [],
+        default_cwd: File.cwd!(),
+        raw: %{}
+      }
+
+      assert {:error, msg} = Config.validate(config)
+      assert msg =~ "at least one root"
     end
 
-    @tag :skip
     test "rejects root that doesn't exist" do
+      nonexistent = "/this/path/definitely/does/not/exist/#{:rand.uniform(10_000)}"
+
+      config = %Config{
+        version: "0.1",
+        roots: [nonexistent],
+        default_cwd: nonexistent,
+        raw: %{}
+      }
+
+      assert {:error, msg} = Config.validate(config)
+      assert msg =~ "does not exist"
     end
 
-    @tag :skip
     test "rejects root that is a file (not directory)" do
+      # Create a temp file (not a directory)
+      file_path = Path.join(System.tmp_dir!(), "test_file_#{:rand.uniform(10_000)}.txt")
+      File.write!(file_path, "I am a file, not a directory")
+
+      try do
+        config = %Config{
+          version: "0.1",
+          roots: [file_path],
+          default_cwd: file_path,
+          raw: %{}
+        }
+
+        assert {:error, msg} = Config.validate(config)
+        assert msg =~ "not a directory"
+      after
+        File.rm!(file_path)
+      end
     end
 
     @tag :skip
+    @tag :deferred
     test "rejects root outside user home (security)" do
-      # Should we allow /tmp? /var? Probably not by default
+      # DEFERRED: Security boundary enforcement belongs in the harness, not config loader
+      # The harness-protected paths from SPEC.md should be checked at runtime
       # config = %{roots: ["/etc"]}
       # Should return {:error, "root /etc is outside allowed base paths"}
     end
 
     @tag :skip
+    @tag :deferred
     test "accepts system_paths override in config" do
+      # DEFERRED: Requires security boundary implementation first
       # By default, /etc, ~/.ssh, etc. are blocked
       # But config could allow specific system paths (with warning?)
     end
