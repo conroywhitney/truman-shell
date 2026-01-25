@@ -35,8 +35,8 @@ defmodule TrumanShell.Stages.Expander do
   ## Config
 
   Accepts a `%Config.Sandbox{}` struct with:
-  - `allowed_paths` - List of allowed directories (first path used for tilde expansion)
-  - `home_path` - Working directory for glob expansion
+  - `allowed_paths` - List of allowed directories (boundaries for validation)
+  - `home_path` - Used for tilde expansion (`~` → `home_path`)
 
   ## Examples
 
@@ -75,8 +75,8 @@ defmodule TrumanShell.Stages.Expander do
 
   # Expand a {:glob, pattern} argument - tilde expansion then glob expansion
   # Glob.expand/2 returns [String.t()] if matches found, or String.t() if no matches
-  defp expand_arg({:glob, pattern}, %SandboxConfig{allowed_paths: [root | _]} = config) do
-    expanded = Tilde.expand(pattern, root)
+  defp expand_arg({:glob, pattern}, %SandboxConfig{home_path: home} = config) do
+    expanded = Tilde.expand(pattern, home)
 
     case Glob.expand(expanded, config) do
       files when is_list(files) -> files
@@ -86,12 +86,12 @@ defmodule TrumanShell.Stages.Expander do
 
   # Expand a literal string argument - tilde expansion only, NO glob expansion
   # This handles quoted args like "*.txt" which should remain literal
-  defp expand_arg(arg, %SandboxConfig{allowed_paths: [root | _]}) when is_binary(arg) do
-    [Tilde.expand(arg, root)]
+  defp expand_arg(arg, %SandboxConfig{home_path: home}) when is_binary(arg) do
+    [Tilde.expand(arg, home)]
   end
 
   # Expand tilde in redirect path
-  defp expand_redirect({type, path}, %SandboxConfig{allowed_paths: [root | _]}) when is_binary(path) do
-    {type, Tilde.expand(path, root)}
+  defp expand_redirect({type, path}, %SandboxConfig{home_path: home}) when is_binary(path) do
+    {type, Tilde.expand(path, home)}
   end
 end

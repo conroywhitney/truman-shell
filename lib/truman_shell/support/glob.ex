@@ -24,7 +24,7 @@ defmodule TrumanShell.Support.Glob do
   ## Config
 
   Accepts a `%Config.Sandbox{}` struct with:
-  - `allowed_paths` - List of allowed directories (first path used for sandbox constraint)
+  - `allowed_paths` - List of allowed directories (all paths checked for sandbox constraint)
   - `home_path` - Current working directory for relative patterns
 
   ## Examples
@@ -47,12 +47,12 @@ defmodule TrumanShell.Support.Glob do
 
   """
   @spec expand(String.t(), SandboxConfig.t() | map()) :: [String.t()] | String.t()
-  def expand(pattern, %SandboxConfig{allowed_paths: [root | _], home_path: current_dir} = config) do
+  def expand(pattern, %SandboxConfig{home_path: current_dir} = config) do
     # Defense-in-depth: validate current_dir is absolute and inside sandbox
     # This prevents Path.wildcard from resolving relative patterns against process cwd
     # (In normal operation, current_dir is always validated by cd command)
     with :ok <- validate_current_dir_is_absolute(current_dir),
-         {:ok, validated_current_dir} <- Sandbox.validate_path(current_dir, root) do
+         {:ok, validated_current_dir} <- Sandbox.validate_path(current_dir, config) do
       do_expand_with_config(pattern, %{config | home_path: validated_current_dir})
     else
       _ ->
@@ -76,14 +76,14 @@ defmodule TrumanShell.Support.Glob do
     end
   end
 
-  defp do_expand_with_config(pattern, %SandboxConfig{allowed_paths: [root | _], home_path: current_dir} = config) do
+  defp do_expand_with_config(pattern, %SandboxConfig{home_path: current_dir} = config) do
     is_absolute = String.starts_with?(pattern, "/")
     full_pattern = resolve_pattern(pattern, is_absolute, current_dir)
     base_dir = glob_base_dir(full_pattern)
 
     # Security: validate base path is in sandbox BEFORE calling DomePath.wildcard
     # This prevents filesystem enumeration outside the sandbox
-    if in_sandbox?(base_dir, root) do
+    if in_sandbox?(base_dir, config) do
       do_expand(pattern, full_pattern, base_dir, is_absolute, config)
     else
       pattern
@@ -93,17 +93,14 @@ defmodule TrumanShell.Support.Glob do
   defp resolve_pattern(pattern, true, _current_dir), do: pattern
   defp resolve_pattern(pattern, false, current_dir), do: DomePath.join(current_dir, pattern)
 
-  defp do_expand(pattern, full_pattern, base_dir, is_absolute, %SandboxConfig{
-         allowed_paths: [root | _],
-         home_path: current_dir
-       }) do
+  defp do_expand(pattern, full_pattern, base_dir, is_absolute, %SandboxConfig{home_path: current_dir} = config) do
     match_dot = pattern_matches_dotfiles?(pattern)
     has_dot_prefix = String.starts_with?(pattern, "./")
 
     matches =
       full_pattern
       |> DomePath.wildcard(match_dot: match_dot)
-      |> Enum.filter(&(in_sandbox?(&1, root) and within_depth_limit?(&1, base_dir)))
+      |> Enum.filter(&(in_sandbox?(&1, config) and within_depth_limit?(&1, base_dir)))
       |> normalize_paths(is_absolute, has_dot_prefix, current_dir)
       |> Enum.sort()
 
@@ -151,7 +148,7 @@ defmodule TrumanShell.Support.Glob do
     pattern |> DomePath.basename() |> String.starts_with?(".")
   end
 
-  defp in_sandbox?(path, sandbox_root) do
-    match?({:ok, _}, Sandbox.validate_path(path, sandbox_root))
+  defp in_sandbox?(path, %SandboxConfig{} = config) do
+    match?({:ok, _}, Sandbox.validate_path(path, config))
   end
 end
