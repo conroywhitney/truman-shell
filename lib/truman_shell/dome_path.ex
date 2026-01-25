@@ -23,7 +23,7 @@ defmodule TrumanShell.DomePath do
   These delegate to Path.* but exist here so all path operations
   go through one module:
 
-  - `basename/1`, `type/1`, `split/1`
+  - `basename/1`, `dirname/1`, `type/1`, `split/1`
   - `join/1`, `join/2`
   - `expand/1`, `expand/2`
   - `relative_to/2`
@@ -202,6 +202,14 @@ defmodule TrumanShell.DomePath do
   """
   @spec type(String.t()) :: :absolute | :relative
   def type(path), do: Path.type(path)
+
+  @doc """
+  Returns the directory component of a path.
+
+  Delegates to `Path.dirname/1`.
+  """
+  @spec dirname(String.t()) :: String.t()
+  def dirname(path), do: Path.dirname(path)
 
   @doc """
   Splits a path into its components.
