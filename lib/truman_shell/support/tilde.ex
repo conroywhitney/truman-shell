@@ -6,6 +6,8 @@ defmodule TrumanShell.Support.Tilde do
   expands `~` to the user's home directory.
   """
 
+  alias TrumanShell.DomePath
+
   @doc """
   Expands tilde (`~`) in a path to the sandbox root.
 
@@ -45,7 +47,7 @@ defmodule TrumanShell.Support.Tilde do
   def expand("~/" <> rest, sandbox_root) do
     # Strip leading slashes to handle ~//lib -> sandbox_root/lib
     subpath = String.trim_leading(rest, "/")
-    Path.join(sandbox_root, subpath)
+    DomePath.join(sandbox_root, subpath)
   end
 
   # No tilde or ~user (not supported) → pass through unchanged

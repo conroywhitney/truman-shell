@@ -7,7 +7,7 @@ defmodule TrumanShell.Commands.HeadTest do
 
   # Helper to create a temp file with numbered lines
   defp with_lines_file(n, fun) do
-    tmp_dir = Path.join(System.tmp_dir!(), "truman-test-head-#{:rand.uniform(100_000)}")
+    tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-head-#{:rand.uniform(100_000)}")
     File.mkdir_p!(tmp_dir)
 
     try do

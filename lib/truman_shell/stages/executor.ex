@@ -24,6 +24,7 @@ defmodule TrumanShell.Stages.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
+  alias TrumanShell.DomePath
   alias TrumanShell.Stages.Redirector
 
   # Maximum number of commands in a pipeline (e.g., cmd1 | cmd2 | cmd3 = 3 commands)
@@ -60,7 +61,7 @@ defmodule TrumanShell.Stages.Executor do
 
   def run(%Command{pipes: pipes} = command, opts) do
     if root = Keyword.get(opts, :sandbox_root) do
-      set_sandbox_root(Path.expand(root))
+      set_sandbox_root(DomePath.expand(root))
     end
 
     context = %{sandbox_root: sandbox_root(), current_dir: current_dir()}

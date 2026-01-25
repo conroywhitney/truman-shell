@@ -8,7 +8,7 @@ defmodule TrumanShell.Commands.CpTest do
   describe "handle/2" do
     setup do
       # Create a temp sandbox for each test
-      sandbox = Path.join(System.tmp_dir!(), "cp_test_#{:rand.uniform(100_000)}")
+      sandbox = Path.join(Path.join(File.cwd!(), "tmp"), "cp_test_#{:rand.uniform(100_000)}")
       File.mkdir_p!(sandbox)
 
       on_exit(fn -> File.rm_rf!(sandbox) end)

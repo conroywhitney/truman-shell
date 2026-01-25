@@ -3,6 +3,7 @@ defmodule TrumanShell.Support.FileIO do
   Shared file I/O functions for command handlers.
   """
 
+  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   # Maximum file size in bytes (10MB) to prevent memory exhaustion
@@ -37,8 +38,8 @@ defmodule TrumanShell.Support.FileIO do
   @spec read_file(String.t(), map()) :: {:ok, String.t()} | {:error, String.t()}
   def read_file(path, context) do
     # Resolve path relative to current working directory
-    target = Path.expand(path, context.current_dir)
-    target_rel = Path.relative_to(target, context.sandbox_root)
+    target = DomePath.expand(path, context.current_dir)
+    target_rel = DomePath.relative_to(target, context.sandbox_root)
 
     with {:ok, safe_path} <- Sandbox.validate_path(target_rel, context.sandbox_root),
          {:ok, contents} <- read_with_limit(safe_path) do

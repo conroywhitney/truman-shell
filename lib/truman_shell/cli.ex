@@ -90,10 +90,6 @@ defmodule TrumanShell.CLI do
         IO.puts(resolved_path)
         System.halt(0)
 
-      {:error, :eloop} ->
-        IO.puts(:stderr, "Too many levels of symbolic links")
-        System.halt(1)
-
       {:error, _reason} ->
         # 404 principle: silent deny (no stdout, no stderr)
         System.halt(1)

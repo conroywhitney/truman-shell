@@ -19,6 +19,7 @@ defmodule TrumanShell.Commands.Rm do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   @doc """
@@ -26,7 +27,7 @@ defmodule TrumanShell.Commands.Rm do
 
   ## Examples
 
-      iex> sandbox = Path.join(System.tmp_dir!(), "rm_doctest_#{System.unique_integer([:positive])}")
+      iex> sandbox = Path.join([File.cwd!(), "tmp", "rm_doctest_#{System.unique_integer([:positive])}"])
       iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
       iex> File.mkdir_p!(Path.join(sandbox, ".trash"))
@@ -66,8 +67,8 @@ defmodule TrumanShell.Commands.Rm do
   end
 
   defp handle_rm([file_name | _], context, opts) do
-    target = Path.expand(file_name, context.current_dir)
-    target_rel = Path.relative_to(target, context.sandbox_root)
+    target = DomePath.expand(file_name, context.current_dir)
+    target_rel = DomePath.relative_to(target, context.sandbox_root)
 
     case Sandbox.validate_path(target_rel, context.sandbox_root) do
       {:ok, safe_path} ->
@@ -102,16 +103,16 @@ defmodule TrumanShell.Commands.Rm do
   end
 
   defp move_to_trash(safe_path, file_name, sandbox_root) do
-    trash_dir = Path.join(sandbox_root, ".trash")
+    trash_dir = DomePath.join(sandbox_root, ".trash")
     # Ensure .trash exists
     File.mkdir_p(trash_dir)
 
     # Generate unique-prefixed name to avoid collisions
     # System.unique_integer guarantees uniqueness even for rapid successive calls
     unique_id = System.unique_integer([:positive, :monotonic])
-    basename = Path.basename(file_name)
+    basename = DomePath.basename(file_name)
     trash_name = "#{unique_id}_#{basename}"
-    trash_path = Path.join(trash_dir, trash_name)
+    trash_path = DomePath.join(trash_dir, trash_name)
 
     case File.rename(safe_path, trash_path) do
       :ok -> {:ok, ""}

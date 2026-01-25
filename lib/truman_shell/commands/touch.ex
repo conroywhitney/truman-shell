@@ -8,6 +8,7 @@ defmodule TrumanShell.Commands.Touch do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
 
@@ -16,7 +17,7 @@ defmodule TrumanShell.Commands.Touch do
 
   ## Examples
 
-      iex> sandbox = Path.join(System.tmp_dir!(), "touch_doctest_#{System.unique_integer([:positive])}")
+      iex> sandbox = Path.join([File.cwd!(), "tmp", "touch_doctest_#{System.unique_integer([:positive])}"])
       iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
       iex> context = %{sandbox_root: sandbox, current_dir: sandbox}
@@ -28,8 +29,8 @@ defmodule TrumanShell.Commands.Touch do
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
   def handle([file_name | _rest], context) do
-    target = Path.expand(file_name, context.current_dir)
-    target_rel = Path.relative_to(target, context.sandbox_root)
+    target = DomePath.expand(file_name, context.current_dir)
+    target_rel = DomePath.relative_to(target, context.sandbox_root)
 
     case Sandbox.validate_path(target_rel, context.sandbox_root) do
       {:ok, safe_path} ->

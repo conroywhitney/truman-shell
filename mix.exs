@@ -11,7 +11,11 @@ defmodule TrumanShell.MixProject do
       escript: escript(),
       description: "A simulated shell environment for AI agents",
       package: package(),
-      dialyzer: dialyzer()
+      dialyzer: dialyzer(),
+      test_coverage: [
+        ignore_modules: [TrumanShell.CLI],
+        threshold: 90.0
+      ]
     ]
   end
 
@@ -44,7 +48,9 @@ defmodule TrumanShell.MixProject do
       plt_core_path: "priv/plts/core.plt",
       plt_local_path: "priv/plts/project.plt",
       plt_add_apps: [:mix],
-      flags: [:error_handling, :underspecs]
+      flags: [:error_handling, :underspecs],
+      # Exclude credo checks (Credo is dev dependency, dialyzer can't see it)
+      exclude_modules: [TrumanShell.Credo.NoRawPathCalls]
     ]
   end
 

@@ -41,7 +41,7 @@
       # If you create your own checks, you must specify the source files for
       # them here, so they can be loaded by Credo before running the analysis.
       #
-      requires: [],
+      requires: [".credo/checks/no_raw_path_calls.ex"],
       #
       # If you want to enforce a style guide and need a more traditional linting
       # experience, you can change `strict` to `true` below:
@@ -161,6 +161,11 @@
           {Credo.Check.Warning.UnusedStringOperation, []},
           {Credo.Check.Warning.UnusedTupleOperation, []},
           {Credo.Check.Warning.WrongTestFileExtension, []},
+
+          #
+          ## Custom Checks - TrumanShell
+          #
+          {TrumanShell.Credo.NoRawPathCalls, []},
 
           #
           ## Plugin Checks - credo_naming

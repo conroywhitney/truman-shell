@@ -8,6 +8,7 @@ defmodule TrumanShell.Commands.Cp do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
 
@@ -16,7 +17,7 @@ defmodule TrumanShell.Commands.Cp do
 
   ## Examples
 
-      iex> sandbox = Path.join(System.tmp_dir!(), "cp_doctest_#{System.unique_integer([:positive])}")
+      iex> sandbox = Path.join([File.cwd!(), "tmp", "cp_doctest_#{System.unique_integer([:positive])}"])
       iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
       iex> File.write!(Path.join(sandbox, "src.txt"), "content")
@@ -45,11 +46,11 @@ defmodule TrumanShell.Commands.Cp do
   end
 
   defp copy_file(src, dst, context, opts) do
-    src_target = Path.expand(src, context.current_dir)
-    src_rel = Path.relative_to(src_target, context.sandbox_root)
+    src_target = DomePath.expand(src, context.current_dir)
+    src_rel = DomePath.relative_to(src_target, context.sandbox_root)
 
-    dst_target = Path.expand(dst, context.current_dir)
-    dst_rel = Path.relative_to(dst_target, context.sandbox_root)
+    dst_target = DomePath.expand(dst, context.current_dir)
+    dst_rel = DomePath.relative_to(dst_target, context.sandbox_root)
 
     with {:ok, src_safe} <- Sandbox.validate_path(src_rel, context.sandbox_root),
          {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, context.sandbox_root) do

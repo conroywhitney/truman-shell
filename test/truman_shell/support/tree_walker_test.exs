@@ -7,7 +7,7 @@ defmodule TrumanShell.Support.TreeWalkerTest do
 
   describe "walk/2" do
     test "walks nested directory structure returning files and directories" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-walker-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-walker-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -45,7 +45,7 @@ defmodule TrumanShell.Support.TreeWalkerTest do
     end
 
     test "respects maxdepth option to limit traversal" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-walker-depth-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-walker-depth-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -86,7 +86,7 @@ defmodule TrumanShell.Support.TreeWalkerTest do
     end
 
     test "filters by type: :file to return only files" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-walker-type-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-walker-type-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -112,7 +112,7 @@ defmodule TrumanShell.Support.TreeWalkerTest do
     end
 
     test "filters by type: :dir to return only directories" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-walker-type-dir-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-walker-type-dir-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -137,9 +137,9 @@ defmodule TrumanShell.Support.TreeWalkerTest do
 
     test "SECURITY: does not traverse symlinks to directories (prevents sandbox escape)" do
       # Create sandbox directory
-      sandbox = Path.join(System.tmp_dir!(), "truman-test-sandbox-#{:rand.uniform(100_000)}")
+      sandbox = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-sandbox-#{:rand.uniform(100_000)}")
       # Create outside directory (simulates /etc or other protected area)
-      outside = Path.join(System.tmp_dir!(), "truman-test-outside-#{:rand.uniform(100_000)}")
+      outside = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-outside-#{:rand.uniform(100_000)}")
 
       File.mkdir_p!(sandbox)
       File.mkdir_p!(outside)
@@ -177,8 +177,8 @@ defmodule TrumanShell.Support.TreeWalkerTest do
     end
 
     test "SECURITY: does not follow symlinks to files" do
-      sandbox = Path.join(System.tmp_dir!(), "truman-test-sandbox-file-#{:rand.uniform(100_000)}")
-      outside = Path.join(System.tmp_dir!(), "truman-test-outside-file-#{:rand.uniform(100_000)}")
+      sandbox = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-sandbox-file-#{:rand.uniform(100_000)}")
+      outside = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-outside-file-#{:rand.uniform(100_000)}")
 
       File.mkdir_p!(sandbox)
       File.mkdir_p!(outside)
@@ -212,7 +212,7 @@ defmodule TrumanShell.Support.TreeWalkerTest do
     test "SAFETY: enforces maximum depth limit to prevent stack overflow" do
       # TreeWalker has a hard-coded max depth of 100 to prevent stack overflow
       # on maliciously deep directory structures
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-depth-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-depth-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do

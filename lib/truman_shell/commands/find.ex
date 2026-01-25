@@ -6,6 +6,7 @@ defmodule TrumanShell.Commands.Find do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
   alias TrumanShell.Support.TreeWalker
 
@@ -141,7 +142,7 @@ defmodule TrumanShell.Commands.Find do
   end
 
   defp matches_pattern?(path, pattern) do
-    filename = Path.basename(path)
+    filename = DomePath.basename(path)
 
     regex_pattern =
       pattern
@@ -163,7 +164,7 @@ defmodule TrumanShell.Commands.Find do
   defp format_entry(file, base_path, original_path) when file == base_path, do: original_path
 
   defp format_entry(file, base_path, original_path) do
-    relative = Path.relative_to(file, base_path)
-    if original_path == ".", do: "./#{relative}", else: Path.join(original_path, relative)
+    relative = DomePath.relative_to(file, base_path)
+    if original_path == ".", do: "./#{relative}", else: DomePath.join(original_path, relative)
   end
 end

@@ -7,7 +7,7 @@ defmodule TrumanShell.Commands.FindTest do
 
   describe "handle/2" do
     test "find . -name pattern finds matching files" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-find-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -33,7 +33,7 @@ defmodule TrumanShell.Commands.FindTest do
     end
 
     test "find returns error for path outside sandbox (404 principle)" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-sandbox-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-find-sandbox-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -56,7 +56,7 @@ defmodule TrumanShell.Commands.FindTest do
     end
 
     test "find -type f finds only files" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-type-f-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-find-type-f-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -76,7 +76,7 @@ defmodule TrumanShell.Commands.FindTest do
     end
 
     test "find -type d finds only directories" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-type-d-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-find-type-d-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -96,7 +96,7 @@ defmodule TrumanShell.Commands.FindTest do
     end
 
     test "find -maxdepth limits search depth" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-maxdepth-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-find-maxdepth-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -120,7 +120,7 @@ defmodule TrumanShell.Commands.FindTest do
 
     test "find -maxdepth 0 returns only the starting directory" do
       # GNU find with -maxdepth 0 only examines the start point itself
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-find-maxdepth0-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-find-maxdepth0-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do

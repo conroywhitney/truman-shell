@@ -6,6 +6,7 @@ defmodule TrumanShell.Commands.Ls do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   @max_output_lines 200
@@ -140,7 +141,7 @@ defmodule TrumanShell.Commands.Ls do
   end
 
   defp format_entry(base_path, name) do
-    full_path = Path.join(base_path, name)
+    full_path = DomePath.join(base_path, name)
 
     if File.dir?(full_path) do
       name <> "/"

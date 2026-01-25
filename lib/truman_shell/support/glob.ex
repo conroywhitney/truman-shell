@@ -6,6 +6,7 @@ defmodule TrumanShell.Support.Glob do
   Enforces a maximum depth limit of 100 levels for recursive patterns.
   """
 
+  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   # Maximum depth for recursive glob patterns (consistent with TreeWalker)
@@ -46,11 +47,33 @@ defmodule TrumanShell.Support.Glob do
   """
   @spec expand(String.t(), map()) :: [String.t()] | String.t()
   def expand(pattern, context) do
+    # Defense-in-depth: validate current_dir is absolute and inside sandbox
+    # This prevents Path.wildcard from resolving relative patterns against process cwd
+    # (In normal operation, current_dir is always validated by cd command)
+    with :ok <- validate_current_dir_is_absolute(context.current_dir),
+         {:ok, validated_current_dir} <- Sandbox.validate_path(context.current_dir, context.sandbox_root) do
+      do_expand_with_context(pattern, %{context | current_dir: validated_current_dir})
+    else
+      _ ->
+        # Invalid current_dir - fail safe by returning original pattern
+        pattern
+    end
+  end
+
+  defp validate_current_dir_is_absolute(current_dir) do
+    if DomePath.type(current_dir) == :absolute do
+      :ok
+    else
+      {:error, :relative_current_dir}
+    end
+  end
+
+  defp do_expand_with_context(pattern, context) do
     is_absolute = String.starts_with?(pattern, "/")
     full_pattern = resolve_pattern(pattern, is_absolute, context.current_dir)
     base_dir = glob_base_dir(full_pattern)
 
-    # Security: validate base path is in sandbox BEFORE calling Path.wildcard
+    # Security: validate base path is in sandbox BEFORE calling DomePath.wildcard
     # This prevents filesystem enumeration outside the sandbox
     if in_sandbox?(base_dir, context.sandbox_root) do
       do_expand(pattern, full_pattern, base_dir, is_absolute, context)
@@ -60,7 +83,7 @@ defmodule TrumanShell.Support.Glob do
   end
 
   defp resolve_pattern(pattern, true, _current_dir), do: pattern
-  defp resolve_pattern(pattern, false, current_dir), do: Path.join(current_dir, pattern)
+  defp resolve_pattern(pattern, false, current_dir), do: DomePath.join(current_dir, pattern)
 
   defp do_expand(pattern, full_pattern, base_dir, is_absolute, context) do
     match_dot = pattern_matches_dotfiles?(pattern)
@@ -68,7 +91,7 @@ defmodule TrumanShell.Support.Glob do
 
     matches =
       full_pattern
-      |> Path.wildcard(match_dot: match_dot)
+      |> DomePath.wildcard(match_dot: match_dot)
       |> Enum.filter(&(in_sandbox?(&1, context.sandbox_root) and within_depth_limit?(&1, base_dir)))
       |> normalize_paths(is_absolute, has_dot_prefix, context.current_dir)
       |> Enum.sort()
@@ -83,7 +106,7 @@ defmodule TrumanShell.Support.Glob do
 
   defp normalize_paths(paths, false = _is_absolute, has_dot_prefix, current_dir) do
     paths
-    |> Enum.map(&Path.relative_to(&1, current_dir))
+    |> Enum.map(&DomePath.relative_to(&1, current_dir))
     |> then(fn relative_paths ->
       if has_dot_prefix do
         Enum.map(relative_paths, &"./#{&1}")
@@ -96,9 +119,9 @@ defmodule TrumanShell.Support.Glob do
   # Extract the base directory from a glob pattern (everything before first wildcard)
   defp glob_base_dir(pattern) do
     pattern
-    |> Path.split()
+    |> DomePath.split()
     |> Enum.take_while(&(not String.contains?(&1, "*")))
-    |> Path.join()
+    |> DomePath.join()
     |> case do
       "" -> "."
       dir -> dir
@@ -107,14 +130,14 @@ defmodule TrumanShell.Support.Glob do
 
   # Check if path depth relative to base doesn't exceed limit
   defp within_depth_limit?(path, base_dir) do
-    relative = Path.relative_to(path, base_dir)
-    depth = relative |> Path.split() |> length()
+    relative = DomePath.relative_to(path, base_dir)
+    depth = relative |> DomePath.split() |> length()
     depth <= @max_depth_limit
   end
 
   # Check if pattern explicitly targets dotfiles (basename starts with .)
   defp pattern_matches_dotfiles?(pattern) do
-    pattern |> Path.basename() |> String.starts_with?(".")
+    pattern |> DomePath.basename() |> String.starts_with?(".")
   end
 
   defp in_sandbox?(path, sandbox_root) do

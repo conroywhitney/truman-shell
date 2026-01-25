@@ -7,7 +7,7 @@ defmodule TrumanShell.Commands.WcTest do
 
   describe "handle/2" do
     test "returns line, word, and character counts" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -28,7 +28,7 @@ defmodule TrumanShell.Commands.WcTest do
     end
 
     test "counts multiple files with total" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-multi-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-multi-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -48,7 +48,7 @@ defmodule TrumanShell.Commands.WcTest do
     end
 
     test "returns error for missing file" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-missing-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-missing-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -63,7 +63,7 @@ defmodule TrumanShell.Commands.WcTest do
     end
 
     test "returns error for path outside sandbox (404 principle)" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-sandbox-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-sandbox-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -78,7 +78,7 @@ defmodule TrumanShell.Commands.WcTest do
     end
 
     test "wc -l shows only line count" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-l-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-l-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -98,7 +98,7 @@ defmodule TrumanShell.Commands.WcTest do
     end
 
     test "wc -w shows only word count" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-w-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-w-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -115,7 +115,7 @@ defmodule TrumanShell.Commands.WcTest do
     end
 
     test "wc -c shows only byte count" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-c-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-c-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -135,7 +135,7 @@ defmodule TrumanShell.Commands.WcTest do
     test "wc -c counts BYTES not graphemes (Unicode correctness)" do
       # 😄 is 4 UTF-8 bytes but 1 grapheme
       # GNU wc -c counts bytes, so "😄\n" should be 5 bytes (4 + newline)
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-unicode-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-unicode-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -153,7 +153,7 @@ defmodule TrumanShell.Commands.WcTest do
     end
 
     test "wc on zero-length file returns 0 0 0" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-empty-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-empty-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -171,7 +171,7 @@ defmodule TrumanShell.Commands.WcTest do
 
     test "explicit file argument takes precedence over stdin" do
       # Unix behavior: `echo "stdin" | wc -l file.txt` reads file.txt, ignores stdin
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-wc-prec-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-wc-prec-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do

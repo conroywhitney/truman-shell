@@ -10,7 +10,7 @@ defmodule TrumanShell.CLITest do
   @truman_shell Path.expand("../../bin/truman-shell", __DIR__)
 
   setup do
-    sandbox = Path.join(System.tmp_dir!(), "cli_test_#{:rand.uniform(100_000)}")
+    sandbox = Path.join(Path.join(File.cwd!(), "tmp"), "cli_test_#{:rand.uniform(100_000)}")
     File.mkdir_p!(sandbox)
     File.mkdir_p!(Path.join(sandbox, "lib"))
     File.write!(Path.join(sandbox, "lib/example.ex"), "# test file")

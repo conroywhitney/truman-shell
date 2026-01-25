@@ -6,6 +6,7 @@ defmodule TrumanShell.Commands.Grep do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.DomePath
   alias TrumanShell.Support.FileIO
   alias TrumanShell.Support.Sandbox
   alias TrumanShell.Support.TreeWalker
@@ -173,13 +174,13 @@ defmodule TrumanShell.Commands.Grep do
   defp search_files_with_prefix(opts, pattern, files, base_path, original_path, context) do
     results =
       Enum.map(files, fn file ->
-        relative = Path.relative_to(file, base_path)
+        relative = DomePath.relative_to(file, base_path)
 
         display_path =
           if original_path == "." do
             relative
           else
-            Path.join(original_path, relative)
+            DomePath.join(original_path, relative)
           end
 
         case FileIO.read_file(file, context) do

@@ -7,7 +7,7 @@ defmodule TrumanShell.Commands.CatTest do
 
   describe "handle/2" do
     test "returns file contents" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-cat-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -23,7 +23,7 @@ defmodule TrumanShell.Commands.CatTest do
     end
 
     test "concatenates multiple files in order" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-multi-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-cat-multi-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -40,7 +40,7 @@ defmodule TrumanShell.Commands.CatTest do
     end
 
     test "stops on first missing file" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-stop-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-cat-stop-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -58,7 +58,7 @@ defmodule TrumanShell.Commands.CatTest do
     end
 
     test "returns error for missing file" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-missing-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-cat-missing-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -83,7 +83,7 @@ defmodule TrumanShell.Commands.CatTest do
     end
 
     test "returns error for file exceeding size limit (10MB)" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-size-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-cat-size-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
@@ -113,7 +113,7 @@ defmodule TrumanShell.Commands.CatTest do
     end
 
     test "explicit file argument takes precedence over stdin" do
-      tmp_dir = Path.join(System.tmp_dir!(), "truman-test-cat-stdin-#{:rand.uniform(100_000)}")
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-cat-stdin-#{:rand.uniform(100_000)}")
       File.mkdir_p!(tmp_dir)
 
       try do
