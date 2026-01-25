@@ -150,5 +150,31 @@ defmodule TrumanShell.Commands.FindTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "find . uses current_path, not home_path (P1 fix)" do
+      # When current_path != home_path (after cd), find . should search current_path
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-find-cwd-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create structure: sandbox/subdir/found.txt and sandbox/root.txt
+        subdir = Path.join(tmp_dir, "subdir")
+        File.mkdir_p!(subdir)
+        File.write!(Path.join(subdir, "found.txt"), "in subdir")
+        File.write!(Path.join(tmp_dir, "root.txt"), "at root")
+
+        # Simulate: cd subdir (current_path = subdir, home_path = sandbox root)
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: subdir, sandbox_config: config}
+
+        {:ok, output} = Find.handle([".", "-name", "*.txt"], ctx)
+
+        # Should find subdir/found.txt, NOT sandbox/root.txt
+        assert output =~ "found.txt"
+        refute output =~ "root.txt"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end

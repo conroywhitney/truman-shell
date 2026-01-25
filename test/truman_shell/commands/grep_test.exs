@@ -301,5 +301,31 @@ defmodule TrumanShell.Commands.GrepTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "grep -r . uses current_path, not home_path (P1 fix)" do
+      # When current_path != home_path (after cd), grep -r . should search current_path
+      tmp_dir = Path.join(Path.join(File.cwd!(), "tmp"), "truman-test-grep-cwd-#{:rand.uniform(100_000)}")
+      File.mkdir_p!(tmp_dir)
+
+      try do
+        # Create structure: sandbox/subdir/found.txt and sandbox/root.txt
+        subdir = Path.join(tmp_dir, "subdir")
+        File.mkdir_p!(subdir)
+        File.write!(Path.join(subdir, "found.txt"), "NEEDLE in subdir\n")
+        File.write!(Path.join(tmp_dir, "root.txt"), "NEEDLE at root\n")
+
+        # Simulate: cd subdir (current_path = subdir, home_path = sandbox root)
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: subdir, sandbox_config: config}
+
+        {:ok, output} = Grep.handle(["-r", "NEEDLE", "."], ctx)
+
+        # Should find subdir/found.txt, NOT sandbox/root.txt
+        assert output =~ "in subdir"
+        refute output =~ "at root"
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 end
