@@ -27,6 +27,9 @@ defmodule TrumanShell.MixProject do
 
   defp deps do
     [
+      # YAML parsing for agents.yaml config
+      {:yaml_elixir, "~> 2.11"},
+      # Dev/test only
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:credo_naming, "~> 2.1", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},

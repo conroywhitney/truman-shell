@@ -15,4 +15,6 @@
   "nimble_parsec": {:hex, :nimble_parsec, "1.4.2", "8efba0122db06df95bfaa78f791344a89352ba04baedd3849593bfce4d0dc1c6", [:mix], [], "hexpm", "4b21398942dda052b403bbe1da991ccd03a053668d147d53fb8c4e0efe09c973"},
   "styler": {:hex, :styler, "1.10.1", "9229050c978bfaaab1d94e8673843576d0127d48fe64824a30babde3d6342475", [:mix], [], "hexpm", "d86cbcc70e8ab424393af313d1d885931ba9dc7c383d7dd30f4ab255a8d39f73"},
   "tallarium_credo": {:hex, :tallarium_credo, "0.1.0", "85f50f422a8d41c7ec0494b70c9c55c8645278e6713ec37f098df878faa7294f", [:mix], [{:credo, ">= 1.5.1", [hex: :credo, repo: "hexpm", optional: false]}, {:destructure, "~> 0.2", [hex: :destructure, repo: "hexpm", optional: false]}], "hexpm", "eb096798a17dfbab3588b1b1cbbc49efb19517913c0a9ca5ce6ecd7b5a527d1d"},
+  "yamerl": {:hex, :yamerl, "0.10.0", "4ff81fee2f1f6a46f1700c0d880b24d193ddb74bd14ef42cb0bcf46e81ef2f8e", [:rebar3], [], "hexpm", "346adb2963f1051dc837a2364e4acf6eb7d80097c0f53cbdc3046ec8ec4b4e6e"},
+  "yaml_elixir": {:hex, :yaml_elixir, "2.12.0", "30343ff5018637a64b1b7de1ed2a3ca03bc641410c1f311a4dbdc1ffbbf449c7", [:mix], [{:yamerl, "~> 0.10", [hex: :yamerl, repo: "hexpm", optional: false]}], "hexpm", "ca6bacae7bac917a7155dca0ab6149088aa7bc800c94d0fe18c5238f53b313c6"},
 }

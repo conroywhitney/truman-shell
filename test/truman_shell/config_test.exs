@@ -9,8 +9,7 @@ defmodule TrumanShell.ConfigTest do
   """
   use ExUnit.Case, async: false
 
-  # We'll create this module
-  # alias TrumanShell.Config
+  alias TrumanShell.Config
 
   @moduletag :config
 
@@ -125,9 +124,14 @@ defmodule TrumanShell.ConfigTest do
     test "falls back to ~/.config/truman/agents.yaml" do
     end
 
-    @tag :skip
     test "returns sensible defaults when no config found" do
       # Default: single root = cwd, default_cwd = cwd
+      config = Config.defaults()
+
+      assert config.version == "0.1"
+      assert length(config.roots) == 1
+      assert hd(config.roots) == File.cwd!()
+      assert config.default_cwd == File.cwd!()
     end
   end
 
