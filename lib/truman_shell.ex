@@ -55,8 +55,8 @@ defmodule TrumanShell do
     # Pipeline: Tokenizer → Parser → Expander → Executor → Redirector
     # (Tokenizer is called by Parser, Redirector is called by Executor)
     with {:ok, command} <- parse(input) do
-      context = Sandbox.build_context()
-      expanded = Expander.expand(command, context)
+      config = Sandbox.build_config()
+      expanded = Expander.expand(command, config)
       Executor.run(expanded)
     end
   end
