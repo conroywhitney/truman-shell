@@ -11,7 +11,11 @@ defmodule TrumanShell.MixProject do
       escript: escript(),
       description: "A simulated shell environment for AI agents",
       package: package(),
-      dialyzer: dialyzer()
+      dialyzer: dialyzer(),
+      test_coverage: [
+        ignore_modules: [TrumanShell.CLI],
+        threshold: 90.0
+      ]
     ]
   end
 

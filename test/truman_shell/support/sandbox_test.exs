@@ -64,6 +64,12 @@ defmodule TrumanShell.Support.SandboxTest do
       assert result == "/custom/dome"
     end
 
+    test "normalizes root path to single slash" do
+      System.put_env("TRUMAN_DOME", "///")
+      result = Sandbox.sandbox_root()
+      assert result == "/"
+    end
+
     # Note: TRUMAN_DOME existence validation deferred to future PR
     # Current behavior: returns the configured path even if it doesn't exist
     # This allows testing with mock paths while production should use real dirs
@@ -96,6 +102,11 @@ defmodule TrumanShell.Support.SandboxTest do
     test "eloop error converts to 'Too many levels of symbolic links'" do
       message = Sandbox.error_message({:error, :eloop})
       assert message == "Too many levels of symbolic links"
+    end
+
+    test "unknown error converts to stringified atom" do
+      message = Sandbox.error_message({:error, :some_unknown_error})
+      assert message == "some_unknown_error"
     end
   end
 
