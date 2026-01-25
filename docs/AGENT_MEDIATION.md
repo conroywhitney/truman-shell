@@ -50,34 +50,28 @@ TrumanShell: "rm: /: No such file or directory"
 | `rm file` | ✅ Moves to .trash (reversible) |
 | `which ls` | "ls: TrumanShell builtin" |
 
-### The Escape Hatch
+### The Escape Hatch (Closed)
 
-**Problem**: Other tools bypass the sandbox!
+**Previously**: Other tools bypassed the sandbox. `Read("/etc/passwd")` returned file contents even though `Bash("cat /etc/passwd")` was blocked.
 
-```
-# This is blocked (goes through TrumanShell):
-Bash("cat /etc/passwd")  → "No such file or directory"
+**Now**: A single `PreToolUse` hook intercepts all file-access tools and validates paths through `Sandbox.validate_path/3`. See [`hooks/claude-code/`](../hooks/claude-code/) for setup.
 
-# This works (raw tool access):
-Read("/etc/passwd")  → [full file contents]
-```
-
-## Tool-by-Tool Mediation Plan
+## Tool-by-Tool Mediation
 
 ### Claude Code Tools
 
-| Tool | Category | Current | Mediation Strategy |
-|------|----------|---------|-------------------|
-| `Bash` | Execute | ✅ Hooked | Route through TrumanShell |
-| `Read` | File | ❌ Raw | Validate path, return 404 or content |
-| `Write` | File | ❌ Raw | Validate path, enforce sandbox |
-| `Edit` | File | ❌ Raw | Validate path, enforce sandbox |
-| `Glob` | Search | ❌ Raw | Filter results to whitelisted paths |
-| `Grep` | Search | ❌ Raw | Only search whitelisted paths |
-| `NotebookEdit` | File | ❌ Raw | Validate notebook path |
-| `WebFetch` | Web | ❌ Raw | URL allowlist? |
-| `WebSearch` | Web | ❌ Raw | Query filtering? |
-| `Task` | Agent | ❌ Raw | Subagent inherits sandbox? |
+| Tool | Category | Status | Mediation Strategy |
+|------|----------|--------|-------------------|
+| `Bash` | Execute | ✅ Hooked | Route through `truman-shell execute` |
+| `Read` | File | ✅ Hooked | Validate `file_path` via `truman-shell validate-path` |
+| `Write` | File | ✅ Hooked | Validate `file_path` via `truman-shell validate-path` |
+| `Edit` | File | ✅ Hooked | Validate `file_path` via `truman-shell validate-path` |
+| `Glob` | Search | ✅ Hooked | Validate `path` via `truman-shell validate-path` |
+| `Grep` | Search | ✅ Hooked | Validate `path` via `truman-shell validate-path` |
+| `NotebookEdit` | File | — | Not hooked (low priority) |
+| `WebFetch` | Web | — | Not hooked (network, not filesystem) |
+| `WebSearch` | Web | — | Not hooked (network, not filesystem) |
+| `Task` | Agent | — | Subagent inherits parent hooks |
 
 ### Hook Implementation Pattern
 
@@ -246,10 +240,13 @@ Every agent operation flows through TrumanShell:
 
 ## Files
 
-- Hook: `.claude/hooks/truman-proxy-experiment.{sh,ts}`
-- Config: `.claude/settings.json`
+- Hooks: `hooks/claude-code/truman-sandbox.{sh,ts}` (production)
+- Settings: `hooks/claude-code/settings-snippet.json`
+- Setup: `hooks/claude-code/README.md`
+- CLI: `bin/truman-shell` (with `validate-path` subcommand)
+- Escript: `dist/truman-shell` (built via `mix escript.build`)
 - Core: `lib/truman_shell.ex`
-- CLI: `bin/truman-shell`
+- Sandbox: `lib/truman_shell/support/sandbox.ex`
 
 ## References
 

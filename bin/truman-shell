@@ -4,7 +4,8 @@
 #
 # Usage:
 #   truman-shell execute "ls -la"
-#   truman-shell execute "cat file.txt | grep pattern"
+#   truman-shell validate-path "/etc/passwd"
+#   truman-shell validate-path "lib/foo.ex" "/sandbox/cwd"
 #
 # Returns the command output on success, error message on failure.
 # Exit code: 0 on success, 1 on error.
@@ -12,17 +13,30 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ESCRIPT="$SCRIPT_DIR/dist/truman-shell"
 
+# If escript exists, use it (fast path — no mix startup overhead)
+if [ -x "$ESCRIPT" ]; then
+  exec "$ESCRIPT" "$@"
+fi
+
+# Fall back to mix run for development
 usage() {
   echo "Usage: truman-shell <command> [args]"
   echo ""
   echo "Commands:"
-  echo "  execute <shell-command>  Execute a command through TrumanShell"
-  echo "  version                  Show version"
+  echo "  execute <shell-command>                Execute a command through TrumanShell"
+  echo "  validate-path <path> [<current_dir>]   Validate path is within sandbox"
+  echo "  version                                Show version"
+  echo ""
+  echo "Environment:"
+  echo "  TRUMAN_DOME          Sandbox root directory (default: cwd)"
   echo ""
   echo "Examples:"
   echo "  truman-shell execute 'ls -la'"
   echo "  truman-shell execute 'cat README.md | head -10'"
+  echo "  truman-shell validate-path '/etc/passwd'"
+  echo "  TRUMAN_DOME=/tmp truman-shell validate-path './test.txt'"
 }
 
 case "${1:-}" in
@@ -52,6 +66,45 @@ case "${1:-}" in
           System.halt(0)
         {:error, reason} ->
           IO.puts(:stderr, "Error: #{reason}")
+          System.halt(1)
+      end
+    '
+    ;;
+
+  validate-path)
+    shift
+    if [ -z "${1:-}" ]; then
+      echo "Error: No path provided" >&2
+      echo "Usage: truman-shell validate-path <path> [<current_dir>]" >&2
+      exit 1
+    fi
+
+    # Pass path via environment variable for safety
+    export TRUMAN_VALIDATE_PATH="$1"
+    export TRUMAN_CURRENT_DIR="${2:-}"
+
+    cd "$SCRIPT_DIR"
+
+    elixir -S mix run --no-start -e '
+      alias TrumanShell.Support.Sandbox
+
+      path = System.get_env("TRUMAN_VALIDATE_PATH") || ""
+      current_dir = case System.get_env("TRUMAN_CURRENT_DIR") do
+        nil -> nil
+        "" -> nil
+        dir -> dir
+      end
+
+      sandbox_root = Sandbox.sandbox_root()
+
+      case Sandbox.validate_path(path, sandbox_root, current_dir) do
+        {:ok, resolved} ->
+          IO.write(resolved)
+          System.halt(0)
+        {:error, :eloop} ->
+          IO.puts(:stderr, "Too many levels of symbolic links")
+          System.halt(1)
+        {:error, _} ->
           System.halt(1)
       end
     '

@@ -1,0 +1,16 @@
+{
+  "_comment": "Add this to your project's .claude/settings.json to sandbox Claude Code with TrumanShell.",
+  "_instructions": "Replace /path/to/truman-shell with the actual path to your truman-shell checkout.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/truman-shell/hooks/claude-code/truman-sandbox.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

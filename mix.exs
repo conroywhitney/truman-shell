@@ -8,6 +8,7 @@ defmodule TrumanShell.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      escript: escript(),
       description: "A simulated shell environment for AI agents",
       package: package(),
       dialyzer: dialyzer()
@@ -28,6 +29,13 @@ defmodule TrumanShell.MixProject do
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
       {:styler, "~> 1.10", only: [:dev, :test], runtime: false},
       {:tallarium_credo, "~> 0.1", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp escript do
+    [
+      main_module: TrumanShell.CLI,
+      path: "dist/truman-shell"
     ]
   end
 

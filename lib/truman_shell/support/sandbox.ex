@@ -125,7 +125,7 @@ defmodule TrumanShell.Support.Sandbox do
 
   """
   @spec validate_path(String.t(), String.t(), String.t() | nil) ::
-          {:ok, String.t()} | {:error, :outside_sandbox}
+          {:ok, String.t()} | {:error, :outside_sandbox | :eloop}
   def validate_path(path, sandbox_root, current_dir \\ nil)
 
   def validate_path(path, sandbox_root, current_dir) do
