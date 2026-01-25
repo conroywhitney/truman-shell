@@ -405,4 +405,90 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == ["my dir/file.md"]
     end
   end
+
+  describe "expand/2 symlink security" do
+    test "rejects glob when base path IS a symlink", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create a real directory with files
+      real_dir = Path.join(current_dir, "real_dir")
+      File.mkdir_p!(real_dir)
+      File.write!(Path.join(real_dir, "file.md"), "content")
+
+      # Create a symlink to it
+      link_path = Path.join(current_dir, "link_to_real")
+      File.ln_s!(real_dir, link_path)
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Pattern with symlink in base path should return original pattern
+      # because base validation will detect the symlink
+      result = Glob.expand("link_to_real/*.md", context)
+
+      assert result == "link_to_real/*.md"
+    end
+
+    test "rejects glob results that traverse symlinks in subdirectories", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create a directory structure
+      parent_dir = Path.join(current_dir, "parent")
+      File.mkdir_p!(parent_dir)
+
+      # Create a real file in parent (should be found)
+      File.write!(Path.join(parent_dir, "real.md"), "real content")
+
+      # Create a symlink to /etc inside parent
+      etc_link = Path.join(parent_dir, "etc_link")
+      # Only create if not on a system where /etc doesn't exist
+      if File.exists?("/etc") do
+        File.ln_s!("/etc", etc_link)
+
+        context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+        # Pattern: parent/*/*.conf
+        # This WOULD match /etc/*.conf if symlinks were followed
+        # But the filter should reject symlink paths
+        result = Glob.expand("parent/*/*.conf", context)
+
+        # Should NOT find any /etc files - either no match or only sandbox files
+        assert result == "parent/*/*.conf" or
+                 (is_list(result) and not Enum.any?(result, &String.contains?(&1, "etc_link")))
+      end
+    end
+
+    test "glob results through symlinks are filtered by validation", %{
+      sandbox_root: sandbox,
+      current_dir: current_dir
+    } do
+      # Create structure: dir/link -> outside
+      # Pattern: dir/link/*
+      # Path.wildcard would return dir/link/file paths
+      # But DomePath.validate should reject them because link is a symlink
+
+      outside_dir = Path.join(Path.dirname(sandbox), "outside_glob_test_#{:erlang.unique_integer([:positive])}")
+      File.mkdir_p!(outside_dir)
+      File.write!(Path.join(outside_dir, "secret.md"), "secret data")
+
+      on_exit(fn -> File.rm_rf!(outside_dir) end)
+
+      # Create a symlink inside sandbox pointing outside
+      inside_dir = Path.join(current_dir, "dir")
+      File.mkdir_p!(inside_dir)
+      link_path = Path.join(inside_dir, "link")
+      File.ln_s!(outside_dir, link_path)
+
+      context = %{sandbox_root: sandbox, current_dir: current_dir}
+
+      # Try to glob through the symlink
+      result = Glob.expand("dir/link/*.md", context)
+
+      # Should NOT return the secret file
+      # Either returns original pattern (base rejected) or empty list filtered
+      assert result == "dir/link/*.md" or
+               (is_list(result) and Enum.empty?(result))
+    end
+  end
 end

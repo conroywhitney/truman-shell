@@ -114,8 +114,12 @@ defmodule TrumanShell.DomePath do
   # --- Private: Symlink detection (any symlink = error) ---
 
   defp check_symlinks_in_path(path) do
-    components = Path.split(path)
-    check_components_for_symlinks(components, "/")
+    # Path.split returns the root component first (e.g., "/" on Unix, "C:/" on Windows)
+    # Use the first component as the starting point for cross-platform compatibility
+    case Path.split(path) do
+      [] -> :ok
+      [root | rest] -> check_components_for_symlinks(rest, root)
+    end
   end
 
   defp check_components_for_symlinks([], _current), do: :ok
