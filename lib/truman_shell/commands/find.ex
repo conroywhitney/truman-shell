@@ -6,6 +6,7 @@ defmodule TrumanShell.Commands.Find do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
   alias TrumanShell.Support.TreeWalker
@@ -94,7 +95,9 @@ defmodule TrumanShell.Commands.Find do
   end
 
   defp find_files(path, opts, context) do
-    case Sandbox.validate_path(path, context.sandbox_root) do
+    config = to_sandbox_config(context)
+
+    case Sandbox.validate_path(path, config) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
           do_find(safe_path, path, opts)
@@ -166,5 +169,11 @@ defmodule TrumanShell.Commands.Find do
   defp format_entry(file, base_path, original_path) do
     relative = DomePath.relative_to(file, base_path)
     if original_path == ".", do: "./#{relative}", else: DomePath.join(original_path, relative)
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

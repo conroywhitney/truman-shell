@@ -14,6 +14,7 @@ defmodule TrumanShell.Commands.Cd do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -58,8 +59,9 @@ defmodule TrumanShell.Commands.Cd do
     # Then make it relative to sandbox for validation
     target_abs = DomePath.expand(path, context.current_dir)
     target_rel = DomePath.relative_to(target_abs, context.sandbox_root)
+    config = to_sandbox_config(context)
 
-    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, context.sandbox_root),
+    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, config),
          {:dir, true} <- {:dir, File.dir?(safe_path)} do
       # Return success with the new cwd for executor to apply
       {:ok, "", set_cwd: safe_path}
@@ -78,5 +80,11 @@ defmodule TrumanShell.Commands.Cd do
           {:error, "bash: cd: #{path}: No such file or directory\n"}
         end
     end
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because cd.ex pre-resolves paths relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

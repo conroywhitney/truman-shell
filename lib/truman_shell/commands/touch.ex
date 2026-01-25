@@ -8,6 +8,7 @@ defmodule TrumanShell.Commands.Touch do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
@@ -31,8 +32,9 @@ defmodule TrumanShell.Commands.Touch do
   def handle([file_name | _rest], context) do
     target = DomePath.expand(file_name, context.current_dir)
     target_rel = DomePath.relative_to(target, context.sandbox_root)
+    config = to_sandbox_config(context)
 
-    case Sandbox.validate_path(target_rel, context.sandbox_root) do
+    case Sandbox.validate_path(target_rel, config) do
       {:ok, safe_path} ->
         case File.touch(safe_path) do
           :ok -> {:ok, ""}
@@ -46,5 +48,11 @@ defmodule TrumanShell.Commands.Touch do
 
   def handle([], _context) do
     {:error, "touch: missing file operand\n"}
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

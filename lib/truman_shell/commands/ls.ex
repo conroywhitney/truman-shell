@@ -6,6 +6,7 @@ defmodule TrumanShell.Commands.Ls do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -87,7 +88,9 @@ defmodule TrumanShell.Commands.Ls do
 
   # List a single path (file or directory)
   defp list_single_path(path, context) do
-    case Sandbox.validate_path(path, context.sandbox_root) do
+    config = to_sandbox_config(context)
+
+    case Sandbox.validate_path(path, config) do
       {:ok, safe_path} ->
         cond do
           File.regular?(safe_path) ->
@@ -148,5 +151,11 @@ defmodule TrumanShell.Commands.Ls do
     else
       name
     end
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

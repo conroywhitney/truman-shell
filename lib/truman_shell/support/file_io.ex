@@ -3,6 +3,7 @@ defmodule TrumanShell.Support.FileIO do
   Shared file I/O functions for command handlers.
   """
 
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -40,8 +41,9 @@ defmodule TrumanShell.Support.FileIO do
     # Resolve path relative to current working directory
     target = DomePath.expand(path, context.current_dir)
     target_rel = DomePath.relative_to(target, context.sandbox_root)
+    config = to_sandbox_config(context)
 
-    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, context.sandbox_root),
+    with {:ok, safe_path} <- Sandbox.validate_path(target_rel, config),
          {:ok, contents} <- read_with_limit(safe_path) do
       {:ok, contents}
     else
@@ -156,5 +158,11 @@ defmodule TrumanShell.Support.FileIO do
       {n, ""} when n > 0 -> {:ok, n}
       _ -> :error
     end
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

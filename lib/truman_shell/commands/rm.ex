@@ -19,6 +19,7 @@ defmodule TrumanShell.Commands.Rm do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -69,8 +70,9 @@ defmodule TrumanShell.Commands.Rm do
   defp handle_rm([file_name | _], context, opts) do
     target = DomePath.expand(file_name, context.current_dir)
     target_rel = DomePath.relative_to(target, context.sandbox_root)
+    config = to_sandbox_config(context)
 
-    case Sandbox.validate_path(target_rel, context.sandbox_root) do
+    case Sandbox.validate_path(target_rel, config) do
       {:ok, safe_path} ->
         soft_delete(safe_path, file_name, context.sandbox_root, opts)
 
@@ -118,5 +120,11 @@ defmodule TrumanShell.Commands.Rm do
       :ok -> {:ok, ""}
       {:error, _} -> {:error, "rm: #{file_name}: No such file or directory\n"}
     end
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

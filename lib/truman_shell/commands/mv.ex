@@ -8,6 +8,7 @@ defmodule TrumanShell.Commands.Mv do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
@@ -35,9 +36,10 @@ defmodule TrumanShell.Commands.Mv do
 
     dst_target = DomePath.expand(dst, context.current_dir)
     dst_rel = DomePath.relative_to(dst_target, context.sandbox_root)
+    config = to_sandbox_config(context)
 
-    with {:ok, src_safe} <- Sandbox.validate_path(src_rel, context.sandbox_root),
-         {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, context.sandbox_root),
+    with {:ok, src_safe} <- Sandbox.validate_path(src_rel, config),
+         {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, config),
          true <- File.exists?(src_safe) do
       case File.rename(src_safe, dst_safe) do
         :ok -> {:ok, ""}
@@ -58,5 +60,11 @@ defmodule TrumanShell.Commands.Mv do
 
   def handle([], _context) do
     {:error, "mv: missing file operand\n"}
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

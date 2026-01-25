@@ -17,6 +17,7 @@ defmodule TrumanShell.Stages.Redirector do
   - Earlier redirects create/truncate the file with empty content
   """
 
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
@@ -68,8 +69,8 @@ defmodule TrumanShell.Stages.Redirector do
         {"", output}
       end
 
-    sandbox_root = context.sandbox_root
     current_dir = context.current_dir
+    config = to_sandbox_config(context)
 
     # Resolve path: absolute paths stay as-is, relative paths join with current_dir
     target_path =
@@ -80,7 +81,7 @@ defmodule TrumanShell.Stages.Redirector do
       end
 
     # Validate the resolved path against sandbox
-    with {:ok, safe_path} <- Sandbox.validate_path(target_path, sandbox_root),
+    with {:ok, safe_path} <- Sandbox.validate_path(target_path, config),
          :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
       do_apply(next_output, rest, context)
     else
@@ -98,5 +99,11 @@ defmodule TrumanShell.Stages.Redirector do
       :ok -> :ok
       {:error, reason} -> {:error, "bash: #{original_path}: #{Errors.to_message(reason)}\n"}
     end
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end

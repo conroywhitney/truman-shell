@@ -8,6 +8,7 @@ defmodule TrumanShell.Commands.Cp do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
@@ -51,9 +52,10 @@ defmodule TrumanShell.Commands.Cp do
 
     dst_target = DomePath.expand(dst, context.current_dir)
     dst_rel = DomePath.relative_to(dst_target, context.sandbox_root)
+    config = to_sandbox_config(context)
 
-    with {:ok, src_safe} <- Sandbox.validate_path(src_rel, context.sandbox_root),
-         {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, context.sandbox_root) do
+    with {:ok, src_safe} <- Sandbox.validate_path(src_rel, config),
+         {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, config) do
       do_copy(src_safe, dst_safe, src, opts)
     else
       {:error, :outside_sandbox} ->
@@ -90,5 +92,11 @@ defmodule TrumanShell.Commands.Cp do
     else
       {:error, "cp: -r not specified; omitting directory '#{src_name}'\n"}
     end
+  end
+
+  # Convert legacy context map to SandboxConfig struct
+  # Use sandbox_root as default_cwd because path is pre-resolved relative to sandbox_root
+  defp to_sandbox_config(%{sandbox_root: root}) do
+    %SandboxConfig{roots: [root], default_cwd: root}
   end
 end
