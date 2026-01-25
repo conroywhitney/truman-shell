@@ -485,10 +485,9 @@ defmodule TrumanShell.Support.GlobTest do
       # Try to glob through the symlink
       result = Glob.expand("dir/link/*.md", context)
 
-      # Should NOT return the secret file
-      # Either returns original pattern (base rejected) or empty list filtered
-      assert result == "dir/link/*.md" or
-               (is_list(result) and Enum.empty?(result))
+      # Should return original pattern (base contains symlink, rejected before wildcard)
+      # Per Glob contract: "no match returns original pattern"
+      assert result == "dir/link/*.md"
     end
   end
 
