@@ -271,15 +271,19 @@ defmodule TrumanShell.Config do
 
   defp validate_roots(roots) do
     Enum.reduce_while(roots, :ok, fn root, :ok ->
-      cond do
-        not File.exists?(root) ->
-          {:halt, {:error, "root does not exist: #{root}"}}
+      # Use File.stat for atomic check (avoids TOCTOU race)
+      case File.stat(root) do
+        {:ok, %{type: :directory}} ->
+          {:cont, :ok}
 
-        not File.dir?(root) ->
+        {:ok, %{type: _other}} ->
           {:halt, {:error, "root is not a directory: #{root}"}}
 
-        true ->
-          {:cont, :ok}
+        {:error, :enoent} ->
+          {:halt, {:error, "root does not exist: #{root}"}}
+
+        {:error, reason} ->
+          {:halt, {:error, "cannot access root #{root}: #{reason}"}}
       end
     end)
   end
@@ -288,18 +292,23 @@ defmodule TrumanShell.Config do
     # Build a temporary sandbox to check if cwd is within roots
     sandbox = %Config.Sandbox{roots: roots, default_cwd: default_cwd}
 
-    cond do
-      not File.exists?(default_cwd) ->
-        {:error, "default_cwd does not exist: #{default_cwd}"}
+    # Use File.stat for atomic check (avoids TOCTOU race)
+    case File.stat(default_cwd) do
+      {:ok, %{type: :directory}} ->
+        if Config.Sandbox.path_allowed?(sandbox, default_cwd) do
+          :ok
+        else
+          {:error, "default_cwd must be within one of the roots: #{default_cwd}"}
+        end
 
-      not File.dir?(default_cwd) ->
+      {:ok, %{type: _other}} ->
         {:error, "default_cwd is not a directory: #{default_cwd}"}
 
-      not Config.Sandbox.path_allowed?(sandbox, default_cwd) ->
-        {:error, "default_cwd must be within one of the roots: #{default_cwd}"}
+      {:error, :enoent} ->
+        {:error, "default_cwd does not exist: #{default_cwd}"}
 
-      true ->
-        :ok
+      {:error, reason} ->
+        {:error, "cannot access default_cwd #{default_cwd}: #{reason}"}
     end
   end
 
