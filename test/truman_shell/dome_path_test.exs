@@ -10,7 +10,7 @@ defmodule TrumanShell.DomePathTest do
   - `within?/2` - pure string boundary checking
 
   **Wrapper functions (delegate to Path.*):**
-  - `basename/1`, `type/1`, `split/1`
+  - `basename/1`, `dirname/1`, `type/1`, `split/1`
   - `join/1`, `join/2`
   - `expand/1`, `expand/2`
   - `relative_to/2`
@@ -277,6 +277,24 @@ defmodule TrumanShell.DomePathTest do
 
     test "returns :relative for dot path" do
       assert DomePath.type("./foo") == :relative
+    end
+  end
+
+  describe "dirname/1" do
+    test "returns parent directory of file path" do
+      assert DomePath.dirname("/foo/bar/baz.ex") == "/foo/bar"
+    end
+
+    test "returns parent of nested directory" do
+      assert DomePath.dirname("/foo/bar") == "/foo"
+    end
+
+    test "returns root for top-level file" do
+      assert DomePath.dirname("/foo") == "/"
+    end
+
+    test "returns dot for relative file without directory" do
+      assert DomePath.dirname("foo.ex") == "."
     end
   end
 

@@ -18,6 +18,8 @@ defmodule TrumanShell.Config.Sandbox do
 
   """
 
+  alias TrumanShell.DomePath
+
   @type t :: %__MODULE__{
           roots: [String.t()],
           default_cwd: String.t()
@@ -100,14 +102,14 @@ defmodule TrumanShell.Config.Sandbox do
   defp resolve_real_path(path) do
     case File.read_link(path) do
       {:ok, target} ->
-        if Path.type(target) == :absolute do
+        if DomePath.type(target) == :absolute do
           resolve_real_path(target)
         else
-          path |> Path.dirname() |> Path.join(target) |> resolve_real_path()
+          path |> DomePath.dirname() |> DomePath.join(target) |> resolve_real_path()
         end
 
       {:error, _} ->
-        Path.expand(path)
+        DomePath.expand(path)
     end
   end
 end

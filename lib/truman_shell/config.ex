@@ -42,6 +42,8 @@ defmodule TrumanShell.Config do
   # expand_user_home/2 expands ~ to sandbox_root (agent's home).
   # For config loading, we expand ~ to the user's actual home.
 
+  alias TrumanShell.DomePath
+
   @type t :: %__MODULE__{
           version: String.t(),
           roots: [String.t()],
@@ -175,7 +177,7 @@ defmodule TrumanShell.Config do
         end
 
       found ->
-        {:ok, Path.expand(found)}
+        {:ok, DomePath.expand(found)}
     end
   end
 
@@ -235,10 +237,10 @@ defmodule TrumanShell.Config do
     if String.contains?(expanded, "*") do
       # Glob expansion
       expanded
-      |> Path.wildcard()
+      |> DomePath.wildcard()
       |> Enum.filter(&File.dir?/1)
     else
-      [Path.expand(expanded)]
+      [DomePath.expand(expanded)]
     end
   end
 
@@ -246,12 +248,12 @@ defmodule TrumanShell.Config do
     expanded = expand_user_home(raw_cwd)
 
     # Absolute path
-    if Path.type(expanded) == :absolute do
-      Path.expand(expanded)
+    if DomePath.type(expanded) == :absolute do
+      DomePath.expand(expanded)
     else
       # Relative path - resolve against first root
       first_root = List.first(roots, File.cwd!())
-      Path.expand(expanded, first_root)
+      DomePath.expand(expanded, first_root)
     end
   end
 
@@ -301,7 +303,7 @@ defmodule TrumanShell.Config do
 
   # Expand ~ to user's home directory (for config paths, not agent paths)
   defp expand_user_home("~"), do: System.user_home!()
-  defp expand_user_home("~/" <> rest), do: Path.join(System.user_home!(), rest)
+  defp expand_user_home("~/" <> rest), do: DomePath.join(System.user_home!(), rest)
   defp expand_user_home(path), do: path
 
   # Resolve symlinks to get real path
@@ -309,15 +311,15 @@ defmodule TrumanShell.Config do
     case File.read_link(path) do
       {:ok, target} ->
         # Symlink - resolve it
-        if Path.type(target) == :absolute do
+        if DomePath.type(target) == :absolute do
           resolve_real_path(target)
         else
-          path |> Path.dirname() |> Path.join(target) |> resolve_real_path()
+          path |> DomePath.dirname() |> DomePath.join(target) |> resolve_real_path()
         end
 
       {:error, _} ->
         # Not a symlink, just expand
-        Path.expand(path)
+        DomePath.expand(path)
     end
   end
 end
