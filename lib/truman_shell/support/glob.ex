@@ -7,7 +7,6 @@ defmodule TrumanShell.Support.Glob do
   """
 
   alias TrumanShell.Commands.Context
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -53,16 +52,18 @@ defmodule TrumanShell.Support.Glob do
 
   """
   @spec expand(String.t(), Context.t()) :: [String.t()] | String.t()
-  def expand(pattern, %Context{current_path: current_path, sandbox_config: config}) do
+  def expand(pattern, %Context{} = ctx) do
     # current_path is @enforce_keys in Context - if nil, let it crash
-    do_expand_with_validation(pattern, current_path, config)
+    do_expand_with_validation(pattern, ctx)
   end
 
-  defp do_expand_with_validation(pattern, current_path, config) do
+  defp do_expand_with_validation(pattern, ctx) do
+    current_path = ctx.current_path
+
     # Defense-in-depth: validate current_path is absolute and inside sandbox
     with :ok <- validate_absolute(current_path),
-         {:ok, validated_path} <- Sandbox.validate_path(current_path, config) do
-      do_expand(pattern, validated_path, config)
+         {:ok, _validated_path} <- Sandbox.validate_path(current_path, ctx) do
+      do_expand(pattern, ctx)
     else
       _ ->
         # Invalid current_path - fail loud (this is a bug, not user error)
@@ -74,30 +75,31 @@ defmodule TrumanShell.Support.Glob do
     if DomePath.type(path) == :absolute, do: :ok, else: {:error, :relative}
   end
 
-  defp do_expand(pattern, current_path, config) do
+  defp do_expand(pattern, ctx) do
+    current_path = ctx.current_path
     is_absolute = String.starts_with?(pattern, "/")
     full_pattern = resolve_pattern(pattern, is_absolute, current_path)
     base_dir = glob_base_dir(full_pattern)
 
     # Security: validate base path is in sandbox BEFORE calling DomePath.wildcard
-    if in_sandbox?(base_dir, config) do
-      expand_glob(pattern, full_pattern, base_dir, is_absolute, current_path, config)
-    else
-      pattern
+    case Sandbox.validate_path(base_dir, ctx) do
+      {:ok, _} -> expand_glob(pattern, full_pattern, base_dir, is_absolute, ctx)
+      {:error, _} -> pattern
     end
   end
 
   defp resolve_pattern(pattern, true, _current_path), do: pattern
   defp resolve_pattern(pattern, false, current_path), do: DomePath.join(current_path, pattern)
 
-  defp expand_glob(pattern, full_pattern, base_dir, is_absolute, current_path, config) do
+  defp expand_glob(pattern, full_pattern, base_dir, is_absolute, ctx) do
+    current_path = ctx.current_path
     match_dot = pattern_matches_dotfiles?(pattern)
     has_dot_prefix = String.starts_with?(pattern, "./")
 
     matches =
       full_pattern
       |> DomePath.wildcard(match_dot: match_dot)
-      |> Enum.filter(&(in_sandbox?(&1, config) and within_depth_limit?(&1, base_dir)))
+      |> Enum.filter(&(in_sandbox?(&1, ctx) and within_depth_limit?(&1, base_dir)))
       |> normalize_paths(is_absolute, has_dot_prefix, current_path)
       |> Enum.sort()
 
@@ -145,7 +147,7 @@ defmodule TrumanShell.Support.Glob do
     pattern |> DomePath.basename() |> String.starts_with?(".")
   end
 
-  defp in_sandbox?(path, %SandboxConfig{} = config) do
-    match?({:ok, _}, Sandbox.validate_path(path, config))
+  defp in_sandbox?(path, ctx) do
+    match?({:ok, _}, Sandbox.validate_path(path, ctx))
   end
 end
