@@ -24,11 +24,7 @@ defmodule TrumanShell.CLI do
   alias TrumanShell.Support.Sandbox
 
   # All private functions call System.halt/1, which is no_return
-  @dialyzer {:no_return,
-             execute: 1,
-             validate: 1,
-             handle_version: 0,
-             handle_usage: 0}
+  @dialyzer {:no_return, execute: 1, validate: 1, handle_version: 0, handle_usage: 0}
 
   @spec main([String.t()]) :: no_return()
   def main(argv) do
