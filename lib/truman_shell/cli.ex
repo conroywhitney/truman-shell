@@ -89,9 +89,9 @@ defmodule TrumanShell.CLI do
     # Load config from agents.yaml (or defaults)
     case Config.discover() do
       {:ok, config} ->
-        # Build sandbox config using roots and current_dir (or default_cwd)
-        home_path = current_dir || config.default_cwd
-        sandbox_config = %SandboxConfig{allowed_paths: config.roots, home_path: home_path}
+        # Build sandbox config using config.sandbox fields
+        home_path = current_dir || config.sandbox.home_path
+        sandbox_config = %SandboxConfig{allowed_paths: config.sandbox.allowed_paths, home_path: home_path}
 
         case Sandbox.validate_path(path, sandbox_config) do
           {:ok, resolved_path} ->

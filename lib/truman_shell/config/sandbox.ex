@@ -20,16 +20,16 @@ defmodule TrumanShell.Config.Sandbox do
   ## YAML Configuration
 
   In `agents.yaml`, the sandbox section uses these fields:
-  - `roots` - Directories the agent can access (→ `allowed_paths`)
-  - `default_cwd` - Working directory for commands (→ `home_path`)
+  - `allowed_paths` - List of directories the agent can access (supports ~ and globs)
+  - `home_path` - The agent's home directory (must be within allowed_paths)
 
   Example:
 
       sandbox:
-        roots:
+        allowed_paths:
           - "~/studios/reification-labs"
           - "~/code/*"
-        default_cwd: "~/studios/reification-labs"
+        home_path: "~/studios/reification-labs"
 
   """
 
