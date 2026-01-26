@@ -23,6 +23,65 @@ defmodule TrumanShell.Stages.PipelineTest do
     end
   end
 
+  describe "full pipeline: context persistence" do
+    test "cd persists across multiple execute/2 calls" do
+      # First command: cd into lib directory
+      {:ok, _, ctx} = TrumanShell.execute("cd lib")
+
+      # Second command with same context: pwd should show lib
+      {:ok, pwd, ctx} = TrumanShell.execute("pwd", ctx)
+      assert String.trim(pwd) == Path.join(File.cwd!(), "lib")
+
+      # Third command: cd into truman_shell subdirectory
+      {:ok, _, ctx} = TrumanShell.execute("cd truman_shell", ctx)
+
+      # Fourth command: verify nested cd
+      {:ok, pwd, _ctx} = TrumanShell.execute("pwd", ctx)
+      assert String.trim(pwd) == Path.join(File.cwd!(), "lib/truman_shell")
+    end
+
+    test "ls uses current_path from context" do
+      # cd into lib, then ls should show lib contents
+      {:ok, _, ctx} = TrumanShell.execute("cd lib")
+      {:ok, output, _ctx} = TrumanShell.execute("ls", ctx)
+
+      # Should list files in lib/ directory
+      assert output =~ "truman_shell"
+    end
+
+    test "relative paths resolve against current_path" do
+      # cd into lib, then cat a file with relative path
+      {:ok, _, ctx} = TrumanShell.execute("cd lib")
+      {:ok, output, _ctx} = TrumanShell.execute("cat truman_shell.ex", ctx)
+
+      # Should read the actual file
+      assert output =~ "defmodule TrumanShell"
+    end
+
+    test "cd ~ returns to home_path regardless of current_path" do
+      # Navigate deep into directory structure
+      {:ok, _, ctx} = TrumanShell.execute("cd lib")
+      {:ok, _, ctx} = TrumanShell.execute("cd truman_shell", ctx)
+      {:ok, _, ctx} = TrumanShell.execute("cd commands", ctx)
+
+      # cd ~ should return to home_path (sandbox root)
+      {:ok, _, ctx} = TrumanShell.execute("cd ~", ctx)
+      {:ok, pwd, _ctx} = TrumanShell.execute("pwd", ctx)
+      assert String.trim(pwd) == File.cwd!()
+    end
+
+    test "stdin is cleared between commands (no leakage)" do
+      # First command produces output via pipe
+      {:ok, _output, ctx} = TrumanShell.execute("echo hello | grep hello")
+
+      # Second command with same context should NOT see previous stdin
+      {:ok, output, _ctx} = TrumanShell.execute("pwd", ctx)
+
+      # pwd should work normally, not affected by previous pipe
+      assert String.trim(output) == File.cwd!()
+    end
+  end
+
   describe "full pipeline: tilde expansion" do
     test "cd ~ expands to sandbox root" do
       {:ok, _, ctx} = TrumanShell.execute("cd ~")

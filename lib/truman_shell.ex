@@ -80,9 +80,11 @@ defmodule TrumanShell do
   def execute(input, %Context{} = ctx) do
     # Context provided - use it directly
     # Pipeline: Tokenizer → Parser → Expander → Executor → Redirector
-    with {:ok, command} <- parse(input) do
-      expanded = Expander.expand(command, ctx)
-      Executor.run(expanded, ctx)
+    with {:ok, command} <- parse(input),
+         expanded = Expander.expand(command, ctx),
+         {:ok, output, final_ctx} <- Executor.run(expanded, ctx) do
+      # Clear stdin to prevent leakage between chained commands in REPL usage
+      {:ok, output, %{final_ctx | stdin: nil}}
     end
   end
 

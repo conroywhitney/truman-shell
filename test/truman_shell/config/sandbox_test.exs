@@ -85,7 +85,7 @@ defmodule TrumanShell.Config.SandboxTest do
       assert Sandbox.path_allowed?(sandbox, "/libs/dep/lib.ex")
     end
 
-    test "returns false for path outside all roots", %{sandbox: sandbox} do
+    test "returns false for path outside all allowed_paths", %{sandbox: sandbox} do
       refute Sandbox.path_allowed?(sandbox, "/etc/passwd")
     end
 

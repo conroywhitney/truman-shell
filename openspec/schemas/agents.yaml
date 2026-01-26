@@ -16,7 +16,7 @@ version: "0.1"
 sandbox:
   # Allowed paths - agent can access files/commands within these paths
   # Supports globs: "~/code/*" allows all subdirectories of ~/code
-  # Agent cannot access anything outside these roots
+  # Agent cannot access anything outside these allowed_paths
   allowed_paths:
     - "~/studios/reification-labs"
     - "~/code/*"

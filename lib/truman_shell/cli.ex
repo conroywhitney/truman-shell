@@ -4,51 +4,42 @@ defmodule TrumanShell.CLI do
 
   ## Subcommands
 
-      truman-shell execute <command>                Execute a shell command through TrumanShell
-      truman-shell validate-path <path> [<cwd>]     Validate path is within sandbox
-      truman-shell version                          Show version
+      truman-shell execute <command>    Execute a shell command through TrumanShell
+      truman-shell validate-path <path> Validate path is within sandbox allowed_paths
+      truman-shell version              Show version
 
   ## Exit codes
 
   - `0` — Success (output on stdout)
   - `1` — Error (message on stderr, or silent for validate-path deny)
+
+  ## Configuration
+
+  Sandbox `allowed_paths` and `home_path` are loaded from agents.yaml.
+  See `TrumanShell.Config` for discovery order and defaults.
   """
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Config
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.Support.Sandbox
 
   # All private functions call System.halt/1, which is no_return
   @dialyzer {:no_return,
-             handle_execute: 1,
              execute: 1,
-             handle_validate_path: 1,
-             validate: 2,
+             validate: 1,
              handle_version: 0,
-             handle_usage: 0,
-             error: 1}
+             handle_usage: 0}
 
   @spec main([String.t()]) :: no_return()
   def main(argv) do
     case argv do
-      ["execute" | rest] -> handle_execute(rest)
-      ["validate-path" | rest] -> handle_validate_path(rest)
+      ["execute", command | _] -> execute(command)
+      ["execute"] -> handle_usage()
+      ["validate-path", path | _] -> validate(path)
+      ["validate-path"] -> handle_usage()
       ["version"] -> handle_version()
       _ -> handle_usage()
     end
-  end
-
-  defp handle_execute([]) do
-    # Support TRUMAN_CMD env var (for shell safety) or direct argument
-    case System.get_env("TRUMAN_CMD") do
-      nil -> error("No command provided")
-      "" -> error("No command provided")
-      cmd -> execute(cmd)
-    end
-  end
-
-  defp handle_execute([command | _]) do
-    execute(command)
   end
 
   defp execute(command) do
@@ -65,35 +56,14 @@ defmodule TrumanShell.CLI do
     end
   end
 
-  defp handle_validate_path([]) do
-    # Support env var pattern (for shell safety) or direct argument
-    case System.get_env("TRUMAN_VALIDATE_PATH") do
-      nil -> error("No path provided")
-      "" -> error("No path provided")
-      path -> validate(path, System.get_env("TRUMAN_CURRENT_DIR"))
-    end
-  end
-
-  defp handle_validate_path([path]) do
-    validate(path, nil)
-  end
-
-  defp handle_validate_path([path, current_dir | _]) do
-    validate(path, current_dir)
-  end
-
-  defp validate(path, current_dir) do
-    # Normalize empty string to nil for current_dir fallback
-    current_dir = if current_dir in [nil, ""], do: nil, else: current_dir
-
+  defp validate(path) do
     # Load config from agents.yaml (or defaults)
     case Config.discover() do
       {:ok, config} ->
-        # Build sandbox config using config.sandbox fields
-        home_path = current_dir || config.sandbox.home_path
-        sandbox_config = %SandboxConfig{allowed_paths: config.sandbox.allowed_paths, home_path: home_path}
+        # Build context from config (respects YAML-defined sandbox)
+        ctx = Context.from_config(config)
 
-        case Sandbox.validate_path(path, sandbox_config) do
+        case Sandbox.validate_path(path, ctx) do
           {:ok, resolved_path} ->
             IO.puts(resolved_path)
             System.halt(0)
@@ -120,25 +90,15 @@ defmodule TrumanShell.CLI do
     Usage: truman-shell <command> [args]
 
     Commands:
-      execute <shell-command>              Execute a command through TrumanShell
-      validate-path <path> [<current_dir>] Validate path is within sandbox
-      version                              Show version
-
-    Environment:
-      TRUMAN_CMD           Command for execute (alternative to argument)
-      TRUMAN_VALIDATE_PATH Path for validate-path (alternative to argument)
-      TRUMAN_CURRENT_DIR   Current directory for validate-path (optional)
+      execute <shell-command>   Execute a command through TrumanShell
+      validate-path <path>      Validate path is within sandbox allowed_paths
+      version                   Show version
 
     Configuration:
-      Sandbox roots and default_cwd are loaded from agents.yaml.
+      Sandbox allowed_paths and home_path are loaded from agents.yaml.
       See TrumanShell.Config for discovery order and defaults.
     """)
 
-    System.halt(1)
-  end
-
-  defp error(message) do
-    IO.puts(:stderr, "Error: #{message}")
     System.halt(1)
   end
 end

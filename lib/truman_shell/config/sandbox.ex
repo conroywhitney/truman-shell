@@ -47,14 +47,14 @@ defmodule TrumanShell.Config.Sandbox do
   Creates a Sandbox config from the "sandbox" section of agents.yaml.
 
   Handles:
-  - `roots` → `allowed_paths` (with tilde and glob expansion)
-  - `default_cwd` → `home_path` (with tilde expansion)
+  - `allowed_paths` - list of directories (with tilde and glob expansion)
+  - `home_path` - agent's home directory (with tilde expansion)
   - Validation that all paths exist and are directories
   - Validation that home_path is within allowed_paths
 
   ## Examples
 
-      iex> yaml = %{"roots" => [File.cwd!()], "default_cwd" => File.cwd!()}
+      iex> yaml = %{"allowed_paths" => [File.cwd!()], "home_path" => File.cwd!()}
       iex> {:ok, sandbox} = TrumanShell.Config.Sandbox.from_yaml(yaml)
       iex> sandbox.home_path == File.cwd!()
       true
