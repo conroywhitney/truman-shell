@@ -55,7 +55,7 @@ defmodule TrumanShell.CLI do
     Application.ensure_all_started(:truman_shell)
 
     case TrumanShell.execute(command) do
-      {:ok, output} ->
+      {:ok, output, _ctx} ->
         IO.write(output)
         System.halt(0)
 

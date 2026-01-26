@@ -17,6 +17,20 @@ defmodule TrumanShell.Config.Sandbox do
         home_path: "/home/user/project"
       }
 
+  ## YAML Configuration
+
+  In `agents.yaml`, the sandbox section uses these fields:
+  - `roots` - Directories the agent can access (→ `allowed_paths`)
+  - `default_cwd` - Working directory for commands (→ `home_path`)
+
+  Example:
+
+      sandbox:
+        roots:
+          - "~/studios/reification-labs"
+          - "~/code/*"
+        default_cwd: "~/studios/reification-labs"
+
   """
 
   alias TrumanShell.DomePath
@@ -28,6 +42,63 @@ defmodule TrumanShell.Config.Sandbox do
 
   @enforce_keys [:allowed_paths, :home_path]
   defstruct [:allowed_paths, :home_path]
+
+  @doc """
+  Creates a Sandbox config from the "sandbox" section of agents.yaml.
+
+  Handles:
+  - `roots` → `allowed_paths` (with tilde and glob expansion)
+  - `default_cwd` → `home_path` (with tilde expansion)
+  - Validation that all paths exist and are directories
+  - Validation that home_path is within allowed_paths
+
+  ## Examples
+
+      iex> yaml = %{"roots" => [File.cwd!()], "default_cwd" => File.cwd!()}
+      iex> {:ok, sandbox} = TrumanShell.Config.Sandbox.from_yaml(yaml)
+      iex> sandbox.home_path == File.cwd!()
+      true
+
+  """
+  @spec from_yaml(map()) :: {:ok, t()} | {:error, String.t()}
+  def from_yaml(yaml) when is_map(yaml) do
+    with {:ok, raw_paths} <- require_field(yaml, "allowed_paths"),
+         {:ok, raw_home} <- require_field(yaml, "home_path") do
+      # Expand ~ and globs in allowed_paths
+      allowed_paths = expand_paths(raw_paths)
+
+      # Expand ~ in home_path
+      home_path = expand_home_path(raw_home, allowed_paths)
+
+      # Validate and return
+      with :ok <- validate_paths_exist(allowed_paths),
+           :ok <- validate_home_exists(home_path, allowed_paths) do
+        {:ok, %__MODULE__{allowed_paths: allowed_paths, home_path: home_path}}
+      end
+    end
+  end
+
+  def from_yaml(_), do: {:error, "sandbox config must be a map"}
+
+  defp require_field(yaml, field) do
+    case Map.get(yaml, field) do
+      nil -> {:error, "sandbox.#{field} is required"}
+      "" -> {:error, "sandbox.#{field} cannot be empty"}
+      [] -> {:error, "sandbox.#{field} cannot be empty"}
+      value -> {:ok, value}
+    end
+  end
+
+  @doc """
+  Creates default sandbox config using current working directory.
+
+  Used when no agents.yaml is found.
+  """
+  @spec defaults() :: t()
+  def defaults do
+    cwd = File.cwd!()
+    %__MODULE__{allowed_paths: [cwd], home_path: cwd}
+  end
 
   @doc """
   Creates a Sandbox config from raw values.
@@ -55,22 +126,6 @@ defmodule TrumanShell.Config.Sandbox do
 
     sandbox = %__MODULE__{allowed_paths: canonical_paths, home_path: canonical_home}
     validate(sandbox)
-  end
-
-  @doc """
-  Validates a Sandbox config struct.
-  """
-  @spec validate(t()) :: {:ok, t()} | {:error, String.t()}
-  def validate(%__MODULE__{allowed_paths: []}) do
-    {:error, "sandbox must have at least one allowed_path"}
-  end
-
-  def validate(%__MODULE__{home_path: home} = sandbox) do
-    if path_allowed?(sandbox, home) do
-      {:ok, sandbox}
-    else
-      {:error, "home_path must be within one of the allowed_paths"}
-    end
   end
 
   @doc """
@@ -105,4 +160,99 @@ defmodule TrumanShell.Config.Sandbox do
   def path_allowed?(%__MODULE__{}, path) when is_binary(path) do
     raise ArgumentError, "path must be absolute, got: #{inspect(path)}"
   end
+
+  @doc """
+  Validates a Sandbox config struct.
+  """
+  @spec validate(t()) :: {:ok, t()} | {:error, String.t()}
+  def validate(%__MODULE__{allowed_paths: []}) do
+    {:error, "sandbox must have at least one allowed_path"}
+  end
+
+  def validate(%__MODULE__{home_path: home} = sandbox) do
+    if path_allowed?(sandbox, home) do
+      {:ok, sandbox}
+    else
+      {:error, "home_path must be within one of the allowed_paths"}
+    end
+  end
+
+  # --- Private Functions for YAML parsing ---
+
+  defp expand_paths(raw_paths) when is_list(raw_paths) do
+    raw_paths
+    |> Enum.flat_map(&expand_path/1)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp expand_path(path) do
+    expanded = expand_user_home(path)
+
+    if String.contains?(expanded, "*") do
+      # Glob expansion - ensure results are absolute paths
+      expanded
+      |> DomePath.wildcard()
+      |> Enum.filter(&File.dir?/1)
+      |> Enum.map(&DomePath.expand/1)
+    else
+      [DomePath.expand(expanded)]
+    end
+  end
+
+  defp expand_home_path(raw_path, _allowed_paths) do
+    expanded = expand_user_home(raw_path)
+    # home_path must be absolute (after ~ expansion)
+    DomePath.expand(expanded)
+  end
+
+  defp validate_paths_exist([]) do
+    {:error, "sandbox must have at least one allowed_path"}
+  end
+
+  defp validate_paths_exist(paths) do
+    Enum.reduce_while(paths, :ok, fn path, :ok ->
+      case File.stat(path) do
+        {:ok, %{type: :directory}} ->
+          {:cont, :ok}
+
+        {:ok, %{type: _other}} ->
+          {:halt, {:error, "allowed_path is not a directory: #{path}"}}
+
+        {:error, :enoent} ->
+          {:halt, {:error, "allowed_path does not exist: #{path}"}}
+
+        {:error, reason} ->
+          {:halt, {:error, "cannot access allowed_path #{path}: #{reason}"}}
+      end
+    end)
+  end
+
+  defp validate_home_exists(home_path, allowed_paths) do
+    # Build a temporary sandbox to check if home is within allowed_paths
+    sandbox = %__MODULE__{allowed_paths: allowed_paths, home_path: home_path}
+
+    case File.stat(home_path) do
+      {:ok, %{type: :directory}} ->
+        if path_allowed?(sandbox, home_path) do
+          :ok
+        else
+          {:error, "home_path must be within one of the allowed_paths: #{home_path}"}
+        end
+
+      {:ok, %{type: _other}} ->
+        {:error, "home_path is not a directory: #{home_path}"}
+
+      {:error, :enoent} ->
+        {:error, "home_path does not exist: #{home_path}"}
+
+      {:error, reason} ->
+        {:error, "cannot access home_path #{home_path}: #{reason}"}
+    end
+  end
+
+  # Expand ~ to user's home directory (for config paths)
+  defp expand_user_home("~"), do: System.user_home!()
+  defp expand_user_home("~/" <> rest), do: DomePath.join(System.user_home!(), rest)
+  defp expand_user_home(path), do: path
 end

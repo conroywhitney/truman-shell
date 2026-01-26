@@ -1,20 +1,9 @@
 defmodule TrumanShell.Config do
   @moduledoc """
-  Configuration loading and validation for agents.yaml.
+  Configuration loading for agents.yaml.
 
-  The agents.yaml file defines:
-  - `sandbox.roots` - Directories the agent can access (boundaries)
-  - `sandbox.default_cwd` - Working directory for command execution (home base)
-
-  ## Key Concepts
-
-  **Roots (Boundaries)**: Where the agent CAN access. Multiple roots are supported,
-  with glob expansion (e.g., `~/code/*` expands to all subdirectories).
-
-  **Default CWD (Home Base)**: Where outputs land. Commands are spawned with this
-  as their working directory, eliminating TOCTOU race conditions. Even if you
-  `cd ~/code/truman-shell` for git operations, `/checkpoint` creates files in
-  the homebase.
+  Discovers, loads, and parses the agents.yaml config file. Delegates sandbox
+  parsing and validation to `TrumanShell.Config.Sandbox`.
 
   ## File Discovery
 
@@ -23,7 +12,7 @@ defmodule TrumanShell.Config do
   2. `./.agents.yaml`
   3. `~/.config/truman/agents.yaml`
 
-  If no config is found, sensible defaults are used (single root = cwd).
+  If no config is found, defaults to cwd for both allowed_paths and home_path.
 
   ## Example Config
 
@@ -31,32 +20,26 @@ defmodule TrumanShell.Config do
       version: "0.1"
 
       sandbox:
-        roots:
+        allowed_paths:
           - "~/studios/reification-labs"
           - "~/code/*"
-        default_cwd: "~/studios/reification-labs"
+        home_path: "~/studios/reification-labs"
 
+  See `TrumanShell.Config.Sandbox` for sandbox field documentation.
   """
-
-  # Note: We use expand_user_home/1 instead of expand_user_home/2 here.
-  # expand_user_home/2 expands ~ to home_path (agent's home).
-  # For config loading, we expand ~ to the user's actual home.
 
   alias TrumanShell.Config
   alias TrumanShell.DomePath
 
   @type t :: %__MODULE__{
           version: String.t(),
-          roots: [String.t()],
-          default_cwd: String.t(),
-          # Future: per-agent overrides, file permissions, execute permissions
+          sandbox: Config.Sandbox.t(),
           raw: map()
         }
 
   defstruct [
     :version,
-    :roots,
-    :default_cwd,
+    :sandbox,
     :raw
   ]
 
@@ -75,7 +58,8 @@ defmodule TrumanShell.Config do
   ## Examples
 
       iex> {:ok, config} = TrumanShell.Config.discover()
-      iex> is_list(config.roots)
+      iex> %TrumanShell.Config.Sandbox{} = config.sandbox
+      iex> is_list(config.sandbox.allowed_paths)
       true
 
   """
@@ -113,8 +97,8 @@ defmodule TrumanShell.Config do
   Returns default configuration when no config file is found.
 
   Default behavior:
-  - Single root: current working directory
-  - default_cwd: same as root
+  - Single allowed_path: current working directory
+  - home_path: same as allowed_path
 
   Note: This uses File.cwd!() which is the shell's cwd at load time.
   For production use, prefer explicit config files.
@@ -122,18 +106,15 @@ defmodule TrumanShell.Config do
   ## Examples
 
       iex> config = TrumanShell.Config.defaults()
-      iex> length(config.roots) == 1
+      iex> length(config.sandbox.allowed_paths) == 1
       true
 
   """
   @spec defaults() :: t()
   def defaults do
-    cwd = File.cwd!()
-
     %__MODULE__{
       version: "0.1",
-      roots: [cwd],
-      default_cwd: cwd,
+      sandbox: Config.Sandbox.defaults(),
       raw: %{}
     }
   end
@@ -141,25 +122,30 @@ defmodule TrumanShell.Config do
   @doc """
   Validates a configuration struct.
 
-  Checks:
-  - All roots exist and are directories
-  - default_cwd is within one of the roots
-  - Paths are resolved (no unresolved ~ or globs)
+  Delegates sandbox validation to `Config.Sandbox.validate/1` which checks:
+  - allowed_paths is not empty
+  - home_path is within one of the allowed_paths
+
+  Note: Path existence validation is done during `from_yaml/1` loading.
+  This function validates struct invariants only.
 
   ## Examples
 
-      iex> config = %TrumanShell.Config{version: "0.1", roots: ["/nonexistent"], default_cwd: "/nonexistent", raw: %{}}
-      iex> {:error, msg} = TrumanShell.Config.validate(config)
-      iex> msg =~ "does not exist"
-      true
+      iex> sandbox = TrumanShell.Config.Sandbox.defaults()
+      iex> config = %TrumanShell.Config{version: "0.1", sandbox: sandbox, raw: %{}}
+      iex> {:ok, ^config} = TrumanShell.Config.validate(config)
 
   """
   @spec validate(t()) :: {:ok, t()} | {:error, String.t()}
-  def validate(%__MODULE__{} = config) do
-    with :ok <- validate_roots(config.roots),
-         :ok <- validate_default_cwd(config.default_cwd, config.roots) do
-      {:ok, config}
+  def validate(%__MODULE__{sandbox: %Config.Sandbox{} = sandbox} = config) do
+    case Config.Sandbox.validate(sandbox) do
+      {:ok, _} -> {:ok, config}
+      {:error, reason} -> {:error, reason}
     end
+  end
+
+  def validate(%__MODULE__{sandbox: nil}) do
+    {:error, "config.sandbox is required"}
   end
 
   # --- Private Functions ---
@@ -198,115 +184,25 @@ defmodule TrumanShell.Config do
   end
 
   defp build_config(parsed) when is_map(parsed) do
-    sandbox = Map.get(parsed, "sandbox", %{})
-    raw_roots = Map.get(sandbox, "roots", ["."])
+    sandbox_yaml = Map.get(parsed, "sandbox", %{})
 
-    # Expand ~ and globs in roots FIRST
-    expanded_roots = expand_roots(raw_roots)
+    case Config.Sandbox.from_yaml(sandbox_yaml) do
+      {:ok, sandbox} ->
+        {:ok,
+         %__MODULE__{
+           version: Map.get(parsed, "version", "0.1"),
+           sandbox: sandbox,
+           raw: parsed
+         }}
 
-    # Default to first EXPANDED root (not raw glob pattern)
-    raw_default_cwd =
-      case Map.get(sandbox, "default_cwd") do
-        nil -> List.first(expanded_roots, File.cwd!())
-        explicit -> explicit
-      end
-
-    # Expand ~ in default_cwd (resolve relative to first root)
-    default_cwd = expand_default_cwd(raw_default_cwd, expanded_roots)
-
-    {:ok,
-     %__MODULE__{
-       version: Map.get(parsed, "version", "0.1"),
-       roots: expanded_roots,
-       default_cwd: default_cwd,
-       raw: parsed
-     }}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp build_config(_), do: {:error, "config must be a YAML map"}
 
-  defp expand_roots(raw_roots) when is_list(raw_roots) do
-    raw_roots
-    |> Enum.flat_map(&expand_root/1)
-    |> Enum.uniq()
-    |> Enum.sort()
-  end
-
-  defp expand_root(root) do
-    expanded = expand_user_home(root)
-
-    if String.contains?(expanded, "*") do
-      # Glob expansion - ensure results are absolute paths
-      expanded
-      |> DomePath.wildcard()
-      |> Enum.filter(&File.dir?/1)
-      |> Enum.map(&DomePath.expand/1)
-    else
-      [DomePath.expand(expanded)]
-    end
-  end
-
-  defp expand_default_cwd(raw_cwd, roots) do
-    expanded = expand_user_home(raw_cwd)
-
-    # Absolute path
-    if DomePath.type(expanded) == :absolute do
-      DomePath.expand(expanded)
-    else
-      # Relative path - resolve against first root
-      first_root = List.first(roots, File.cwd!())
-      DomePath.expand(expanded, first_root)
-    end
-  end
-
-  defp validate_roots([]) do
-    {:error, "config must have at least one root"}
-  end
-
-  defp validate_roots(roots) do
-    Enum.reduce_while(roots, :ok, fn root, :ok ->
-      # Use File.stat for atomic check (avoids TOCTOU race)
-      case File.stat(root) do
-        {:ok, %{type: :directory}} ->
-          {:cont, :ok}
-
-        {:ok, %{type: _other}} ->
-          {:halt, {:error, "root is not a directory: #{root}"}}
-
-        {:error, :enoent} ->
-          {:halt, {:error, "root does not exist: #{root}"}}
-
-        {:error, reason} ->
-          {:halt, {:error, "cannot access root #{root}: #{reason}"}}
-      end
-    end)
-  end
-
-  defp validate_default_cwd(default_cwd, roots) do
-    # Build a temporary sandbox to check if cwd is within roots
-    sandbox = %Config.Sandbox{allowed_paths: roots, home_path: default_cwd}
-
-    # Use File.stat for atomic check (avoids TOCTOU race)
-    case File.stat(default_cwd) do
-      {:ok, %{type: :directory}} ->
-        if Config.Sandbox.path_allowed?(sandbox, default_cwd) do
-          :ok
-        else
-          {:error, "default_cwd must be within one of the roots: #{default_cwd}"}
-        end
-
-      {:ok, %{type: _other}} ->
-        {:error, "default_cwd is not a directory: #{default_cwd}"}
-
-      {:error, :enoent} ->
-        {:error, "default_cwd does not exist: #{default_cwd}"}
-
-      {:error, reason} ->
-        {:error, "cannot access default_cwd #{default_cwd}: #{reason}"}
-    end
-  end
-
-  # Expand ~ to user's home directory (for config paths, not agent paths)
+  # Expand ~ to user's home directory (for config file paths)
   defp expand_user_home("~"), do: System.user_home!()
   defp expand_user_home("~/" <> rest), do: DomePath.join(System.user_home!(), rest)
   defp expand_user_home(path), do: path

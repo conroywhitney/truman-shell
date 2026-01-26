@@ -26,7 +26,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
       result = Executor.run(command, ctx)
 
-      assert {:ok, output} = result
+      assert {:ok, output, _ctx} = result
       assert output == "line 1\nline 2\n"
     end
 
@@ -44,7 +44,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
       result = Executor.run(command, ctx)
 
-      assert {:ok, output} = result
+      assert {:ok, output, _ctx} = result
       assert output =~ "2"
     end
 
@@ -54,7 +54,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
       result = Executor.run(command, ctx)
 
-      assert {:ok, output} = result
+      assert {:ok, output, _ctx} = result
       assert is_binary(output)
     end
 
@@ -76,7 +76,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
       try do
         command = %Command{name: :cmd_ls, args: [], pipes: [], redirects: []}
         ctx = build_ctx(tmp_dir)
-        {:ok, output} = Executor.run(command, ctx)
+        {:ok, output, _ctx} = Executor.run(command, ctx)
 
         assert output =~ "test.txt"
       after
@@ -92,7 +92,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
       ctx = build_ctx(home_path)
 
       cd_cmd = %Command{name: :cmd_cd, args: ["lib"], pipes: [], redirects: []}
-      {:ok, ""} = Executor.run(cd_cmd, ctx)
+      {:ok, "", _ctx} = Executor.run(cd_cmd, ctx)
 
       # The returned ctx would have updated current_path, but since run/2
       # doesn't return ctx, we test through the full pipeline
@@ -107,7 +107,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
       command = %Command{name: :cmd_ls, args: ["lib"], pipes: [], redirects: []}
       ctx = default_ctx()
 
-      {:ok, output} = Executor.run(command, ctx)
+      {:ok, output, _ctx} = Executor.run(command, ctx)
 
       assert output =~ "truman_shell"
     end
@@ -116,7 +116,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
       command = %Command{name: :cmd_pwd, args: [], pipes: [], redirects: []}
       ctx = default_ctx()
 
-      {:ok, output} = Executor.run(command, ctx)
+      {:ok, output, _ctx} = Executor.run(command, ctx)
 
       assert output == File.cwd!() <> "\n"
     end
@@ -127,14 +127,14 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
       cd_cmd = %Command{name: :cmd_cd, args: ["lib"], pipes: [], redirects: []}
 
-      assert {:ok, ""} = Executor.run(cd_cmd, ctx)
+      assert {:ok, "", _ctx} = Executor.run(cd_cmd, ctx)
     end
 
     test "dispatches :cmd_cat to Commands.Cat" do
       ctx = default_ctx()
       command = %Command{name: :cmd_cat, args: ["mix.exs"], pipes: [], redirects: []}
 
-      {:ok, output} = Executor.run(command, ctx)
+      {:ok, output, _ctx} = Executor.run(command, ctx)
 
       assert output =~ "defmodule TrumanShell.MixProject"
     end
@@ -143,7 +143,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
       command = %Command{name: :cmd_head, args: ["-n", "1", "mix.exs"], pipes: [], redirects: []}
       ctx = default_ctx()
 
-      {:ok, output} = Executor.run(command, ctx)
+      {:ok, output, _ctx} = Executor.run(command, ctx)
 
       assert output == "defmodule TrumanShell.MixProject do\n"
     end
@@ -152,7 +152,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
       command = %Command{name: :cmd_tail, args: ["-n", "1", "mix.exs"], pipes: [], redirects: []}
       ctx = default_ctx()
 
-      {:ok, output} = Executor.run(command, ctx)
+      {:ok, output, _ctx} = Executor.run(command, ctx)
 
       assert output == "end\n"
     end
@@ -161,7 +161,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
       command = %Command{name: :cmd_echo, args: ["hello", "world"], pipes: [], redirects: []}
       ctx = default_ctx()
 
-      {:ok, output} = Executor.run(command, ctx)
+      {:ok, output, _ctx} = Executor.run(command, ctx)
 
       assert output == "hello world\n"
     end
@@ -184,7 +184,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
       result = Executor.run(command, ctx)
 
-      assert {:ok, _output} = result
+      assert {:ok, _output, _ctx} = result
     end
 
     test "accepts exactly 10 stages (boundary)" do
@@ -204,7 +204,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
       result = Executor.run(command, ctx)
 
-      assert {:ok, _output} = result
+      assert {:ok, _output, _ctx} = result
     end
 
     test "rejects 11 stages (exceeds limit)" do
@@ -267,7 +267,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         ctx = build_ctx(tmp_dir)
 
-        {:ok, output} = Executor.run(command, ctx)
+        {:ok, output, _ctx} = Executor.run(command, ctx)
 
         assert output == ""
         file_path = Path.join(tmp_dir, "output.txt")
@@ -295,7 +295,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         ctx = build_ctx(tmp_dir)
 
-        {:ok, output} = Executor.run(command, ctx)
+        {:ok, output, _ctx} = Executor.run(command, ctx)
 
         assert output == ""
         assert File.read!(file_path) == "first\nsecond\n"
@@ -390,7 +390,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         result = Executor.run(command, ctx)
 
-        assert {:ok, ""} = result
+        assert {:ok, "", _ctx} = result
         assert File.exists?(Path.join(tmp_dir, "a.txt"))
         assert File.exists?(Path.join(tmp_dir, "b.txt"))
         assert File.read!(Path.join(tmp_dir, "a.txt")) == ""
@@ -424,7 +424,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         result = Executor.run(command, ctx)
 
-        assert {:ok, output} = result
+        assert {:ok, output, _ctx} = result
         assert output =~ "test_file.txt"
         refute output =~ "other_file.txt"
         refute output =~ "readme.md"
@@ -454,7 +454,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         result = Executor.run(command, ctx)
 
-        assert {:ok, output} = result
+        assert {:ok, output, _ctx} = result
         lines = String.split(output, "\n", trim: true)
         assert length(lines) == 5
         assert hd(lines) == "line 1"
@@ -496,7 +496,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         result = Executor.run(command, ctx)
 
-        assert {:ok, output} = result
+        assert {:ok, output, _ctx} = result
         lines = String.split(output, "\n", trim: true)
         assert length(lines) == 3
         assert Enum.all?(lines, &String.contains?(&1, "apple"))
@@ -528,7 +528,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         result = Executor.run(command, ctx)
 
-        assert {:ok, output} = result
+        assert {:ok, output, _ctx} = result
         lines = String.split(output, "\n", trim: true)
         assert length(lines) == 3
         assert hd(lines) == "line 8"
@@ -559,7 +559,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         result = Executor.run(command, ctx)
 
-        assert {:ok, output} = result
+        assert {:ok, output, _ctx} = result
         assert output =~ "5"
       after
         File.rm_rf!(tmp_dir)
@@ -638,7 +638,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
 
         result = Executor.run(command, ctx)
 
-        assert {:ok, ""} = result
+        assert {:ok, "", _ctx} = result
       after
         File.rm_rf!(tmp_dir)
       end
@@ -649,7 +649,7 @@ defmodule TrumanShell.Stages.ExecutorTest do
     test "parses and executes a command string" do
       result = TrumanShell.execute("ls")
 
-      assert {:ok, output} = result
+      assert {:ok, output, _ctx} = result
       assert output =~ "mix.exs"
     end
 

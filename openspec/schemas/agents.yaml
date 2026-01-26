@@ -1,0 +1,30 @@
+# agents.yaml - AI Agent Permission Schema
+# Version: 0.1.0 (draft)
+#
+# Design principles:
+# 1. Deny by default - nothing allowed unless explicitly permitted
+# 2. Hidden files excluded by default (like `ls` without `-a`)
+# 3. Dangerous operations require explicit opt-in
+# 4. Harness enforces, file declares (not advisory like robots.txt)
+# 5. Self-protection is hardcoded in harness, not configurable
+
+version: "0.1"
+
+# ------------------------------------------------------------------------------
+# SANDBOX - The boundaries of the agent's world
+# ------------------------------------------------------------------------------
+sandbox:
+  # Allowed paths - agent can access files/commands within these paths
+  # Supports globs: "~/code/*" allows all subdirectories of ~/code
+  # Agent cannot access anything outside these roots
+  allowed_paths:
+    - "~/studios/reification-labs"
+    - "~/code/*"
+
+  # Home path for command execution (must be in allowed_paths)
+  # Resolved to absolute path at config load, passed to spawned processes
+  # Eliminates TOCTOU race: we SET cwd, don't CHECK inherited cwd
+  #
+  # Use case: You cd into ~/code/truman-shell for git operations,
+  # but .checkpoint should still create files in homebase, not in truman-shell
+  home_path: "~/studios/reification-labs"

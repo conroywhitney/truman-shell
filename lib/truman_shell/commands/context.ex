@@ -21,8 +21,16 @@ defmodule TrumanShell.Commands.Context do
         }
       }
 
+  ## Construction
+
+  Context should be built using `from_config/1`, not constructed directly:
+
+      {:ok, config} = TrumanShell.Config.discover()
+      ctx = TrumanShell.Commands.Context.from_config(config)
+
   """
 
+  alias TrumanShell.Config
   alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @type t :: %__MODULE__{
@@ -33,4 +41,25 @@ defmodule TrumanShell.Commands.Context do
 
   @enforce_keys [:current_path, :sandbox_config]
   defstruct [:current_path, :sandbox_config, :stdin]
+
+  @doc """
+  Creates a Context from a loaded Config.
+
+  Sets `current_path` to `home_path` (the starting directory).
+
+  ## Examples
+
+      iex> config = TrumanShell.Config.defaults()
+      iex> ctx = TrumanShell.Commands.Context.from_config(config)
+      iex> ctx.current_path == ctx.sandbox_config.home_path
+      true
+
+  """
+  @spec from_config(Config.t()) :: t()
+  def from_config(%Config{sandbox: sandbox}) do
+    %__MODULE__{
+      current_path: sandbox.home_path,
+      sandbox_config: sandbox
+    }
+  end
 end

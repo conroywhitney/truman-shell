@@ -49,7 +49,7 @@ defmodule TrumanShell.Stages.Executor do
       iex> cmd = %Command{name: :cmd_ls, args: ["lib"], pipes: [], redirects: []}
       iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
       iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
-      iex> {:ok, output} = TrumanShell.Stages.Executor.run(cmd, ctx)
+      iex> {:ok, output, _ctx} = TrumanShell.Stages.Executor.run(cmd, ctx)
       iex> output =~ "truman_shell"
       true
 
@@ -63,15 +63,16 @@ defmodule TrumanShell.Stages.Executor do
       {:error, "bash: fake: command not found\\n"}
 
   """
-  @spec run(Command.t(), Context.t()) :: {:ok, String.t()} | {:error, String.t()}
+  @spec run(Command.t(), Context.t()) :: {:ok, String.t(), Context.t()} | {:error, String.t()}
   def run(%Command{pipes: pipes} = command, %Context{} = ctx) do
     # Get redirects from the LAST command in pipeline (most common: cmd1 | cmd2 > file.txt)
     final_command = if pipes == [], do: command, else: List.last(pipes)
 
     with :ok <- validate_depth(command),
          {:ok, output, ctx} <- execute(command, ctx),
-         {:ok, piped_output, ctx} <- run_pipeline(output, pipes, ctx) do
-      Redirector.apply(piped_output, final_command.redirects, ctx)
+         {:ok, piped_output, ctx} <- run_pipeline(output, pipes, ctx),
+         {:ok, final_output} <- Redirector.apply(piped_output, final_command.redirects, ctx) do
+      {:ok, final_output, ctx}
     end
   end
 
