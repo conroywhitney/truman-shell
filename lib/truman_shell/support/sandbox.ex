@@ -100,7 +100,7 @@ defmodule TrumanShell.Support.Sandbox do
   Accepts three forms:
   - `validate_path(path, %Context{})` - uses ctx.current_path for relative resolution
   - `validate_path(path, %Config.Sandbox{})` - uses config.home_path for relative resolution
-  - `validate_path(path, sandbox_root)` - simple string boundary
+  - `validate_path(path, boundary)` - simple string boundary (for tests)
 
   Handles:
   - Absolute paths
@@ -161,16 +161,16 @@ defmodule TrumanShell.Support.Sandbox do
     end)
   end
 
-  def validate_path(path, sandbox_root) when is_binary(sandbox_root) do
-    do_validate_path(path, sandbox_root, nil)
+  def validate_path(path, boundary) when is_binary(boundary) do
+    do_validate_path(path, boundary, nil)
   end
 
-  defp do_validate_path(path, sandbox_root, current_dir) do
+  defp do_validate_path(path, boundary, current_dir) do
     # Delegate to DomePath.validate which enforces:
     # - No $VAR references
     # - No symlinks (symlinks denied, period)
     # - Path must be within boundary
-    case DomePath.validate(path, sandbox_root, current_dir) do
+    case DomePath.validate(path, boundary, current_dir) do
       {:ok, validated_path} ->
         {:ok, validated_path}
 

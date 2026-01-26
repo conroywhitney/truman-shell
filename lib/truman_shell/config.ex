@@ -39,7 +39,7 @@ defmodule TrumanShell.Config do
   """
 
   # Note: We use expand_user_home/1 instead of expand_user_home/2 here.
-  # expand_user_home/2 expands ~ to sandbox_root (agent's home).
+  # expand_user_home/2 expands ~ to home_path (agent's home).
   # For config loading, we expand ~ to the user's actual home.
 
   alias TrumanShell.Config

@@ -3,7 +3,7 @@ defmodule TrumanShell.Stages.Expander do
   Expands shell syntax in command arguments before execution.
 
   Handles (in order):
-  1. Tilde expansion: `~` → sandbox_root, `~/path` → sandbox_root/path
+  1. Tilde expansion: `~` → home_path, `~/path` → home_path/path
   2. Glob expansion: `*.ex` → list of matching files
 
   Runs after Parser, before Executor in the pipeline.
