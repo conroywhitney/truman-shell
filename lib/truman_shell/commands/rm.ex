@@ -19,7 +19,6 @@ defmodule TrumanShell.Commands.Rm do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.Context
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -70,11 +69,8 @@ defmodule TrumanShell.Commands.Rm do
     {:error, "rm: missing operand\n"}
   end
 
-  defp handle_rm([file_name | _], %Context{} = ctx, opts) do
-    target = DomePath.expand(file_name, ctx.current_path)
-    target_rel = DomePath.relative_to(target, ctx.sandbox_config.home_path)
-
-    case Sandbox.validate_path(target_rel, ctx.sandbox_config) do
+  defp handle_rm([file_name | _], ctx, opts) do
+    case Sandbox.validate_path(file_name, ctx) do
       {:ok, safe_path} ->
         soft_delete(safe_path, file_name, ctx.sandbox_config.home_path, opts)
 

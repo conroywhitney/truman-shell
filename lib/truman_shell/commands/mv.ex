@@ -8,8 +8,6 @@ defmodule TrumanShell.Commands.Mv do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.Context
-  alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
 
@@ -33,15 +31,9 @@ defmodule TrumanShell.Commands.Mv do
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle([src, dst | _rest], %Context{} = ctx) do
-    src_target = DomePath.expand(src, ctx.current_path)
-    src_rel = DomePath.relative_to(src_target, ctx.sandbox_config.home_path)
-
-    dst_target = DomePath.expand(dst, ctx.current_path)
-    dst_rel = DomePath.relative_to(dst_target, ctx.sandbox_config.home_path)
-
-    with {:ok, src_safe} <- Sandbox.validate_path(src_rel, ctx.sandbox_config),
-         {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, ctx.sandbox_config),
+  def handle([src, dst | _rest], ctx) do
+    with {:ok, src_safe} <- Sandbox.validate_path(src, ctx),
+         {:ok, dst_safe} <- Sandbox.validate_path(dst, ctx),
          true <- File.exists?(src_safe) do
       case File.rename(src_safe, dst_safe) do
         :ok -> {:ok, ""}

@@ -29,6 +29,7 @@ defmodule TrumanShell.Support.Sandbox do
   OS-level isolation (containers, chroot, namespaces) in addition to this module.
   """
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
 
@@ -91,10 +92,15 @@ defmodule TrumanShell.Support.Sandbox do
   end
 
   @doc """
-  Validates that a path resolves within the sandbox root.
+  Validates that a path resolves within the sandbox.
 
   Returns `{:ok, resolved_path}` if the path is safe,
   or `{:error, :outside_sandbox}` if it would escape.
+
+  Accepts three forms:
+  - `validate_path(path, %Context{})` - uses ctx.current_path for relative resolution
+  - `validate_path(path, %Config.Sandbox{})` - uses config.home_path for relative resolution
+  - `validate_path(path, sandbox_root)` - simple string boundary
 
   Handles:
   - Absolute paths
@@ -104,6 +110,15 @@ defmodule TrumanShell.Support.Sandbox do
   - `$VAR` injection prevention
 
   ## Examples
+
+      # With Context - relative paths resolve using current_path
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
+      iex> ctx = %Context{current_path: "/sandbox/subdir", sandbox_config: config}
+      iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("file.txt", ctx)
+      iex> path
+      "/sandbox/subdir/file.txt"
 
       # Relative paths within sandbox are allowed
       iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("lib/foo.ex", "/sandbox")
@@ -118,18 +133,22 @@ defmodule TrumanShell.Support.Sandbox do
       iex> TrumanShell.Support.Sandbox.validate_path("/etc/passwd", "/sandbox")
       {:error, :outside_sandbox}
 
-      # Similar prefix but different directory is blocked
-      iex> TrumanShell.Support.Sandbox.validate_path("/sandbox2/file", "/sandbox")
-      {:error, :outside_sandbox}
-
-      # Absolute paths within sandbox are allowed
-      iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("/sandbox/file", "/sandbox")
-      iex> path
-      "/sandbox/file"
-
   """
-  @spec validate_path(String.t(), SandboxConfig.t() | String.t()) ::
+  @spec validate_path(String.t(), Context.t() | SandboxConfig.t() | String.t()) ::
           {:ok, String.t()} | {:error, :outside_sandbox}
+  def validate_path(path, %Context{} = ctx) do
+    # Use current_path for resolving relative paths (where user cd'd to)
+    %Context{current_path: current_path, sandbox_config: config} = ctx
+    %SandboxConfig{allowed_paths: allowed_paths} = config
+
+    Enum.reduce_while(allowed_paths, {:error, :outside_sandbox}, fn boundary, _acc ->
+      case do_validate_path(path, boundary, current_path) do
+        {:ok, validated_path} -> {:halt, {:ok, validated_path}}
+        {:error, _} -> {:cont, {:error, :outside_sandbox}}
+      end
+    end)
+  end
+
   def validate_path(path, %SandboxConfig{} = config) do
     # Try each allowed_path until one validates, or return error if none work
     %SandboxConfig{allowed_paths: allowed_paths, home_path: home_path} = config

@@ -10,7 +10,6 @@ defmodule TrumanShell.Commands.Cd do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   @doc """
@@ -54,11 +53,8 @@ defmodule TrumanShell.Commands.Cd do
   end
 
   defp change_directory(path, ctx) do
-    # Expand path relative to current_path, then validate
-    absolute_path = DomePath.expand(path, ctx.current_path)
-
-    with {:ok, safe_path} <- Sandbox.validate_path(absolute_path, ctx.sandbox_config),
-         {:dir, true} <- {:dir, File.dir?(safe_path)} do
+    with {:ok, safe_path} <- Sandbox.validate_path(path, ctx),
+         {:dir, true, _} <- {:dir, File.dir?(safe_path), safe_path} do
       # Return success with updated ctx
       new_ctx = %{ctx | current_path: safe_path}
       {:ok, "", ctx: new_ctx}
@@ -67,9 +63,9 @@ defmodule TrumanShell.Commands.Cd do
         # 404 principle: don't reveal anything about paths outside sandbox
         {:error, "bash: cd: #{path}: No such file or directory\n"}
 
-      {:dir, false} ->
+      {:dir, false, safe_path} ->
         # Path is inside sandbox but not a directory - check if it's a file
-        if File.regular?(absolute_path) do
+        if File.regular?(safe_path) do
           {:error, "bash: cd: #{path}: Not a directory\n"}
         else
           {:error, "bash: cd: #{path}: No such file or directory\n"}

@@ -8,8 +8,6 @@ defmodule TrumanShell.Commands.Mkdir do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.Context
-  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   @doc """
@@ -43,11 +41,8 @@ defmodule TrumanShell.Commands.Mkdir do
     {:error, "mkdir: missing operand\n"}
   end
 
-  defp create_directory(dir_name, %Context{} = ctx, parents: true) do
-    target = DomePath.expand(dir_name, ctx.current_path)
-    target_rel = DomePath.relative_to(target, ctx.sandbox_config.home_path)
-
-    case Sandbox.validate_path(target_rel, ctx.sandbox_config) do
+  defp create_directory(dir_name, ctx, parents: true) do
+    case Sandbox.validate_path(dir_name, ctx) do
       {:ok, safe_path} ->
         # mkdir -p never fails for existing directories
         File.mkdir_p(safe_path)
@@ -58,11 +53,8 @@ defmodule TrumanShell.Commands.Mkdir do
     end
   end
 
-  defp create_directory(dir_name, %Context{} = ctx, parents: false) do
-    target = DomePath.expand(dir_name, ctx.current_path)
-    target_rel = DomePath.relative_to(target, ctx.sandbox_config.home_path)
-
-    case Sandbox.validate_path(target_rel, ctx.sandbox_config) do
+  defp create_directory(dir_name, ctx, parents: false) do
+    case Sandbox.validate_path(dir_name, ctx) do
       {:ok, safe_path} ->
         case File.mkdir(safe_path) do
           :ok -> {:ok, ""}

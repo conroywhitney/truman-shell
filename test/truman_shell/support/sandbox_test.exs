@@ -458,4 +458,63 @@ defmodule TrumanShell.Support.SandboxTest do
       assert String.ends_with?(resolved, "/lib/foo.ex")
     end
   end
+
+  describe "validate_path/2 with Context struct" do
+    alias TrumanShell.Commands.Context
+
+    setup do
+      # Use project tmp/ to avoid symlinks (macOS /var -> /private/var)
+      tmp_dir = Path.join(File.cwd!(), "tmp")
+      sandbox = Path.join(tmp_dir, "test_sandbox_ctx_#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox)
+      subdir = Path.join(sandbox, "subdir")
+      File.mkdir_p!(subdir)
+      File.write!(Path.join(subdir, "file.txt"), "content")
+
+      on_exit(fn -> File.rm_rf!(sandbox) end)
+
+      %{sandbox: sandbox, subdir: subdir}
+    end
+
+    test "expands relative path using current_path, not home_path", %{sandbox: sandbox, subdir: subdir} do
+      # Key test: current_path differs from home_path
+      # Simulates: user cd'd to subdir, then runs `cat file.txt`
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+
+      result = Sandbox.validate_path("file.txt", ctx)
+
+      # Should resolve to subdir/file.txt (using current_path), NOT sandbox/file.txt (home_path)
+      assert {:ok, resolved} = result
+      assert resolved == Path.join(subdir, "file.txt")
+    end
+
+    test "rejects path that escapes sandbox via traversal", %{sandbox: sandbox, subdir: subdir} do
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+
+      result = Sandbox.validate_path("../../etc/passwd", ctx)
+
+      assert {:error, :outside_sandbox} = result
+    end
+
+    test "allows absolute path within sandbox", %{sandbox: sandbox, subdir: subdir} do
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+      absolute_path = Path.join(sandbox, "subdir/file.txt")
+
+      result = Sandbox.validate_path(absolute_path, ctx)
+
+      assert {:ok, ^absolute_path} = result
+    end
+
+    test "rejects absolute path outside sandbox", %{sandbox: sandbox, subdir: subdir} do
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+
+      result = Sandbox.validate_path("/etc/passwd", ctx)
+
+      assert {:error, :outside_sandbox} = result
+    end
+  end
 end

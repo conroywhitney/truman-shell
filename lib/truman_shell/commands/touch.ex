@@ -8,8 +8,6 @@ defmodule TrumanShell.Commands.Touch do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.Context
-  alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
 
@@ -32,11 +30,8 @@ defmodule TrumanShell.Commands.Touch do
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle([file_name | _rest], %Context{} = ctx) do
-    target = DomePath.expand(file_name, ctx.current_path)
-    target_rel = DomePath.relative_to(target, ctx.sandbox_config.home_path)
-
-    case Sandbox.validate_path(target_rel, ctx.sandbox_config) do
+  def handle([file_name | _rest], ctx) do
+    case Sandbox.validate_path(file_name, ctx) do
       {:ok, safe_path} ->
         case File.touch(safe_path) do
           :ok -> {:ok, ""}

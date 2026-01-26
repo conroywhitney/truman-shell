@@ -89,10 +89,7 @@ defmodule TrumanShell.Commands.Ls do
 
   # List a single path (file or directory)
   defp list_single_path(path, ctx) do
-    # Expand path relative to current_path, then validate
-    absolute_path = DomePath.expand(path, ctx.current_path)
-
-    case Sandbox.validate_path(absolute_path, ctx.sandbox_config) do
+    case Sandbox.validate_path(path, ctx) do
       {:ok, safe_path} ->
         cond do
           File.regular?(safe_path) ->

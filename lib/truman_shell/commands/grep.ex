@@ -154,11 +154,8 @@ defmodule TrumanShell.Commands.Grep do
   end
 
   # Recursive search in directory
-  defp search_recursive(opts, pattern, path, %Context{} = ctx) do
-    # Expand relative paths against current_path (not home_path)
-    expanded = DomePath.expand(path, ctx.current_path)
-
-    case Sandbox.validate_path(expanded, ctx.sandbox_config) do
+  defp search_recursive(opts, pattern, path, ctx) do
+    case Sandbox.validate_path(path, ctx) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
           files = collect_files(safe_path)

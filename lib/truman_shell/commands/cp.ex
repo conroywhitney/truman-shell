@@ -8,8 +8,6 @@ defmodule TrumanShell.Commands.Cp do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.Commands.Context
-  alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
 
@@ -49,15 +47,9 @@ defmodule TrumanShell.Commands.Cp do
     {:error, "cp: missing file operand\n"}
   end
 
-  defp copy_file(src, dst, %Context{} = ctx, opts) do
-    src_target = DomePath.expand(src, ctx.current_path)
-    src_rel = DomePath.relative_to(src_target, ctx.sandbox_config.home_path)
-
-    dst_target = DomePath.expand(dst, ctx.current_path)
-    dst_rel = DomePath.relative_to(dst_target, ctx.sandbox_config.home_path)
-
-    with {:ok, src_safe} <- Sandbox.validate_path(src_rel, ctx.sandbox_config),
-         {:ok, dst_safe} <- Sandbox.validate_path(dst_rel, ctx.sandbox_config) do
+  defp copy_file(src, dst, ctx, opts) do
+    with {:ok, src_safe} <- Sandbox.validate_path(src, ctx),
+         {:ok, dst_safe} <- Sandbox.validate_path(dst, ctx) do
       do_copy(src_safe, dst_safe, src, opts)
     else
       {:error, :outside_sandbox} ->
