@@ -18,7 +18,6 @@ defmodule TrumanShell.Stages.Redirector do
   """
 
   alias TrumanShell.Commands.Context
-  alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
 
@@ -69,11 +68,7 @@ defmodule TrumanShell.Stages.Redirector do
         {"", output}
       end
 
-    # Expand path relative to current_path, then validate
-    absolute_path = DomePath.expand(path, ctx.current_path)
-
-    # Validate the resolved path against sandbox
-    with {:ok, safe_path} <- Sandbox.validate_path(absolute_path, ctx.sandbox_config),
+    with {:ok, safe_path} <- Sandbox.validate_path(path, ctx),
          :ok <- do_write_file(safe_path, content_to_write, write_opts, path) do
       do_apply(next_output, rest, ctx)
     else

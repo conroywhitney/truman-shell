@@ -1,7 +1,9 @@
 defmodule TrumanShell.Commands.WcTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Wc
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
@@ -13,9 +15,10 @@ defmodule TrumanShell.Commands.WcTest do
       try do
         content = "hello world\nfoo bar baz\n"
         File.write!(Path.join(tmp_dir, "test.txt"), content)
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Wc.handle(["test.txt"], context)
+        {:ok, output} = Wc.handle(["test.txt"], ctx)
 
         # Format: lines words chars filename
         assert output =~ "2"
@@ -34,9 +37,10 @@ defmodule TrumanShell.Commands.WcTest do
       try do
         File.write!(Path.join(tmp_dir, "a.txt"), "one two\n")
         File.write!(Path.join(tmp_dir, "b.txt"), "three\n")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Wc.handle(["a.txt", "b.txt"], context)
+        {:ok, output} = Wc.handle(["a.txt", "b.txt"], ctx)
 
         # Should show totals for multiple files
         assert output =~ "a.txt"
@@ -52,9 +56,10 @@ defmodule TrumanShell.Commands.WcTest do
       File.mkdir_p!(tmp_dir)
 
       try do
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:error, msg} = Wc.handle(["missing.txt"], context)
+        {:error, msg} = Wc.handle(["missing.txt"], ctx)
 
         assert msg == "wc: missing.txt: No such file or directory\n"
       after
@@ -67,9 +72,10 @@ defmodule TrumanShell.Commands.WcTest do
       File.mkdir_p!(tmp_dir)
 
       try do
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:error, msg} = Wc.handle(["/etc/passwd"], context)
+        {:error, msg} = Wc.handle(["/etc/passwd"], ctx)
 
         assert msg == "wc: /etc/passwd: No such file or directory\n"
       after
@@ -83,9 +89,10 @@ defmodule TrumanShell.Commands.WcTest do
 
       try do
         File.write!(Path.join(tmp_dir, "test.txt"), "line1\nline2\nline3\n")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Wc.handle(["-l", "test.txt"], context)
+        {:ok, output} = Wc.handle(["-l", "test.txt"], ctx)
 
         # Should show only line count and filename
         assert output =~ "3"
@@ -103,9 +110,10 @@ defmodule TrumanShell.Commands.WcTest do
 
       try do
         File.write!(Path.join(tmp_dir, "test.txt"), "one two three four five\n")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Wc.handle(["-w", "test.txt"], context)
+        {:ok, output} = Wc.handle(["-w", "test.txt"], ctx)
 
         assert output =~ "5"
         assert output =~ "test.txt"
@@ -121,9 +129,10 @@ defmodule TrumanShell.Commands.WcTest do
       try do
         content = "hello\n"
         File.write!(Path.join(tmp_dir, "test.txt"), content)
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Wc.handle(["-c", "test.txt"], context)
+        {:ok, output} = Wc.handle(["-c", "test.txt"], ctx)
 
         assert output =~ "6"
         assert output =~ "test.txt"
@@ -141,9 +150,10 @@ defmodule TrumanShell.Commands.WcTest do
       try do
         content = "😄\n"
         File.write!(Path.join(tmp_dir, "emoji.txt"), content)
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Wc.handle(["-c", "emoji.txt"], context)
+        {:ok, output} = Wc.handle(["-c", "emoji.txt"], ctx)
 
         # Must be 5 bytes, NOT 2 graphemes
         assert output =~ ~r/^\s*5\s+emoji\.txt/
@@ -158,9 +168,10 @@ defmodule TrumanShell.Commands.WcTest do
 
       try do
         File.write!(Path.join(tmp_dir, "empty.txt"), "")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Wc.handle(["empty.txt"], context)
+        {:ok, output} = Wc.handle(["empty.txt"], ctx)
 
         # Should show 0 lines, 0 words, 0 chars
         assert output =~ ~r/^\s*0\s+0\s+0\s+empty\.txt/
@@ -176,9 +187,10 @@ defmodule TrumanShell.Commands.WcTest do
 
       try do
         File.write!(Path.join(tmp_dir, "file.txt"), "one\ntwo\nthree\n")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir, stdin: "stdin has ten\nlines here\n"}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config, stdin: "stdin has ten\nlines here\n"}
 
-        {:ok, output} = Wc.handle(["-l", "file.txt"], context)
+        {:ok, output} = Wc.handle(["-l", "file.txt"], ctx)
 
         # Should show 3 lines (from file), not 2 (from stdin)
         assert output =~ ~r/^\s*3\s+file\.txt/
@@ -188,9 +200,10 @@ defmodule TrumanShell.Commands.WcTest do
     end
 
     test "uses stdin when no file argument provided" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: "one\ntwo\nthree\n"}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config, stdin: "one\ntwo\nthree\n"}
 
-      {:ok, output} = Wc.handle(["-l"], context)
+      {:ok, output} = Wc.handle(["-l"], ctx)
 
       # Should count 3 lines from stdin
       assert output =~ "3"

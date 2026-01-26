@@ -2,6 +2,8 @@ defmodule TrumanShell.Commands.CatTest do
   use ExUnit.Case, async: true
 
   alias TrumanShell.Commands.Cat
+  alias TrumanShell.Commands.Context
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
@@ -12,9 +14,10 @@ defmodule TrumanShell.Commands.CatTest do
 
       try do
         File.write!(Path.join(tmp_dir, "hello.txt"), "Hello, World!\n")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Cat.handle(["hello.txt"], context)
+        {:ok, output} = Cat.handle(["hello.txt"], ctx)
 
         assert output == "Hello, World!\n"
       after
@@ -29,9 +32,10 @@ defmodule TrumanShell.Commands.CatTest do
       try do
         File.write!(Path.join(tmp_dir, "a.txt"), "AAA\n")
         File.write!(Path.join(tmp_dir, "b.txt"), "BBB\n")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        {:ok, output} = Cat.handle(["a.txt", "b.txt"], context)
+        {:ok, output} = Cat.handle(["a.txt", "b.txt"], ctx)
 
         assert output == "AAA\nBBB\n"
       after
@@ -45,10 +49,11 @@ defmodule TrumanShell.Commands.CatTest do
 
       try do
         File.write!(Path.join(tmp_dir, "exists.txt"), "EXISTS\n")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
         # Second file doesn't exist - should fail
-        result = Cat.handle(["exists.txt", "missing.txt"], context)
+        result = Cat.handle(["exists.txt", "missing.txt"], ctx)
 
         assert {:error, msg} = result
         assert msg =~ "missing.txt"
@@ -62,9 +67,10 @@ defmodule TrumanShell.Commands.CatTest do
       File.mkdir_p!(tmp_dir)
 
       try do
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        result = Cat.handle(["missing.txt"], context)
+        result = Cat.handle(["missing.txt"], ctx)
 
         assert {:error, msg} = result
         assert msg == "cat: missing.txt: No such file or directory\n"
@@ -74,9 +80,10 @@ defmodule TrumanShell.Commands.CatTest do
     end
 
     test "returns error for directory" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
 
-      result = Cat.handle(["lib"], context)
+      result = Cat.handle(["lib"], ctx)
 
       assert {:error, msg} = result
       assert msg =~ "Is a directory"
@@ -91,9 +98,10 @@ defmodule TrumanShell.Commands.CatTest do
         # This prevents OOM attacks while allowing large source files
         large_content = String.duplicate("x", 10_100_000)
         File.write!(Path.join(tmp_dir, "huge.txt"), large_content)
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config}
 
-        result = Cat.handle(["huge.txt"], context)
+        result = Cat.handle(["huge.txt"], ctx)
 
         assert {:error, msg} = result
         assert msg =~ "File too large"
@@ -105,9 +113,10 @@ defmodule TrumanShell.Commands.CatTest do
 
     test "reads from stdin when no file arguments provided" do
       # Unix behavior: `echo hello | cat` outputs "hello"
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: "hello from stdin\n"}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config, stdin: "hello from stdin\n"}
 
-      {:ok, output} = Cat.handle([], context)
+      {:ok, output} = Cat.handle([], ctx)
 
       assert output == "hello from stdin\n"
     end
@@ -118,9 +127,10 @@ defmodule TrumanShell.Commands.CatTest do
 
       try do
         File.write!(Path.join(tmp_dir, "file.txt"), "from file\n")
-        context = %{sandbox_root: tmp_dir, current_dir: tmp_dir, stdin: "from stdin\n"}
+        config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+        ctx = %Context{current_path: tmp_dir, sandbox_config: config, stdin: "from stdin\n"}
 
-        {:ok, output} = Cat.handle(["file.txt"], context)
+        {:ok, output} = Cat.handle(["file.txt"], ctx)
 
         assert output == "from file\n"
         refute output =~ "stdin"

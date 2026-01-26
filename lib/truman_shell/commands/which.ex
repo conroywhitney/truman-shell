@@ -16,12 +16,18 @@ defmodule TrumanShell.Commands.Which do
 
   ## Examples
 
-      iex> context = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
-      iex> TrumanShell.Commands.Which.handle(["ls"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
+      iex> ctx = %Context{current_path: "/sandbox", sandbox_config: config}
+      iex> TrumanShell.Commands.Which.handle(["ls"], ctx)
       {:ok, "ls: TrumanShell builtin\\n"}
 
-      iex> context = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
-      iex> TrumanShell.Commands.Which.handle(["notreal"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
+      iex> ctx = %Context{current_path: "/sandbox", sandbox_config: config}
+      iex> TrumanShell.Commands.Which.handle(["notreal"], ctx)
       {:error, "notreal not found\\n"}
 
   """

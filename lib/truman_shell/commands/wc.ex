@@ -26,13 +26,19 @@ defmodule TrumanShell.Commands.Wc do
 
   ## Examples
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> {:ok, output} = TrumanShell.Commands.Wc.handle(["mix.exs"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> {:ok, output} = TrumanShell.Commands.Wc.handle(["mix.exs"], ctx)
       iex> output =~ "mix.exs"
       true
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.Wc.handle(["nonexistent.txt"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Commands.Wc.handle(["nonexistent.txt"], ctx)
       {:error, "wc: nonexistent.txt: No such file or directory\\n"}
 
   """

@@ -4,8 +4,6 @@ defmodule TrumanShell.Support.FileIO do
   """
 
   alias TrumanShell.Commands.Context
-  alias TrumanShell.Config.Sandbox, as: SandboxConfig
-  alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
   # Maximum file size in bytes (10MB) to prevent memory exhaustion
@@ -46,22 +44,9 @@ defmodule TrumanShell.Support.FileIO do
       {:error, "/etc/passwd: No such file or directory"}
 
   """
-  @spec read_file(String.t(), Context.t() | map()) :: {:ok, String.t()} | {:error, String.t()}
+  @spec read_file(String.t(), Context.t()) :: {:ok, String.t()} | {:error, String.t()}
   def read_file(path, %Context{} = ctx) do
-    # Expand path to absolute using current_path, then validate against sandbox
-    absolute_path = DomePath.expand(path, ctx.current_path)
-    do_read_file(path, absolute_path, ctx.sandbox_config)
-  end
-
-  # Backward compatibility: convert legacy context map
-  def read_file(path, %{sandbox_root: sandbox_root, current_dir: current_dir}) do
-    absolute_path = DomePath.expand(path, current_dir)
-    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: sandbox_root}
-    do_read_file(path, absolute_path, config)
-  end
-
-  defp do_read_file(path, absolute_path, config) do
-    with {:ok, safe_path} <- Sandbox.validate_path(absolute_path, config),
+    with {:ok, safe_path} <- Sandbox.validate_path(path, ctx),
          {:ok, contents} <- read_with_limit(safe_path) do
       {:ok, contents}
     else
