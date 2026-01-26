@@ -1,18 +1,26 @@
 defmodule TrumanShell.Stages.RedirectorTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.Stages.Redirector
 
   @moduletag :stages
+
+  # Helper to build context with sandbox as both home and current_path
+  defp build_ctx(sandbox) do
+    config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+    %Context{current_path: sandbox, sandbox_config: config}
+  end
 
   describe "apply/3" do
     @tag :tmp_dir
     test "write redirect creates file with output", %{tmp_dir: sandbox} do
       output = "hello world\n"
       redirects = [{:stdout, "test.txt"}]
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
+      ctx = build_ctx(sandbox)
 
-      result = Redirector.apply(output, redirects, context)
+      result = Redirector.apply(output, redirects, ctx)
 
       assert {:ok, ""} = result
       assert File.read!(Path.join(sandbox, "test.txt")) == "hello world\n"
@@ -26,9 +34,9 @@ defmodule TrumanShell.Stages.RedirectorTest do
 
       output = "line 2\n"
       redirects = [{:stdout_append, "existing.txt"}]
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
+      ctx = build_ctx(sandbox)
 
-      result = Redirector.apply(output, redirects, context)
+      result = Redirector.apply(output, redirects, ctx)
 
       assert {:ok, ""} = result
       assert File.read!(target) == "line 1\nline 2\n"
@@ -38,9 +46,9 @@ defmodule TrumanShell.Stages.RedirectorTest do
     test "no redirects passes output through unchanged", %{tmp_dir: sandbox} do
       output = "hello world\n"
       redirects = []
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
+      ctx = build_ctx(sandbox)
 
-      result = Redirector.apply(output, redirects, context)
+      result = Redirector.apply(output, redirects, ctx)
 
       assert {:ok, "hello world\n"} = result
     end
@@ -49,9 +57,9 @@ defmodule TrumanShell.Stages.RedirectorTest do
     test "redirect outside sandbox returns error (404 principle)", %{tmp_dir: sandbox} do
       output = "should not write\n"
       redirects = [{:stdout, "/etc/passwd"}]
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
+      ctx = build_ctx(sandbox)
 
-      result = Redirector.apply(output, redirects, context)
+      result = Redirector.apply(output, redirects, ctx)
 
       assert {:error, error_msg} = result
       assert error_msg =~ "No such file or directory"
@@ -62,9 +70,9 @@ defmodule TrumanShell.Stages.RedirectorTest do
     test "redirect with path traversal returns error", %{tmp_dir: sandbox} do
       output = "should not write\n"
       redirects = [{:stdout, "../../escape.txt"}]
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
+      ctx = build_ctx(sandbox)
 
-      result = Redirector.apply(output, redirects, context)
+      result = Redirector.apply(output, redirects, ctx)
 
       assert {:error, error_msg} = result
       assert error_msg =~ "No such file or directory"
@@ -75,9 +83,9 @@ defmodule TrumanShell.Stages.RedirectorTest do
       # Bash behavior: echo hello > a.txt > b.txt creates empty a.txt, "hello\n" in b.txt
       output = "hello\n"
       redirects = [{:stdout, "first.txt"}, {:stdout, "second.txt"}]
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
+      ctx = build_ctx(sandbox)
 
-      result = Redirector.apply(output, redirects, context)
+      result = Redirector.apply(output, redirects, ctx)
 
       assert {:ok, ""} = result
       assert File.read!(Path.join(sandbox, "first.txt")) == ""
@@ -92,9 +100,9 @@ defmodule TrumanShell.Stages.RedirectorTest do
 
       output = "in subdir\n"
       redirects = [{:stdout, "subdir/file.txt"}]
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
+      ctx = build_ctx(sandbox)
 
-      result = Redirector.apply(output, redirects, context)
+      result = Redirector.apply(output, redirects, ctx)
 
       assert {:ok, ""} = result
       assert File.read!(Path.join(subdir, "file.txt")) == "in subdir\n"
@@ -104,9 +112,9 @@ defmodule TrumanShell.Stages.RedirectorTest do
     test "redirect to nonexistent parent directory returns error", %{tmp_dir: sandbox} do
       output = "should not write\n"
       redirects = [{:stdout, "nonexistent/file.txt"}]
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
+      ctx = build_ctx(sandbox)
 
-      result = Redirector.apply(output, redirects, context)
+      result = Redirector.apply(output, redirects, ctx)
 
       assert {:error, error_msg} = result
       assert error_msg =~ "No such file or directory"

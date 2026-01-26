@@ -3,8 +3,6 @@ defmodule TrumanShell.Support.Sandbox do
   Sandbox boundary management for TrumanShell.
 
   Handles:
-  - Reading sandbox root from `TRUMAN_DOME` env var
-  - Path expansion (tilde, relative paths)
   - Path validation (is this path within the sandbox?)
   - Symlink rejection (symlinks denied, period)
   - Error messages that follow the 404 Principle (no information leakage)
@@ -18,6 +16,13 @@ defmodule TrumanShell.Support.Sandbox do
   Implements the "404 Principle" - paths outside the sandbox appear
   as "not found" rather than "permission denied" to avoid information leakage.
 
+  ## Configuration
+
+  Sandbox boundaries are loaded from `agents.yaml` via `TrumanShell.Config`.
+  The `%Config.Sandbox{}` struct contains:
+  - `allowed_paths` - List of directories the agent can access (boundaries)
+  - `home_path` - The agent's home directory (for `~` expansion, default cd, etc.)
+
   ## Security Limitations
 
   **TOCTOU (Time-of-Check to Time-of-Use):** This module validates paths at
@@ -29,70 +34,20 @@ defmodule TrumanShell.Support.Sandbox do
   OS-level isolation (containers, chroot, namespaces) in addition to this module.
   """
 
+  alias TrumanShell.Commands.Context
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
 
-  @env_var "TRUMAN_DOME"
-
   @doc """
-  Builds the execution context with sandbox boundaries.
-
-  Returns a map with `:sandbox_root` and `:current_dir` keys.
-
-  ## Examples
-
-      iex> context = TrumanShell.Support.Sandbox.build_context()
-      iex> Map.has_key?(context, :sandbox_root)
-      true
-      iex> Map.has_key?(context, :current_dir)
-      true
-
-  """
-  @spec build_context() :: %{sandbox_root: String.t(), current_dir: String.t()}
-  def build_context do
-    root = sandbox_root()
-    %{sandbox_root: root, current_dir: root}
-  end
-
-  @doc """
-  Returns the sandbox root path.
-
-  Reads from `TRUMAN_DOME` environment variable, falling back
-  to `File.cwd!()` if not set or empty.
-
-  Handles path expansion:
-  - `~` expands to `$HOME`
-  - `.` and `./path` expand relative to cwd
-  - Trailing slashes are normalized
-
-  Does NOT expand `$VAR` references (security risk).
-
-  ## Examples
-
-      # With env var set
-      System.put_env("TRUMAN_DOME", "~/projects/myapp")
-      TrumanShell.Support.Sandbox.sandbox_root()
-      #=> "/Users/you/projects/myapp"
-
-      # Without env var
-      System.delete_env("TRUMAN_DOME")
-      TrumanShell.Support.Sandbox.sandbox_root()
-      #=> File.cwd!()
-
-  """
-  @spec sandbox_root() :: String.t()
-  def sandbox_root do
-    case System.get_env(@env_var) do
-      nil -> File.cwd!()
-      "" -> File.cwd!()
-      path -> expand_and_normalize(path)
-    end
-  end
-
-  @doc """
-  Validates that a path resolves within the sandbox root.
+  Validates that a path resolves within the sandbox.
 
   Returns `{:ok, resolved_path}` if the path is safe,
   or `{:error, :outside_sandbox}` if it would escape.
+
+  Accepts three forms:
+  - `validate_path(path, %Context{})` - uses ctx.current_path for relative resolution
+  - `validate_path(path, %Config.Sandbox{})` - uses config.home_path for relative resolution
+  - `validate_path(path, boundary)` - simple string boundary (for tests)
 
   Handles:
   - Absolute paths
@@ -102,6 +57,15 @@ defmodule TrumanShell.Support.Sandbox do
   - `$VAR` injection prevention
 
   ## Examples
+
+      # With Context - relative paths resolve using current_path
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
+      iex> ctx = %Context{current_path: "/sandbox/subdir", sandbox_config: config}
+      iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("file.txt", ctx)
+      iex> path
+      "/sandbox/subdir/file.txt"
 
       # Relative paths within sandbox are allowed
       iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("lib/foo.ex", "/sandbox")
@@ -116,31 +80,44 @@ defmodule TrumanShell.Support.Sandbox do
       iex> TrumanShell.Support.Sandbox.validate_path("/etc/passwd", "/sandbox")
       {:error, :outside_sandbox}
 
-      # Similar prefix but different directory is blocked
-      iex> TrumanShell.Support.Sandbox.validate_path("/sandbox2/file", "/sandbox")
-      {:error, :outside_sandbox}
-
-      # Absolute paths within sandbox are allowed
-      iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("/sandbox/file", "/sandbox")
-      iex> path
-      "/sandbox/file"
-
-      # With current_dir context
-      iex> {:ok, path} = TrumanShell.Support.Sandbox.validate_path("lib/foo.ex", "/sandbox", "/sandbox")
-      iex> path
-      "/sandbox/lib/foo.ex"
-
   """
-  @spec validate_path(String.t(), String.t(), String.t() | nil) ::
+  @spec validate_path(String.t(), Context.t() | SandboxConfig.t() | String.t()) ::
           {:ok, String.t()} | {:error, :outside_sandbox}
-  def validate_path(path, sandbox_root, current_dir \\ nil)
+  def validate_path(path, %Context{} = ctx) do
+    # Use current_path for resolving relative paths (where user cd'd to)
+    %Context{current_path: current_path, sandbox_config: config} = ctx
+    %SandboxConfig{allowed_paths: allowed_paths} = config
 
-  def validate_path(path, sandbox_root, current_dir) do
+    Enum.reduce_while(allowed_paths, {:error, :outside_sandbox}, fn boundary, _acc ->
+      case do_validate_path(path, boundary, current_path) do
+        {:ok, validated_path} -> {:halt, {:ok, validated_path}}
+        {:error, _} -> {:cont, {:error, :outside_sandbox}}
+      end
+    end)
+  end
+
+  def validate_path(path, %SandboxConfig{} = config) do
+    # Try each allowed_path until one validates, or return error if none work
+    %SandboxConfig{allowed_paths: allowed_paths, home_path: home_path} = config
+
+    Enum.reduce_while(allowed_paths, {:error, :outside_sandbox}, fn boundary, _acc ->
+      case do_validate_path(path, boundary, home_path) do
+        {:ok, validated_path} -> {:halt, {:ok, validated_path}}
+        {:error, _} -> {:cont, {:error, :outside_sandbox}}
+      end
+    end)
+  end
+
+  def validate_path(path, boundary) when is_binary(boundary) do
+    do_validate_path(path, boundary, nil)
+  end
+
+  defp do_validate_path(path, boundary, current_dir) do
     # Delegate to DomePath.validate which enforces:
     # - No $VAR references
     # - No symlinks (symlinks denied, period)
     # - Path must be within boundary
-    case DomePath.validate(path, sandbox_root, current_dir) do
+    case DomePath.validate(path, boundary, current_dir) do
       {:ok, validated_path} ->
         {:ok, validated_path}
 
@@ -175,43 +152,4 @@ defmodule TrumanShell.Support.Sandbox do
   def error_message({:error, :enoent}), do: "No such file or directory"
   def error_message({:error, :eloop}), do: "Too many levels of symbolic links"
   def error_message({:error, reason}) when is_atom(reason), do: "#{reason}"
-
-  # --- Private Functions ---
-
-  defp expand_and_normalize(path) do
-    path
-    |> expand_tilde()
-    |> expand_relative()
-    |> normalize_trailing_slashes()
-  end
-
-  defp expand_tilde("~" <> rest) do
-    home = System.get_env("HOME") || "~"
-    home <> rest
-  end
-
-  defp expand_tilde(path), do: path
-
-  defp expand_relative(path) do
-    cond do
-      # Don't expand $VAR references - return as-is (intentionally not supported)
-      String.starts_with?(path, "$") ->
-        path
-
-      DomePath.type(path) == :relative ->
-        DomePath.expand(path, File.cwd!())
-
-      true ->
-        path
-    end
-  end
-
-  defp normalize_trailing_slashes(path) do
-    path
-    |> String.trim_trailing("/")
-    |> case do
-      "" -> "/"
-      normalized -> normalized
-    end
-  end
 end

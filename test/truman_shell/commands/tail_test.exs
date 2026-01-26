@@ -1,7 +1,9 @@
 defmodule TrumanShell.Commands.TailTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Tail
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
@@ -13,8 +15,9 @@ defmodule TrumanShell.Commands.TailTest do
     try do
       content = Enum.map_join(1..n, "\n", &"Line #{&1}")
       File.write!(Path.join(tmp_dir, "lines.txt"), content <> "\n")
-      context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
-      fun.(context)
+      config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+      ctx = %Context{current_path: tmp_dir, sandbox_config: config}
+      fun.(ctx)
     after
       File.rm_rf!(tmp_dir)
     end
@@ -58,27 +61,30 @@ defmodule TrumanShell.Commands.TailTest do
     end
 
     test "returns error for missing file" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
 
-      result = Tail.handle(["nonexistent.txt"], context)
+      result = Tail.handle(["nonexistent.txt"], ctx)
 
       assert {:error, msg} = result
       assert msg =~ "No such file or directory"
     end
 
     test "returns error for invalid -n value" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
 
-      result = Tail.handle(["-n", "foobar", "mix.exs"], context)
+      result = Tail.handle(["-n", "foobar", "mix.exs"], ctx)
 
       assert {:error, msg} = result
       assert msg =~ "invalid number of lines"
     end
 
     test "returns error for negative -n value" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
 
-      result = Tail.handle(["-n", "-5", "mix.exs"], context)
+      result = Tail.handle(["-n", "-5", "mix.exs"], ctx)
 
       assert {:error, msg} = result
       assert msg =~ "invalid number of lines"
@@ -86,9 +92,9 @@ defmodule TrumanShell.Commands.TailTest do
 
     test "explicit file argument takes precedence over stdin" do
       # Unix behavior: `echo "stdin" | tail -n 1 file.txt` reads file.txt, ignores stdin
-      with_lines_file(5, fn context ->
-        context_with_stdin = Map.put(context, :stdin, "stdin line 1\nstdin line 2\n")
-        {:ok, output} = Tail.handle(["-n", "1", "lines.txt"], context_with_stdin)
+      with_lines_file(5, fn ctx ->
+        ctx_with_stdin = %{ctx | stdin: "stdin line 1\nstdin line 2\n"}
+        {:ok, output} = Tail.handle(["-n", "1", "lines.txt"], ctx_with_stdin)
 
         # Should read from file, not stdin
         assert output == "Line 5\n"
@@ -97,8 +103,9 @@ defmodule TrumanShell.Commands.TailTest do
     end
 
     test "uses stdin when no file argument provided" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: "stdin line 1\nstdin line 2\n"}
-      {:ok, output} = Tail.handle(["-n", "1"], context)
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config, stdin: "stdin line 1\nstdin line 2\n"}
+      {:ok, output} = Tail.handle(["-n", "1"], ctx)
 
       assert output == "stdin line 2\n"
     end

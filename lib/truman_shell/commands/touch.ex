@@ -8,7 +8,6 @@ defmodule TrumanShell.Commands.Touch do
   @behaviour TrumanShell.Commands.Behaviour
 
   alias TrumanShell.Commands.Behaviour
-  alias TrumanShell.DomePath
   alias TrumanShell.Posix.Errors
   alias TrumanShell.Support.Sandbox
 
@@ -17,22 +16,22 @@ defmodule TrumanShell.Commands.Touch do
 
   ## Examples
 
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
       iex> sandbox = Path.join([File.cwd!(), "tmp", "touch_doctest_#{System.unique_integer([:positive])}"])
       iex> File.rm_rf(sandbox)
       iex> File.mkdir_p!(sandbox)
-      iex> context = %{sandbox_root: sandbox, current_dir: sandbox}
-      iex> {:ok, ""} = TrumanShell.Commands.Touch.handle(["testfile.txt"], context)
+      iex> config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+      iex> ctx = %Context{current_path: sandbox, sandbox_config: config}
+      iex> {:ok, ""} = TrumanShell.Commands.Touch.handle(["testfile.txt"], ctx)
       iex> File.exists?(Path.join(sandbox, "testfile.txt"))
       true
 
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle([file_name | _rest], context) do
-    target = DomePath.expand(file_name, context.current_dir)
-    target_rel = DomePath.relative_to(target, context.sandbox_root)
-
-    case Sandbox.validate_path(target_rel, context.sandbox_root) do
+  def handle([file_name | _rest], ctx) do
+    case Sandbox.validate_path(file_name, ctx) do
       {:ok, safe_path} ->
         case File.touch(safe_path) do
           :ok -> {:ok, ""}
@@ -44,7 +43,7 @@ defmodule TrumanShell.Commands.Touch do
     end
   end
 
-  def handle([], _context) do
+  def handle([], _ctx) do
     {:error, "touch: missing file operand\n"}
   end
 end

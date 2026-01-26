@@ -1,7 +1,9 @@
 defmodule TrumanShell.Commands.HeadTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Head
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
@@ -13,8 +15,9 @@ defmodule TrumanShell.Commands.HeadTest do
     try do
       content = Enum.map_join(1..n, "\n", &"Line #{&1}")
       File.write!(Path.join(tmp_dir, "lines.txt"), content <> "\n")
-      context = %{sandbox_root: tmp_dir, current_dir: tmp_dir}
-      fun.(context)
+      config = %SandboxConfig{allowed_paths: [tmp_dir], home_path: tmp_dir}
+      ctx = %Context{current_path: tmp_dir, sandbox_config: config}
+      fun.(ctx)
     after
       File.rm_rf!(tmp_dir)
     end
@@ -68,27 +71,30 @@ defmodule TrumanShell.Commands.HeadTest do
     end
 
     test "returns error for missing file" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
 
-      result = Head.handle(["nonexistent.txt"], context)
+      result = Head.handle(["nonexistent.txt"], ctx)
 
       assert {:error, msg} = result
       assert msg =~ "No such file or directory"
     end
 
     test "returns error for invalid -n value" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
 
-      result = Head.handle(["-n", "foobar", "mix.exs"], context)
+      result = Head.handle(["-n", "foobar", "mix.exs"], ctx)
 
       assert {:error, msg} = result
       assert msg =~ "invalid number of lines"
     end
 
     test "returns error for negative -n value" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
 
-      result = Head.handle(["-n", "-5", "mix.exs"], context)
+      result = Head.handle(["-n", "-5", "mix.exs"], ctx)
 
       assert {:error, msg} = result
       assert msg =~ "invalid number of lines"
@@ -96,9 +102,9 @@ defmodule TrumanShell.Commands.HeadTest do
 
     test "explicit file argument takes precedence over stdin" do
       # Unix behavior: `echo "stdin" | head -n 1 file.txt` reads file.txt, ignores stdin
-      with_lines_file(5, fn context ->
-        context_with_stdin = Map.put(context, :stdin, "stdin line 1\nstdin line 2\n")
-        {:ok, output} = Head.handle(["-n", "1", "lines.txt"], context_with_stdin)
+      with_lines_file(5, fn ctx ->
+        ctx_with_stdin = %{ctx | stdin: "stdin line 1\nstdin line 2\n"}
+        {:ok, output} = Head.handle(["-n", "1", "lines.txt"], ctx_with_stdin)
 
         # Should read from file, not stdin
         assert output == "Line 1\n"
@@ -107,8 +113,9 @@ defmodule TrumanShell.Commands.HeadTest do
     end
 
     test "uses stdin when no file argument provided" do
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: "stdin line 1\nstdin line 2\n"}
-      {:ok, output} = Head.handle(["-n", "1"], context)
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config, stdin: "stdin line 1\nstdin line 2\n"}
+      {:ok, output} = Head.handle(["-n", "1"], ctx)
 
       assert output == "stdin line 1\n"
     end
@@ -116,8 +123,9 @@ defmodule TrumanShell.Commands.HeadTest do
     test "empty stdin is valid and returns empty output" do
       # Unix behavior: empty stdin is valid input, not an error
       # `printf "" | head -n 2` returns empty output, not "missing file operand"
-      context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!(), stdin: ""}
-      {:ok, output} = Head.handle(["-n", "2"], context)
+      config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      ctx = %Context{current_path: File.cwd!(), sandbox_config: config, stdin: ""}
+      {:ok, output} = Head.handle(["-n", "2"], ctx)
 
       assert output == ""
     end

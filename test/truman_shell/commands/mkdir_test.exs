@@ -1,7 +1,9 @@
 defmodule TrumanShell.Commands.MkdirTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Mkdir
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
@@ -13,47 +15,48 @@ defmodule TrumanShell.Commands.MkdirTest do
 
       on_exit(fn -> File.rm_rf!(sandbox) end)
 
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
-      {:ok, context: context, sandbox: sandbox}
+      config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+      ctx = %Context{current_path: sandbox, sandbox_config: config}
+      {:ok, ctx: ctx, sandbox: sandbox}
     end
 
-    test "creates a new directory", %{context: context, sandbox: sandbox} do
-      result = Mkdir.handle(["newdir"], context)
+    test "creates a new directory", %{ctx: ctx, sandbox: sandbox} do
+      result = Mkdir.handle(["newdir"], ctx)
 
       assert {:ok, ""} = result
       assert File.dir?(Path.join(sandbox, "newdir"))
     end
 
-    test "returns error when directory already exists", %{context: context, sandbox: sandbox} do
+    test "returns error when directory already exists", %{ctx: ctx, sandbox: sandbox} do
       # Create the directory first
       existing = Path.join(sandbox, "existing")
       File.mkdir!(existing)
 
-      result = Mkdir.handle(["existing"], context)
+      result = Mkdir.handle(["existing"], ctx)
 
       assert {:error, "mkdir: existing: File exists\n"} = result
     end
 
-    test "blocks mkdir outside sandbox (404 principle)", %{context: context} do
+    test "blocks mkdir outside sandbox (404 principle)", %{ctx: ctx} do
       # Attempting to create /etc/hacked should return "No such file" not "Permission denied"
-      result = Mkdir.handle(["/etc/hacked"], context)
+      result = Mkdir.handle(["/etc/hacked"], ctx)
 
       assert {:error, "mkdir: /etc/hacked: No such file or directory\n"} = result
     end
 
-    test "mkdir -p creates parent directories", %{context: context, sandbox: sandbox} do
-      result = Mkdir.handle(["-p", "path/to/nested"], context)
+    test "mkdir -p creates parent directories", %{ctx: ctx, sandbox: sandbox} do
+      result = Mkdir.handle(["-p", "path/to/nested"], ctx)
 
       assert {:ok, ""} = result
       assert File.dir?(Path.join(sandbox, "path/to/nested"))
     end
 
-    test "mkdir -p succeeds even if directory exists", %{context: context, sandbox: sandbox} do
+    test "mkdir -p succeeds even if directory exists", %{ctx: ctx, sandbox: sandbox} do
       # Create the directory first
       existing = Path.join(sandbox, "already_exists")
       File.mkdir!(existing)
 
-      result = Mkdir.handle(["-p", "already_exists"], context)
+      result = Mkdir.handle(["-p", "already_exists"], ctx)
 
       assert {:ok, ""} = result
     end

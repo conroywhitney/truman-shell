@@ -24,7 +24,7 @@ defmodule TrumanShell.Stages.Executor do
 
   alias TrumanShell.Command
   alias TrumanShell.Commands
-  alias TrumanShell.DomePath
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Stages.Redirector
 
   # Maximum number of commands in a pipeline (e.g., cmd1 | cmd2 | cmd3 = 3 commands)
@@ -36,52 +36,55 @@ defmodule TrumanShell.Stages.Executor do
 
   Returns `{:ok, output}` on success or `{:error, message}` on failure.
 
-  ## Options
+  ## Arguments
 
-    * `:sandbox_root` - Root directory for sandbox confinement.
-      Defaults to `File.cwd!()`. All file operations are restricted
-      to this directory and its subdirectories.
+    * `command` - Parsed Command struct from Parser/Expander
+    * `ctx` - Execution context with current_path and sandbox_config
 
   ## Examples
 
       iex> alias TrumanShell.Command
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
       iex> cmd = %Command{name: :cmd_ls, args: ["lib"], pipes: [], redirects: []}
-      iex> {:ok, output} = TrumanShell.Stages.Executor.run(cmd)
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> {:ok, output, _ctx} = TrumanShell.Stages.Executor.run(cmd, ctx)
       iex> output =~ "truman_shell"
       true
 
       iex> alias TrumanShell.Command
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
       iex> cmd = %Command{name: {:unknown, "fake"}, args: [], pipes: [], redirects: []}
-      iex> TrumanShell.Stages.Executor.run(cmd)
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Stages.Executor.run(cmd, ctx)
       {:error, "bash: fake: command not found\\n"}
 
   """
-  @spec run(Command.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
-  def run(command, opts \\ [])
-
-  def run(%Command{pipes: pipes} = command, opts) do
-    if root = Keyword.get(opts, :sandbox_root) do
-      set_sandbox_root(DomePath.expand(root))
-    end
-
-    context = %{sandbox_root: sandbox_root(), current_dir: current_dir()}
-
+  @spec run(Command.t(), Context.t()) :: {:ok, String.t(), Context.t()} | {:error, String.t()}
+  def run(%Command{pipes: pipes} = command, %Context{} = ctx) do
     # Get redirects from the LAST command in pipeline (most common: cmd1 | cmd2 > file.txt)
     final_command = if pipes == [], do: command, else: List.last(pipes)
 
     with :ok <- validate_depth(command),
-         {:ok, output} <- execute(command, opts),
-         {:ok, piped_output} <- run_pipeline(output, pipes) do
-      Redirector.apply(piped_output, final_command.redirects, context)
+         {:ok, output, ctx} <- execute(command, ctx),
+         {:ok, piped_output, ctx} <- run_pipeline(output, pipes, ctx),
+         {:ok, final_output} <- Redirector.apply(piped_output, final_command.redirects, ctx) do
+      {:ok, final_output, ctx}
     end
   end
 
-  # Execute each pipe stage, passing previous output as stdin
-  defp run_pipeline(output, []), do: {:ok, output}
+  # Execute each pipe stage, passing ctx through (cd can update current_path)
+  defp run_pipeline(output, [], ctx), do: {:ok, output, ctx}
 
-  defp run_pipeline(output, [%Command{} = next_cmd | rest]) do
-    case execute(next_cmd, stdin: output) do
-      {:ok, next_output} -> run_pipeline(next_output, rest)
+  defp run_pipeline(output, [%Command{} = next_cmd | rest], ctx) do
+    # Pass previous output as stdin in ctx
+    ctx_with_stdin = %{ctx | stdin: output}
+
+    case execute(next_cmd, ctx_with_stdin) do
+      {:ok, next_output, new_ctx} -> run_pipeline(next_output, rest, new_ctx)
       {:error, _} = error -> error
     end
   end
@@ -133,40 +136,26 @@ defmodule TrumanShell.Stages.Executor do
     end)
   end
 
-  defp execute(command, opts)
-
-  defp execute(%Command{name: name, args: args}, opts) when is_map_key(@command_modules, name) do
+  defp execute(%Command{name: name, args: args}, %Context{} = ctx) when is_map_key(@command_modules, name) do
     module = @command_modules[name]
-    context = build_context(opts)
 
-    case module.handle(args, context) do
-      # Handle side effects from commands like cd
-      {:ok, output, set_cwd: new_cwd} ->
-        set_current_dir(new_cwd)
-        {:ok, output}
+    case module.handle(args, ctx) do
+      # cd returns updated ctx with new current_path
+      {:ok, output, ctx: new_ctx} ->
+        {:ok, output, new_ctx}
 
-      # Normal success/error pass through
-      result ->
-        result
+      # Normal success - ctx unchanged
+      {:ok, output} ->
+        {:ok, output, ctx}
+
+      # Error pass through
+      {:error, _} = error ->
+        error
     end
   end
 
-  defp execute(%Command{name: {:unknown, name}}, _opts) do
+  defp execute(%Command{name: {:unknown, name}}, _ctx) do
     {:error, "bash: #{name}: command not found\n"}
-  end
-
-  # Context for command handlers
-  defp build_context(opts) do
-    base = %{
-      sandbox_root: sandbox_root(),
-      current_dir: current_dir()
-    }
-
-    # Add stdin to context if provided (for piped commands)
-    case Keyword.get(opts, :stdin) do
-      nil -> base
-      stdin -> Map.put(base, :stdin, stdin)
-    end
   end
 
   # Depth validation for pipelines
@@ -178,26 +167,5 @@ defmodule TrumanShell.Stages.Executor do
     else
       :ok
     end
-  end
-
-  # State management - sandbox root and current directory
-  # These are placed at the bottom as they are called by many functions above
-
-  defp set_current_dir(path) do
-    Process.put(:truman_cwd, path)
-  end
-
-  defp current_dir do
-    Process.get(:truman_cwd, sandbox_root())
-  end
-
-  defp set_sandbox_root(path) do
-    Process.put(:truman_sandbox_root, path)
-    # Reset CWD to new sandbox root to prevent state leakage across sessions
-    Process.put(:truman_cwd, path)
-  end
-
-  defp sandbox_root do
-    Process.get(:truman_sandbox_root, File.cwd!())
   end
 end

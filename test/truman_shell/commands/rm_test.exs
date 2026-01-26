@@ -1,7 +1,9 @@
 defmodule TrumanShell.Commands.RmTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Rm
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
@@ -16,12 +18,13 @@ defmodule TrumanShell.Commands.RmTest do
 
       on_exit(fn -> File.rm_rf!(sandbox) end)
 
-      context = %{sandbox_root: sandbox, current_dir: sandbox}
-      {:ok, context: context, sandbox: sandbox, trash_dir: trash_dir}
+      config = %SandboxConfig{allowed_paths: [sandbox], home_path: sandbox}
+      ctx = %Context{current_path: sandbox, sandbox_config: config}
+      {:ok, ctx: ctx, sandbox: sandbox, trash_dir: trash_dir}
     end
 
     test "soft deletes file to .trash", %{
-      context: context,
+      ctx: ctx,
       sandbox: sandbox,
       trash_dir: trash_dir
     } do
@@ -29,7 +32,7 @@ defmodule TrumanShell.Commands.RmTest do
       file_path = Path.join(sandbox, "deleteme.txt")
       File.write!(file_path, "original content")
 
-      result = Rm.handle(["deleteme.txt"], context)
+      result = Rm.handle(["deleteme.txt"], ctx)
 
       assert {:ok, ""} = result
       # File should no longer exist in original location
@@ -44,24 +47,24 @@ defmodule TrumanShell.Commands.RmTest do
       assert File.read!(trash_path) == "original content"
     end
 
-    test "returns error for nonexistent file", %{context: context} do
-      result = Rm.handle(["nonexistent.txt"], context)
+    test "returns error for nonexistent file", %{ctx: ctx} do
+      result = Rm.handle(["nonexistent.txt"], ctx)
 
       assert {:error, "rm: nonexistent.txt: No such file or directory\n"} = result
     end
 
-    test "rm -f succeeds silently for nonexistent file", %{context: context} do
-      result = Rm.handle(["-f", "nonexistent.txt"], context)
+    test "rm -f succeeds silently for nonexistent file", %{ctx: ctx} do
+      result = Rm.handle(["-f", "nonexistent.txt"], ctx)
 
       assert {:ok, ""} = result
     end
 
-    test "rm directory without -r returns error", %{context: context, sandbox: sandbox} do
+    test "rm directory without -r returns error", %{ctx: ctx, sandbox: sandbox} do
       # Create a directory
       dir_path = Path.join(sandbox, "mydir")
       File.mkdir!(dir_path)
 
-      result = Rm.handle(["mydir"], context)
+      result = Rm.handle(["mydir"], ctx)
 
       assert {:error, "rm: mydir: is a directory\n"} = result
       # Directory should still exist
@@ -69,7 +72,7 @@ defmodule TrumanShell.Commands.RmTest do
     end
 
     test "rm -r soft deletes directory", %{
-      context: context,
+      ctx: ctx,
       sandbox: sandbox,
       trash_dir: trash_dir
     } do
@@ -78,7 +81,7 @@ defmodule TrumanShell.Commands.RmTest do
       File.mkdir!(dir_path)
       File.write!(Path.join(dir_path, "inner.txt"), "inner content")
 
-      result = Rm.handle(["-r", "mydir"], context)
+      result = Rm.handle(["-r", "mydir"], ctx)
 
       assert {:ok, ""} = result
       # Directory should no longer exist in original location
@@ -91,7 +94,7 @@ defmodule TrumanShell.Commands.RmTest do
     end
 
     test "rm -rf combines force and recursive flags", %{
-      context: context,
+      ctx: ctx,
       sandbox: sandbox,
       trash_dir: trash_dir
     } do
@@ -100,7 +103,7 @@ defmodule TrumanShell.Commands.RmTest do
       File.mkdir!(dir_path)
       File.write!(Path.join(dir_path, "inner.txt"), "inner content")
 
-      result = Rm.handle(["-rf", "forcedir"], context)
+      result = Rm.handle(["-rf", "forcedir"], ctx)
 
       assert {:ok, ""} = result
       # Directory should no longer exist in original location
@@ -112,14 +115,14 @@ defmodule TrumanShell.Commands.RmTest do
       assert String.ends_with?(trash_dir_name, "_forcedir")
     end
 
-    test "blocks rm outside sandbox (404 principle)", %{context: context} do
-      result = Rm.handle(["/etc/passwd"], context)
+    test "blocks rm outside sandbox (404 principle)", %{ctx: ctx} do
+      result = Rm.handle(["/etc/passwd"], ctx)
 
       assert {:error, "rm: /etc/passwd: No such file or directory\n"} = result
     end
 
     test "rapid successive rm calls create unique trash entries", %{
-      context: context,
+      ctx: ctx,
       sandbox: sandbox,
       trash_dir: trash_dir
     } do
@@ -128,7 +131,7 @@ defmodule TrumanShell.Commands.RmTest do
         file_path = Path.join(sandbox, "file.txt")
         File.write!(file_path, "content #{i}")
 
-        result = Rm.handle(["file.txt"], context)
+        result = Rm.handle(["file.txt"], ctx)
         assert {:ok, ""} = result
       end
 

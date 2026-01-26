@@ -14,8 +14,11 @@ defmodule TrumanShell.Commands.Date do
 
   ## Examples
 
-      iex> context = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
-      iex> {:ok, output} = TrumanShell.Commands.Date.handle([], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
+      iex> ctx = %Context{current_path: "/sandbox", sandbox_config: config}
+      iex> {:ok, output} = TrumanShell.Commands.Date.handle([], ctx)
       iex> output =~ ~r/^\\w{3} \\w{3} [ \\d]\\d \\d{2}:\\d{2}:\\d{2} \\w+ \\d{4}\\n$/
       true
 

@@ -3,59 +3,64 @@ defmodule TrumanShell.ConfigTest do
   Tests for agents.yaml configuration loading and validation.
 
   These tests explore edge cases around:
-  - default_cwd behavior (the "home base" concept)
-  - Multiple roots validation
+  - home_path behavior (the "home base" concept)
+  - Multiple allowed_paths validation
   - Path resolution and TOCTOU prevention
   """
   use ExUnit.Case, async: false
 
   alias TrumanShell.Config
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :config
 
-  describe "default_cwd resolution" do
-    @describetag :default_cwd
+  describe "home_path resolution" do
+    @describetag :home_path
 
-    test "default_cwd is resolved to absolute path at load time (not at use time)" do
+    test "home_path is resolved to absolute path at load time (not at use time)" do
       # This prevents TOCTOU: we don't check inherited cwd, we SET it
       # The resolved path should be stable regardless of shell cwd changes
       config = Config.defaults()
 
-      # default_cwd should always be absolute
-      assert Path.type(config.default_cwd) == :absolute
+      # home_path should always be absolute
+      assert Path.type(config.sandbox.home_path) == :absolute
 
       # It should be the actual cwd, fully expanded
-      assert config.default_cwd == File.cwd!()
+      assert config.sandbox.home_path == File.cwd!()
 
       # No ~, no .., no relative components
-      refute String.contains?(config.default_cwd, "~")
-      refute String.contains?(config.default_cwd, "/../")
+      refute String.contains?(config.sandbox.home_path, "~")
+      refute String.contains?(config.sandbox.home_path, "/../")
     end
 
-    test "default_cwd must be within one of the roots" do
-      # Invalid: default_cwd outside all roots
+    test "home_path must be within one of the allowed_paths" do
+      # Invalid: home_path outside all allowed_paths
       # We'll test validation directly with a struct
+      sandbox = %SandboxConfig{
+        allowed_paths: [File.cwd!()],
+        home_path: "/tmp"
+      }
+
       config = %Config{
         version: "0.1",
-        roots: [File.cwd!()],
-        default_cwd: "/tmp",
+        sandbox: sandbox,
         raw: %{}
       }
 
       assert {:error, msg} = Config.validate(config)
-      assert msg =~ "default_cwd must be within one of the roots"
+      assert msg =~ "home_path must be within one of the allowed_paths"
     end
 
-    test "default_cwd can be relative to first root" do
-      # Create a temp config file with relative default_cwd
+    test "home_path can be relative to first allowed_path" do
+      # Create a temp config file with relative home_path
       cwd = File.cwd!()
 
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{cwd}"
-        default_cwd: "."
+        home_path: "#{cwd}"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
@@ -63,24 +68,24 @@ defmodule TrumanShell.ConfigTest do
 
       try do
         assert {:ok, config} = Config.load(config_path)
-        # "." relative to first root should resolve to the root itself
-        assert config.default_cwd == cwd
-        assert Path.type(config.default_cwd) == :absolute
+        # home_path should be the cwd
+        assert config.sandbox.home_path == cwd
+        assert Path.type(config.sandbox.home_path) == :absolute
       after
         File.rm(config_path)
       end
     end
 
-    test "default_cwd with ~ expands to home directory" do
+    test "home_path with ~ expands to home directory" do
       # Use a directory we know exists under home
       home = System.user_home!()
 
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "~"
-        default_cwd: "~"
+        home_path: "~"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
@@ -89,15 +94,15 @@ defmodule TrumanShell.ConfigTest do
       try do
         assert {:ok, config} = Config.load(config_path)
         # ~ should expand to home directory
-        assert config.default_cwd == home
-        assert home in config.roots
-        refute String.contains?(config.default_cwd, "~")
+        assert config.sandbox.home_path == home
+        assert home in config.sandbox.allowed_paths
+        refute String.contains?(config.sandbox.home_path, "~")
       after
         File.rm(config_path)
       end
     end
 
-    test "default_cwd with non-existent path fails at load time" do
+    test "home_path with non-existent path fails at load time" do
       # We want early failure, not runtime surprises
       cwd = File.cwd!()
       nonexistent = Path.join(cwd, "this-directory-does-not-exist-#{:rand.uniform(10_000)}")
@@ -105,9 +110,9 @@ defmodule TrumanShell.ConfigTest do
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{cwd}"
-        default_cwd: "#{nonexistent}"
+        home_path: "#{nonexistent}"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
@@ -115,17 +120,38 @@ defmodule TrumanShell.ConfigTest do
 
       try do
         assert {:error, msg} = Config.load(config_path)
-        assert msg =~ "default_cwd does not exist"
+        assert msg =~ "home_path does not exist"
+      after
+        File.rm(config_path)
+      end
+    end
+
+    test "home_path is required in YAML config" do
+      cwd = File.cwd!()
+
+      config_content = """
+      version: "0.1"
+      sandbox:
+        allowed_paths:
+          - "#{cwd}"
+      """
+
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:error, msg} = Config.load(config_path)
+        assert msg =~ "home_path is required"
       after
         File.rm(config_path)
       end
     end
   end
 
-  describe "multiple roots" do
-    @describetag :roots
+  describe "multiple allowed_paths" do
+    @describetag :allowed_paths
 
-    test "roots with globs expand at load time" do
+    test "allowed_paths with globs expand at load time" do
       # Create temp dirs to test glob expansion
       base_dir = Path.join(System.tmp_dir!(), "test_roots_#{:rand.uniform(10_000)}")
       proj1 = Path.join(base_dir, "project1")
@@ -136,9 +162,9 @@ defmodule TrumanShell.ConfigTest do
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{base_dir}/*"
-        default_cwd: "#{proj1}"
+        home_path: "#{proj1}"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
@@ -147,17 +173,17 @@ defmodule TrumanShell.ConfigTest do
       try do
         assert {:ok, config} = Config.load(config_path)
         # Glob should expand to actual directories
-        assert proj1 in config.roots
-        assert proj2 in config.roots
-        # Original glob pattern should not be in roots
-        refute Enum.any?(config.roots, &String.contains?(&1, "*"))
+        assert proj1 in config.sandbox.allowed_paths
+        assert proj2 in config.sandbox.allowed_paths
+        # Original glob pattern should not be in allowed_paths
+        refute Enum.any?(config.sandbox.allowed_paths, &String.contains?(&1, "*"))
       after
         File.rm(config_path)
         File.rm_rf!(base_dir)
       end
     end
 
-    test "relative glob roots expand to absolute paths" do
+    test "relative glob allowed_paths expand to absolute paths" do
       # This is P1: relative globs like "./*" should return absolute paths
       # Create test directories in current directory
       cwd = File.cwd!()
@@ -174,9 +200,9 @@ defmodule TrumanShell.ConfigTest do
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "./#{rel_base}/*"
-        default_cwd: "#{proj1}"
+        home_path: "#{proj1}"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{test_id}.yaml")
@@ -185,60 +211,22 @@ defmodule TrumanShell.ConfigTest do
       try do
         assert {:ok, config} = Config.load(config_path)
 
-        # ALL roots must be absolute paths (this catches the bug!)
-        for root <- config.roots do
-          assert Path.type(root) == :absolute,
-                 "Root #{root} should be absolute, not relative (started with ./)"
+        # ALL allowed_paths must be absolute paths (this catches the bug!)
+        for path <- config.sandbox.allowed_paths do
+          assert Path.type(path) == :absolute,
+                 "Path #{path} should be absolute, not relative (started with ./)"
         end
 
         # Should contain our test dirs as absolute paths
-        assert proj1 in config.roots
-        assert proj2 in config.roots
+        assert proj1 in config.sandbox.allowed_paths
+        assert proj2 in config.sandbox.allowed_paths
       after
         File.rm(config_path)
         File.rm_rf!(base_dir)
       end
     end
 
-    test "default_cwd defaults to first expanded root when omitted with glob" do
-      # This is P1: if roots contain globs and default_cwd is omitted,
-      # default_cwd should be the first EXPANDED root, not the raw glob pattern
-      base_dir = Path.join(System.tmp_dir!(), "test_glob_cwd_#{:rand.uniform(10_000)}")
-      # Will be first after sort
-      proj1 = Path.join(base_dir, "alpha")
-      proj2 = Path.join(base_dir, "beta")
-      File.mkdir_p!(proj1)
-      File.mkdir_p!(proj2)
-
-      # Omit default_cwd - should default to first expanded root
-      config_content = """
-      version: "0.1"
-      sandbox:
-        roots:
-          - "#{base_dir}/*"
-      """
-
-      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
-      File.write!(config_path, config_content)
-
-      try do
-        assert {:ok, config} = Config.load(config_path)
-        # default_cwd should be an actual directory, not a glob pattern
-        refute String.contains?(config.default_cwd, "*"),
-               "default_cwd should not contain glob pattern: #{config.default_cwd}"
-
-        assert File.dir?(config.default_cwd),
-               "default_cwd should be an existing directory"
-
-        # Should be the first expanded root (alpha comes before beta alphabetically)
-        assert config.default_cwd == proj1
-      after
-        File.rm(config_path)
-        File.rm_rf!(base_dir)
-      end
-    end
-
-    test "path validation checks against ALL roots" do
+    test "path validation checks against ALL allowed_paths" do
       # Create two separate root directories
       base_dir = Path.join(System.tmp_dir!(), "test_roots_#{:rand.uniform(10_000)}")
       root1 = Path.join(base_dir, "project")
@@ -246,45 +234,45 @@ defmodule TrumanShell.ConfigTest do
       File.mkdir_p!(root1)
       File.mkdir_p!(root2)
 
-      # default_cwd is in root2, not root1
+      # home_path is in root2, not root1
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{root1}"
           - "#{root2}"
-        default_cwd: "#{root2}"
+        home_path: "#{root2}"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
       File.write!(config_path, config_content)
 
       try do
-        # Should succeed because root2 is in the roots list
+        # Should succeed because root2 is in the allowed_paths list
         assert {:ok, config} = Config.load(config_path)
-        assert config.default_cwd == root2
-        assert root1 in config.roots
-        assert root2 in config.roots
+        assert config.sandbox.home_path == root2
+        assert root1 in config.sandbox.allowed_paths
+        assert root2 in config.sandbox.allowed_paths
       after
         File.rm(config_path)
         File.rm_rf!(base_dir)
       end
     end
 
-    test "overlapping roots are deduplicated" do
+    test "overlapping allowed_paths are deduplicated" do
       # Create nested directories
       base_dir = Path.join(System.tmp_dir!(), "test_roots_#{:rand.uniform(10_000)}")
       nested = Path.join(base_dir, "project")
       File.mkdir_p!(nested)
 
-      # Both parent and child are roots - child is redundant but valid
+      # Both parent and child are allowed_paths - child is redundant but valid
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{base_dir}"
           - "#{nested}"
-        default_cwd: "#{base_dir}"
+        home_path: "#{base_dir}"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
@@ -292,18 +280,18 @@ defmodule TrumanShell.ConfigTest do
 
       try do
         assert {:ok, config} = Config.load(config_path)
-        # Both roots are kept (Enum.uniq only removes exact duplicates)
-        assert base_dir in config.roots
-        assert nested in config.roots
-        # Roots are sorted
-        assert config.roots == Enum.sort(config.roots)
+        # Both paths are kept (Enum.uniq only removes exact duplicates)
+        assert base_dir in config.sandbox.allowed_paths
+        assert nested in config.sandbox.allowed_paths
+        # Paths are sorted
+        assert config.sandbox.allowed_paths == Enum.sort(config.sandbox.allowed_paths)
       after
         File.rm(config_path)
         File.rm_rf!(base_dir)
       end
     end
 
-    test "symlink in root is resolved" do
+    test "symlink in allowed_paths is resolved" do
       # Create a real directory and a symlink to it
       base_dir = Path.join(System.tmp_dir!(), "test_roots_#{:rand.uniform(10_000)}")
       real_dir = Path.join(base_dir, "real")
@@ -315,9 +303,9 @@ defmodule TrumanShell.ConfigTest do
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{symlink_dir}"
-        default_cwd: "#{symlink_dir}"
+        home_path: "#{symlink_dir}"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
@@ -327,24 +315,24 @@ defmodule TrumanShell.ConfigTest do
         assert {:ok, config} = Config.load(config_path)
         # Config loads successfully with symlink path
         # The symlink is expanded but stored as given
-        assert length(config.roots) == 1
-        # default_cwd validation works through symlink
-        assert File.dir?(config.default_cwd)
+        assert length(config.sandbox.allowed_paths) == 1
+        # home_path validation works through symlink
+        assert File.dir?(config.sandbox.home_path)
       after
         File.rm(config_path)
         File.rm_rf!(base_dir)
       end
     end
 
-    test "root with trailing slash is normalized" do
+    test "allowed_path with trailing slash is normalized" do
       cwd = File.cwd!()
 
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{cwd}/"
-        default_cwd: "#{cwd}"
+        home_path: "#{cwd}"
       """
 
       config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
@@ -353,9 +341,29 @@ defmodule TrumanShell.ConfigTest do
       try do
         assert {:ok, config} = Config.load(config_path)
         # Trailing slash should be normalized away
-        [root] = config.roots
-        refute String.ends_with?(root, "/")
-        assert root == cwd
+        [path] = config.sandbox.allowed_paths
+        refute String.ends_with?(path, "/")
+        assert path == cwd
+      after
+        File.rm(config_path)
+      end
+    end
+
+    test "allowed_paths is required in YAML config" do
+      cwd = File.cwd!()
+
+      config_content = """
+      version: "0.1"
+      sandbox:
+        home_path: "#{cwd}"
+      """
+
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:error, msg} = Config.load(config_path)
+        assert msg =~ "allowed_paths is required"
       after
         File.rm(config_path)
       end
@@ -371,9 +379,9 @@ defmodule TrumanShell.ConfigTest do
 
     @tag :skip
     @tag :executor
-    test "executor uses config default_cwd, not inherited shell cwd" do
+    test "executor uses config home_path, not inherited shell cwd" do
       # This is the key test: even if shell cwd is /tmp,
-      # commands should execute with cwd = default_cwd from config
+      # commands should execute with cwd = home_path from config
     end
 
     @tag :skip
@@ -385,8 +393,8 @@ defmodule TrumanShell.ConfigTest do
 
     @tag :skip
     @tag :executor
-    test "relative paths resolve against config default_cwd, not shell cwd" do
-      # If shell cwd is /tmp but default_cwd is /home/user/project,
+    test "relative paths resolve against config home_path, not shell cwd" do
+      # If shell cwd is /tmp but home_path is /home/user/project,
       # "cat README.md" should look in /home/user/project/README.md
     end
   end
@@ -407,9 +415,9 @@ defmodule TrumanShell.ConfigTest do
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{cwd}"
-        default_cwd: "#{cwd}"
+        home_path: "#{cwd}"
       """
 
       File.write!(config_file, config_content)
@@ -417,7 +425,7 @@ defmodule TrumanShell.ConfigTest do
       try do
         assert {:ok, config} = Config.discover()
         assert config.version == "0.1"
-        assert cwd in config.roots
+        assert cwd in config.sandbox.allowed_paths
       after
         File.rm!(config_file)
       end
@@ -436,9 +444,9 @@ defmodule TrumanShell.ConfigTest do
       config_content = """
       version: "0.1"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{cwd}"
-        default_cwd: "#{cwd}"
+        home_path: "#{cwd}"
       """
 
       File.write!(config_file, config_content)
@@ -464,17 +472,17 @@ defmodule TrumanShell.ConfigTest do
       File.write!(visible_config, """
       version: "visible"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{cwd}"
-        default_cwd: "#{cwd}"
+        home_path: "#{cwd}"
       """)
 
       File.write!(hidden_config, """
       version: "hidden"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{cwd}"
-        default_cwd: "#{cwd}"
+        home_path: "#{cwd}"
       """)
 
       try do
@@ -508,9 +516,9 @@ defmodule TrumanShell.ConfigTest do
       File.write!(fallback_config, """
       version: "fallback"
       sandbox:
-        roots:
+        allowed_paths:
           - "#{cwd}"
-        default_cwd: "#{cwd}"
+        home_path: "#{cwd}"
       """)
 
       try do
@@ -526,72 +534,90 @@ defmodule TrumanShell.ConfigTest do
     end
 
     test "returns sensible defaults when no config found" do
-      # Default: single root = cwd, default_cwd = cwd
+      # Default: single allowed_path = cwd, home_path = cwd
       config = Config.defaults()
 
       assert config.version == "0.1"
-      assert length(config.roots) == 1
-      assert hd(config.roots) == File.cwd!()
-      assert config.default_cwd == File.cwd!()
+      assert length(config.sandbox.allowed_paths) == 1
+      assert hd(config.sandbox.allowed_paths) == File.cwd!()
+      assert config.sandbox.home_path == File.cwd!()
     end
   end
 
   describe "config validation" do
     @describetag :validation
 
-    test "rejects config with no roots" do
+    test "rejects config with no allowed_paths" do
+      sandbox = %SandboxConfig{
+        allowed_paths: [],
+        home_path: File.cwd!()
+      }
+
       config = %Config{
         version: "0.1",
-        roots: [],
-        default_cwd: File.cwd!(),
+        sandbox: sandbox,
         raw: %{}
       }
 
       assert {:error, msg} = Config.validate(config)
-      assert msg =~ "at least one root"
+      assert msg =~ "at least one allowed_path"
     end
 
-    test "rejects root that doesn't exist" do
+    test "rejects allowed_path that doesn't exist via loading" do
+      # Path existence is validated during YAML loading, not struct validation
       nonexistent = "/this/path/definitely/does/not/exist/#{:rand.uniform(10_000)}"
 
-      config = %Config{
-        version: "0.1",
-        roots: [nonexistent],
-        default_cwd: nonexistent,
-        raw: %{}
-      }
+      config_content = """
+      version: "0.1"
+      sandbox:
+        allowed_paths:
+          - "#{nonexistent}"
+        home_path: "#{nonexistent}"
+      """
 
-      assert {:error, msg} = Config.validate(config)
-      assert msg =~ "does not exist"
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:error, msg} = Config.load(config_path)
+        assert msg =~ "does not exist"
+      after
+        File.rm(config_path)
+      end
     end
 
-    test "rejects root that is a file (not directory)" do
-      # Create a temp file (not a directory)
+    test "rejects allowed_path that is a file (not directory) via loading" do
+      # Path type is validated during YAML loading, not struct validation
       file_path = Path.join(System.tmp_dir!(), "test_file_#{:rand.uniform(10_000)}.txt")
       File.write!(file_path, "I am a file, not a directory")
 
-      try do
-        config = %Config{
-          version: "0.1",
-          roots: [file_path],
-          default_cwd: file_path,
-          raw: %{}
-        }
+      config_content = """
+      version: "0.1"
+      sandbox:
+        allowed_paths:
+          - "#{file_path}"
+        home_path: "#{file_path}"
+      """
 
-        assert {:error, msg} = Config.validate(config)
+      config_path = Path.join(System.tmp_dir!(), "test_agents_#{:rand.uniform(10_000)}.yaml")
+      File.write!(config_path, config_content)
+
+      try do
+        assert {:error, msg} = Config.load(config_path)
         assert msg =~ "not a directory"
       after
         File.rm!(file_path)
+        File.rm(config_path)
       end
     end
 
     @tag :skip
     @tag :deferred
-    test "rejects root outside user home (security)" do
+    test "rejects allowed_path outside user home (security)" do
       # DEFERRED: Security boundary enforcement belongs in the harness, not config loader
       # The harness-protected paths from SPEC.md should be checked at runtime
-      # config = %{roots: ["/etc"]}
-      # Should return {:error, "root /etc is outside allowed base paths"}
+      # config = %{allowed_paths: ["/etc"]}
+      # Should return {:error, "allowed_path /etc is outside allowed base paths"}
     end
 
     @tag :skip
@@ -608,26 +634,26 @@ defmodule TrumanShell.ConfigTest do
     @describetag :integration
 
     # These tests require Executor/Harness integration - Phase 2-3 of implementation
-    # See handoff: "Integrate Config with Executor", "Integration tests for default_cwd behavior"
+    # See handoff: "Integrate Config with Executor", "Integration tests for home_path behavior"
 
     @tag :skip
     @tag :executor
-    test "cd to another root, then relative path resolves correctly" do
-      # roots: [~/studios/reification-labs, ~/code/truman-shell]
-      # default_cwd: ~/studios/reification-labs
+    test "cd to another allowed_path, then relative path resolves correctly" do
+      # allowed_paths: [~/studios/reification-labs, ~/code/truman-shell]
+      # home_path: ~/studios/reification-labs
       # cd ~/code/truman-shell
-      # cat lib/sandbox.ex -> should work (within roots)
+      # cat lib/sandbox.ex -> should work (within allowed_paths)
     end
 
     @tag :skip
     @tag :executor
-    test "cd to path outside all roots fails" do
-      # cd /tmp -> error, not within roots
+    test "cd to path outside all allowed_paths fails" do
+      # cd /tmp -> error, not within allowed_paths
     end
 
     @tag :skip
     @tag :harness
-    test "checkpoint creates files in default_cwd, not current cd location" do
+    test "checkpoint creates files in home_path, not current cd location" do
       # This is the user's actual use case!
       # cd ~/code/truman-shell (for git work)
       # /checkpoint -> files should go to ~/studios/reification-labs/.checkpoints/
@@ -636,23 +662,23 @@ defmodule TrumanShell.ConfigTest do
 
     @tag :skip
     @tag :executor
-    test "git -C works with paths in any root" do
+    test "git -C works with paths in any allowed_path" do
       # git -C ~/code/truman-shell status
-      # Should work because ~/code/truman-shell is in roots
+      # Should work because ~/code/truman-shell is in allowed_paths
     end
 
     @tag :skip
     @tag :harness
-    test "symlink from one root to another is followed" do
+    test "symlink from one allowed_path to another is followed" do
       # ~/studios/reification-labs/.vault/truman-shell -> ~/code/truman-shell
-      # If both are roots, symlink should be allowed
+      # If both are allowed_paths, symlink should be allowed
     end
 
     @tag :skip
     @tag :harness
-    test "symlink from root to outside-root is denied" do
+    test "symlink from allowed_path to outside-allowed_path is denied" do
       # ~/code/escape -> /etc
-      # Even though ~/code/* is a root, the symlink target is not
+      # Even though ~/code/* is an allowed_path, the symlink target is not
     end
   end
 end

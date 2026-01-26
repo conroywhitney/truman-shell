@@ -1,92 +1,8 @@
 defmodule TrumanShell.Support.SandboxTest do
-  # async: false because sandbox_root/0 tests mutate TRUMAN_DOME env var
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.Support.Sandbox
-
-  # Save and restore TRUMAN_DOME around tests that mutate it
-  setup do
-    original_dome = System.get_env("TRUMAN_DOME")
-    on_exit(fn -> restore_env("TRUMAN_DOME", original_dome) end)
-    :ok
-  end
-
-  defp restore_env(key, nil), do: System.delete_env(key)
-  defp restore_env(key, value), do: System.put_env(key, value)
-
-  describe "sandbox_root/0" do
-    test "returns TRUMAN_DOME env var when set" do
-      System.put_env("TRUMAN_DOME", "/custom/dome")
-      result = Sandbox.sandbox_root()
-      assert result == "/custom/dome"
-    end
-
-    test "returns File.cwd!() when env var is not set" do
-      System.delete_env("TRUMAN_DOME")
-      result = Sandbox.sandbox_root()
-      assert result == File.cwd!()
-    end
-
-    test "returns File.cwd!() when env var is empty string" do
-      System.put_env("TRUMAN_DOME", "")
-      result = Sandbox.sandbox_root()
-      assert result == File.cwd!()
-    end
-
-    test "expands tilde to home directory" do
-      System.put_env("TRUMAN_DOME", "~/studios/reification-labs")
-      result = Sandbox.sandbox_root()
-      home = System.get_env("HOME")
-      assert result == Path.join(home, "studios/reification-labs")
-    end
-
-    test "expands dot to current working directory" do
-      System.put_env("TRUMAN_DOME", ".")
-      result = Sandbox.sandbox_root()
-      assert result == File.cwd!()
-    end
-
-    test "expands relative path to absolute" do
-      System.put_env("TRUMAN_DOME", "./my-project")
-      result = Sandbox.sandbox_root()
-      assert result == Path.join(File.cwd!(), "my-project")
-    end
-
-    test "does NOT expand dollar-sign env var references" do
-      System.put_env("TRUMAN_DOME", "$HOME/projects")
-      result = Sandbox.sandbox_root()
-      assert result == "$HOME/projects"
-    end
-
-    test "normalizes trailing slashes" do
-      System.put_env("TRUMAN_DOME", "/custom/dome///")
-      result = Sandbox.sandbox_root()
-      assert result == "/custom/dome"
-    end
-
-    test "normalizes root path to single slash" do
-      System.put_env("TRUMAN_DOME", "///")
-      result = Sandbox.sandbox_root()
-      assert result == "/"
-    end
-
-    # Note: TRUMAN_DOME existence validation deferred to future PR
-    # Current behavior: returns the configured path even if it doesn't exist
-    # This allows testing with mock paths while production should use real dirs
-  end
-
-  describe "build_context/0" do
-    test "returns context map with sandbox_root key" do
-      context = Sandbox.build_context()
-      assert Map.has_key?(context, :sandbox_root)
-      assert Map.has_key?(context, :current_dir)
-    end
-
-    test "context includes current_dir matching sandbox_root by default" do
-      context = Sandbox.build_context()
-      assert context.current_dir == context.sandbox_root
-    end
-  end
 
   describe "error_message/1" do
     test "outside_sandbox error converts to 'No such file or directory'" do
@@ -231,7 +147,7 @@ defmodule TrumanShell.Support.SandboxTest do
     end
   end
 
-  describe "validate_path/3 with current_dir" do
+  describe "validate_path/2 with current_dir via Config.Sandbox" do
     setup do
       # Use project tmp/ to avoid symlinks (macOS /var -> /private/var)
       tmp_dir = Path.join(File.cwd!(), "tmp")
@@ -247,9 +163,9 @@ defmodule TrumanShell.Support.SandboxTest do
 
     test "resolves relative path within sandbox", %{sandbox: sandbox} do
       relative_path = "lib/foo.ex"
-      current_dir = sandbox
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
 
-      result = Sandbox.validate_path(relative_path, sandbox, current_dir)
+      result = Sandbox.validate_path(relative_path, config)
 
       # Returns resolved path - check it ends with expected suffix
       assert {:ok, resolved} = result
@@ -258,9 +174,9 @@ defmodule TrumanShell.Support.SandboxTest do
 
     test "rejects relative path that escapes via traversal", %{sandbox: sandbox} do
       relative_path = "../../../etc/passwd"
-      current_dir = sandbox
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
 
-      result = Sandbox.validate_path(relative_path, sandbox, current_dir)
+      result = Sandbox.validate_path(relative_path, config)
 
       assert {:error, :outside_sandbox} = result
     end
@@ -370,24 +286,24 @@ defmodule TrumanShell.Support.SandboxTest do
       assert {:error, :outside_sandbox} = result
     end
 
-    test "rejects current_dir outside sandbox", %{sandbox: sandbox} do
-      # SECURITY: If caller passes current_dir outside sandbox,
-      # relative paths should still be validated
+    test "rejects home_path outside sandbox at config creation time", %{sandbox: sandbox} do
+      # SECURITY: If caller tries to create config with home_path outside sandbox,
+      # SandboxConfig.new/2 rejects it at struct creation time
       outside_dir = "/tmp"
-      relative_path = "passwd"
 
-      result = Sandbox.validate_path(relative_path, sandbox, outside_dir)
+      result = SandboxConfig.new([sandbox], outside_dir)
 
-      # Should be rejected - current_dir is outside sandbox
-      assert {:error, :outside_sandbox} = result
+      # Should be rejected - home_path must be within allowed_paths
+      assert {:error, "home_path must be within one of the allowed_paths"} = result
     end
 
     test "allows current_dir inside sandbox", %{sandbox: sandbox} do
       subdir = Path.join(sandbox, "lib")
       File.mkdir_p!(subdir)
       relative_path = "foo.ex"
+      {:ok, config} = SandboxConfig.new([sandbox], subdir)
 
-      result = Sandbox.validate_path(relative_path, sandbox, subdir)
+      result = Sandbox.validate_path(relative_path, config)
 
       assert {:ok, resolved} = result
       assert String.ends_with?(resolved, "/lib/foo.ex")
@@ -403,7 +319,8 @@ defmodule TrumanShell.Support.SandboxTest do
       File.ln_s(real_dir, link_dir)
 
       # Pass symlink as current_dir
-      result = Sandbox.validate_path("file.txt", sandbox, link_dir)
+      {:ok, config} = SandboxConfig.new([sandbox], link_dir)
+      result = Sandbox.validate_path("file.txt", config)
 
       # Rejected: symlink in current_dir is not allowed
       assert {:error, :outside_sandbox} = result
@@ -414,10 +331,95 @@ defmodule TrumanShell.Support.SandboxTest do
       # e.g., current_dir = "/sandbox/$HOME" could expand unexpectedly
       path = "file.txt"
       current_dir = Path.join(sandbox, "$HOME/subdir")
+      {:ok, config} = SandboxConfig.new([sandbox], current_dir)
 
-      result = Sandbox.validate_path(path, sandbox, current_dir)
+      result = Sandbox.validate_path(path, config)
 
       # Should be rejected - embedded $VAR in current_dir is not allowed
+      assert {:error, :outside_sandbox} = result
+    end
+  end
+
+  describe "validate_path/2 with Config.Sandbox struct" do
+    setup do
+      # Use project tmp/ to avoid symlinks (macOS /var -> /private/var)
+      tmp_dir = Path.join(File.cwd!(), "tmp")
+      sandbox = Path.join(tmp_dir, "test_sandbox_#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox)
+      File.mkdir_p!(Path.join(sandbox, "lib"))
+      File.write!(Path.join(sandbox, "lib/foo.ex"), "# test file")
+
+      on_exit(fn -> File.rm_rf!(sandbox) end)
+
+      %{sandbox: sandbox}
+    end
+
+    test "validates path within sandbox using Config.Sandbox struct", %{sandbox: sandbox} do
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      relative_path = "lib/foo.ex"
+
+      result = Sandbox.validate_path(relative_path, config)
+
+      assert {:ok, resolved} = result
+      assert String.ends_with?(resolved, "/lib/foo.ex")
+    end
+  end
+
+  describe "validate_path/2 with Context struct" do
+    alias TrumanShell.Commands.Context
+
+    setup do
+      # Use project tmp/ to avoid symlinks (macOS /var -> /private/var)
+      tmp_dir = Path.join(File.cwd!(), "tmp")
+      sandbox = Path.join(tmp_dir, "test_sandbox_ctx_#{:rand.uniform(100_000)}")
+      File.mkdir_p!(sandbox)
+      subdir = Path.join(sandbox, "subdir")
+      File.mkdir_p!(subdir)
+      File.write!(Path.join(subdir, "file.txt"), "content")
+
+      on_exit(fn -> File.rm_rf!(sandbox) end)
+
+      %{sandbox: sandbox, subdir: subdir}
+    end
+
+    test "expands relative path using current_path, not home_path", %{sandbox: sandbox, subdir: subdir} do
+      # Key test: current_path differs from home_path
+      # Simulates: user cd'd to subdir, then runs `cat file.txt`
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+
+      result = Sandbox.validate_path("file.txt", ctx)
+
+      # Should resolve to subdir/file.txt (using current_path), NOT sandbox/file.txt (home_path)
+      assert {:ok, resolved} = result
+      assert resolved == Path.join(subdir, "file.txt")
+    end
+
+    test "rejects path that escapes sandbox via traversal", %{sandbox: sandbox, subdir: subdir} do
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+
+      result = Sandbox.validate_path("../../etc/passwd", ctx)
+
+      assert {:error, :outside_sandbox} = result
+    end
+
+    test "allows absolute path within sandbox", %{sandbox: sandbox, subdir: subdir} do
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+      absolute_path = Path.join(sandbox, "subdir/file.txt")
+
+      result = Sandbox.validate_path(absolute_path, ctx)
+
+      assert {:ok, ^absolute_path} = result
+    end
+
+    test "rejects absolute path outside sandbox", %{sandbox: sandbox, subdir: subdir} do
+      {:ok, config} = SandboxConfig.new([sandbox], sandbox)
+      ctx = %Context{current_path: subdir, sandbox_config: config}
+
+      result = Sandbox.validate_path("/etc/passwd", ctx)
+
       assert {:error, :outside_sandbox} = result
     end
   end

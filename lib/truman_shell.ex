@@ -24,10 +24,11 @@ defmodule TrumanShell do
 
   """
 
+  alias TrumanShell.Commands.Context
+  alias TrumanShell.Config
   alias TrumanShell.Stages.Executor
   alias TrumanShell.Stages.Expander
   alias TrumanShell.Stages.Parser
-  alias TrumanShell.Support.Sandbox
 
   @doc """
   Parse and execute a shell command string.
@@ -35,11 +36,26 @@ defmodule TrumanShell do
   This is the main entry point for running commands. It parses the input,
   validates it, and executes it in the sandboxed environment.
 
-  Returns `{:ok, output}` on success or `{:error, reason}` on failure.
+  ## Arguments
+
+    * `input` - The shell command string to execute
+    * `ctx` - Optional context (if nil, loads from Config.discover())
+
+  Returns `{:ok, output, ctx}` on success or `{:error, reason}` on failure.
+  The returned context may have updated `current_path` (e.g., after `cd`).
+
+  ## Stateless Design
+
+  Each call to `execute/1` (without context) creates a fresh context from config.
+  To maintain state across commands (e.g., `cd` persistence), pass the returned
+  context to the next call:
+
+      {:ok, _, ctx} = TrumanShell.execute("cd lib")
+      {:ok, output, ctx} = TrumanShell.execute("ls", ctx)
 
   ## Examples
 
-      iex> {:ok, output} = TrumanShell.execute("ls lib")
+      iex> {:ok, output, _ctx} = TrumanShell.execute("ls lib")
       iex> output =~ "truman_shell.ex"
       true
 
@@ -50,14 +66,25 @@ defmodule TrumanShell do
       true
 
   """
-  @spec execute(String.t()) :: {:ok, String.t()} | {:error, String.t()}
-  def execute(input) do
+  @spec execute(String.t(), Context.t() | nil) :: {:ok, String.t(), Context.t()} | {:error, String.t()}
+  def execute(input, ctx \\ nil)
+
+  def execute(input, nil) do
+    # No context provided - load from config
+    with {:ok, config} <- Config.discover() do
+      ctx = Context.from_config(config)
+      execute(input, ctx)
+    end
+  end
+
+  def execute(input, %Context{} = ctx) do
+    # Context provided - use it directly
     # Pipeline: Tokenizer → Parser → Expander → Executor → Redirector
-    # (Tokenizer is called by Parser, Redirector is called by Executor)
-    with {:ok, command} <- parse(input) do
-      context = Sandbox.build_context()
-      expanded = Expander.expand(command, context)
-      Executor.run(expanded)
+    with {:ok, command} <- parse(input),
+         expanded = Expander.expand(command, ctx),
+         {:ok, output, final_ctx} <- Executor.run(expanded, ctx) do
+      # Clear stdin to prevent leakage between chained commands in REPL usage
+      {:ok, output, %{final_ctx | stdin: nil}}
     end
   end
 

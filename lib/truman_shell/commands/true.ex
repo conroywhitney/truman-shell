@@ -12,8 +12,11 @@ defmodule TrumanShell.Commands.True do
 
   ## Examples
 
-      iex> context = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
-      iex> TrumanShell.Commands.True.handle([], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
+      iex> ctx = %Context{current_path: "/sandbox", sandbox_config: config}
+      iex> TrumanShell.Commands.True.handle([], ctx)
       {:ok, ""}
 
   """

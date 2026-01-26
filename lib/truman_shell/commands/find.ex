@@ -27,22 +27,28 @@ defmodule TrumanShell.Commands.Find do
 
   ## Examples
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> {:ok, output} = TrumanShell.Commands.Find.handle([".", "-name", "*.exs"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> {:ok, output} = TrumanShell.Commands.Find.handle([".", "-name", "*.exs"], ctx)
       iex> output =~ "mix.exs"
       true
 
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Commands.Find.handle(["/etc", "-name", "*.conf"], context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> config = %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: config}
+      iex> TrumanShell.Commands.Find.handle(["/etc", "-name", "*.conf"], ctx)
       {:error, "find: /etc: No such file or directory\\n"}
 
   """
   @spec handle(Behaviour.args(), Behaviour.context()) :: Behaviour.result()
   @impl true
-  def handle(args, context) do
+  def handle(args, ctx) do
     case parse_args(args) do
       {:ok, path, opts} ->
-        find_files(path, opts, context)
+        find_files(path, opts, ctx)
 
       {:error, msg} ->
         {:error, msg}
@@ -93,8 +99,8 @@ defmodule TrumanShell.Commands.Find do
     {:error, "find: unknown predicate '#{unknown}'\n"}
   end
 
-  defp find_files(path, opts, context) do
-    case Sandbox.validate_path(path, context.sandbox_root) do
+  defp find_files(path, opts, ctx) do
+    case Sandbox.validate_path(path, ctx) do
       {:ok, safe_path} ->
         if File.dir?(safe_path) do
           do_find(safe_path, path, opts)

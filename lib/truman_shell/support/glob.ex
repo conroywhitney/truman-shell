@@ -6,6 +6,7 @@ defmodule TrumanShell.Support.Glob do
   Enforces a maximum depth limit of 100 levels for recursive patterns.
   """
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.DomePath
   alias TrumanShell.Support.Sandbox
 
@@ -15,85 +16,91 @@ defmodule TrumanShell.Support.Glob do
   @doc """
   Expands a glob pattern to matching file paths.
 
-  Returns a sorted list of matching file paths relative to current_dir,
+  Returns a sorted list of matching file paths relative to current_path,
   or the original pattern if no files match.
 
   Recursive patterns (`**`) are limited to #{@max_depth_limit} levels deep.
 
-  ## Context
+  ## Arguments
 
-  Requires a context map with:
-  - `:sandbox_root` - Root directory for sandbox constraint
-  - `:current_dir` - Current working directory for relative patterns
+  - `pattern` - The glob pattern to expand
+  - `ctx` - `%Commands.Context{}` with current_path and sandbox_config
 
   ## Examples
 
       # No match returns original pattern
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Support.Glob.expand("no_match_*.xyz", context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}}
+      iex> TrumanShell.Support.Glob.expand("no_match_*.xyz", ctx)
       "no_match_*.xyz"
 
       # Matching files returns sorted list
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> result = TrumanShell.Support.Glob.expand("mix.*", context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}}
+      iex> result = TrumanShell.Support.Glob.expand("mix.*", ctx)
       iex> is_list(result) and "mix.exs" in result
       true
 
       # Outside sandbox returns original pattern
-      iex> context = %{sandbox_root: File.cwd!(), current_dir: File.cwd!()}
-      iex> TrumanShell.Support.Glob.expand("/etc/*", context)
+      iex> alias TrumanShell.Commands.Context
+      iex> alias TrumanShell.Config.Sandbox, as: SandboxConfig
+      iex> ctx = %Context{current_path: File.cwd!(), sandbox_config: %SandboxConfig{allowed_paths: [File.cwd!()], home_path: File.cwd!()}}
+      iex> TrumanShell.Support.Glob.expand("/etc/*", ctx)
       "/etc/*"
 
   """
-  @spec expand(String.t(), map()) :: [String.t()] | String.t()
-  def expand(pattern, context) do
-    # Defense-in-depth: validate current_dir is absolute and inside sandbox
-    # This prevents Path.wildcard from resolving relative patterns against process cwd
-    # (In normal operation, current_dir is always validated by cd command)
-    with :ok <- validate_current_dir_is_absolute(context.current_dir),
-         {:ok, validated_current_dir} <- Sandbox.validate_path(context.current_dir, context.sandbox_root) do
-      do_expand_with_context(pattern, %{context | current_dir: validated_current_dir})
+  @spec expand(String.t(), Context.t()) :: [String.t()] | String.t()
+  def expand(pattern, %Context{} = ctx) do
+    # current_path is @enforce_keys in Context - if nil, let it crash
+    do_expand_with_validation(pattern, ctx)
+  end
+
+  defp do_expand_with_validation(pattern, ctx) do
+    current_path = ctx.current_path
+
+    # Defense-in-depth: validate current_path is absolute and inside sandbox
+    with :ok <- validate_absolute(current_path),
+         {:ok, _validated_path} <- Sandbox.validate_path(current_path, ctx) do
+      do_expand(pattern, ctx)
     else
       _ ->
-        # Invalid current_dir - fail safe by returning original pattern
-        pattern
+        # Invalid current_path - fail loud (this is a bug, not user error)
+        raise ArgumentError, "current_path must be absolute and inside sandbox, got: #{inspect(current_path)}"
     end
   end
 
-  defp validate_current_dir_is_absolute(current_dir) do
-    if DomePath.type(current_dir) == :absolute do
-      :ok
-    else
-      {:error, :relative_current_dir}
-    end
+  defp validate_absolute(path) do
+    if DomePath.type(path) == :absolute, do: :ok, else: {:error, :relative}
   end
 
-  defp do_expand_with_context(pattern, context) do
+  defp do_expand(pattern, ctx) do
+    current_path = ctx.current_path
     is_absolute = String.starts_with?(pattern, "/")
-    full_pattern = resolve_pattern(pattern, is_absolute, context.current_dir)
+    full_pattern = resolve_pattern(pattern, is_absolute, current_path)
     base_dir = glob_base_dir(full_pattern)
 
     # Security: validate base path is in sandbox BEFORE calling DomePath.wildcard
-    # This prevents filesystem enumeration outside the sandbox
-    if in_sandbox?(base_dir, context.sandbox_root) do
-      do_expand(pattern, full_pattern, base_dir, is_absolute, context)
-    else
-      pattern
+    case Sandbox.validate_path(base_dir, ctx) do
+      {:ok, _} -> expand_glob(pattern, full_pattern, base_dir, is_absolute, ctx)
+      {:error, _} -> pattern
     end
   end
 
-  defp resolve_pattern(pattern, true, _current_dir), do: pattern
-  defp resolve_pattern(pattern, false, current_dir), do: DomePath.join(current_dir, pattern)
+  defp resolve_pattern(pattern, true, _current_path), do: pattern
+  defp resolve_pattern(pattern, false, current_path), do: DomePath.join(current_path, pattern)
 
-  defp do_expand(pattern, full_pattern, base_dir, is_absolute, context) do
+  defp expand_glob(pattern, full_pattern, base_dir, is_absolute, ctx) do
+    current_path = ctx.current_path
     match_dot = pattern_matches_dotfiles?(pattern)
     has_dot_prefix = String.starts_with?(pattern, "./")
 
     matches =
       full_pattern
       |> DomePath.wildcard(match_dot: match_dot)
-      |> Enum.filter(&(in_sandbox?(&1, context.sandbox_root) and within_depth_limit?(&1, base_dir)))
-      |> normalize_paths(is_absolute, has_dot_prefix, context.current_dir)
+      |> Enum.filter(&(in_sandbox?(&1, ctx) and within_depth_limit?(&1, base_dir)))
+      |> normalize_paths(is_absolute, has_dot_prefix, current_path)
       |> Enum.sort()
 
     case matches do
@@ -140,7 +147,7 @@ defmodule TrumanShell.Support.Glob do
     pattern |> DomePath.basename() |> String.starts_with?(".")
   end
 
-  defp in_sandbox?(path, sandbox_root) do
-    match?({:ok, _}, Sandbox.validate_path(path, sandbox_root))
+  defp in_sandbox?(path, ctx) do
+    match?({:ok, _}, Sandbox.validate_path(path, ctx))
   end
 end

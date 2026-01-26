@@ -1,23 +1,27 @@
 defmodule TrumanShell.Commands.PwdTest do
   use ExUnit.Case, async: true
 
+  alias TrumanShell.Commands.Context
   alias TrumanShell.Commands.Pwd
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
 
   @moduletag :commands
 
   describe "handle/2" do
     test "returns current directory with trailing newline" do
-      context = %{sandbox_root: "/sandbox", current_dir: "/sandbox/project"}
+      config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
+      ctx = %Context{current_path: "/sandbox/project", sandbox_config: config}
 
-      {:ok, output} = Pwd.handle([], context)
+      {:ok, output} = Pwd.handle([], ctx)
 
       assert output == "/sandbox/project\n"
     end
 
     test "ignores any arguments" do
-      context = %{sandbox_root: "/sandbox", current_dir: "/sandbox"}
+      config = %SandboxConfig{allowed_paths: ["/sandbox"], home_path: "/sandbox"}
+      ctx = %Context{current_path: "/sandbox", sandbox_config: config}
 
-      {:ok, output} = Pwd.handle(["ignored", "args"], context)
+      {:ok, output} = Pwd.handle(["ignored", "args"], ctx)
 
       assert output == "/sandbox\n"
     end
