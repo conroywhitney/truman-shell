@@ -129,6 +129,22 @@ defmodule TrumanShell.Config.Sandbox do
   end
 
   @doc """
+  Validates a Sandbox config struct.
+  """
+  @spec validate(t()) :: {:ok, t()} | {:error, String.t()}
+  def validate(%__MODULE__{allowed_paths: []}) do
+    {:error, "sandbox must have at least one allowed_path"}
+  end
+
+  def validate(%__MODULE__{home_path: home} = sandbox) do
+    if path_allowed?(sandbox, home) do
+      {:ok, sandbox}
+    else
+      {:error, "home_path must be within one of the allowed_paths"}
+    end
+  end
+
+  @doc """
   Checks if an absolute path is within any of the allowed_paths.
 
   Canonicalizes the path first (resolving `..` segments) to prevent
@@ -159,22 +175,6 @@ defmodule TrumanShell.Config.Sandbox do
 
   def path_allowed?(%__MODULE__{}, path) when is_binary(path) do
     raise ArgumentError, "path must be absolute, got: #{inspect(path)}"
-  end
-
-  @doc """
-  Validates a Sandbox config struct.
-  """
-  @spec validate(t()) :: {:ok, t()} | {:error, String.t()}
-  def validate(%__MODULE__{allowed_paths: []}) do
-    {:error, "sandbox must have at least one allowed_path"}
-  end
-
-  def validate(%__MODULE__{home_path: home} = sandbox) do
-    if path_allowed?(sandbox, home) do
-      {:ok, sandbox}
-    else
-      {:error, "home_path must be within one of the allowed_paths"}
-    end
   end
 
   # --- Private Functions for YAML parsing ---

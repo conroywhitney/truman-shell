@@ -109,6 +109,7 @@
           {Credo.Check.Readability.RedundantBlankLines, []},
           {Credo.Check.Readability.Semicolons, []},
           {Credo.Check.Readability.SpaceAfterCommas, []},
+          {Credo.Check.Readability.StrictModuleLayout, []},
           {Credo.Check.Readability.StringSigils, []},
           {Credo.Check.Readability.TrailingBlankLine, []},
           {Credo.Check.Readability.TrailingWhiteSpace, []},
@@ -177,7 +178,7 @@
           #
           ## Plugin Checks - tallarium_credo
           #
-          {TallariumCredo.Checks.DefinitionOrder, []}
+          # {TallariumCredo.Checks.DefinitionOrder, []}
           # {TallariumCredo.Checks.Destructure, []}  # Too invasive - requires d() macro
         ],
         disabled: [
@@ -204,7 +205,6 @@
           {Credo.Check.Readability.SingleFunctionToBlockPipe, []},
           {Credo.Check.Readability.SinglePipe, []},
           {Credo.Check.Readability.Specs, []},
-          {Credo.Check.Readability.StrictModuleLayout, []},
           {Credo.Check.Readability.WithCustomTaggedTuple, []},
           {Credo.Check.Refactor.ABCSize, []},
           {Credo.Check.Refactor.AppendSingleItem, []},
