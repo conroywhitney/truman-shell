@@ -25,10 +25,11 @@ defmodule TrumanShell do
   """
 
   alias TrumanShell.Commands.Context
+  alias TrumanShell.Config
+  alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.Stages.Executor
   alias TrumanShell.Stages.Expander
   alias TrumanShell.Stages.Parser
-  alias TrumanShell.Support.Sandbox
 
   @doc """
   Parse and execute a shell command string.
@@ -55,9 +56,10 @@ defmodule TrumanShell do
   def execute(input) do
     # Pipeline: Tokenizer → Parser → Expander → Executor → Redirector
     # (Tokenizer is called by Parser, Redirector is called by Executor)
-    with {:ok, command} <- parse(input) do
-      config = Sandbox.build_config()
-      ctx = %Context{current_path: config.home_path, sandbox_config: config}
+    with {:ok, command} <- parse(input),
+         {:ok, config} <- Config.discover(),
+         {:ok, sandbox_config} <- SandboxConfig.new(config.roots, config.default_cwd) do
+      ctx = %Context{current_path: sandbox_config.home_path, sandbox_config: sandbox_config}
       expanded = Expander.expand(command, ctx)
       Executor.run(expanded, ctx)
     end

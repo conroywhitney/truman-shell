@@ -3,8 +3,6 @@ defmodule TrumanShell.Support.Sandbox do
   Sandbox boundary management for TrumanShell.
 
   Handles:
-  - Reading sandbox root from `TRUMAN_DOME` env var
-  - Path expansion (tilde, relative paths)
   - Path validation (is this path within the sandbox?)
   - Symlink rejection (symlinks denied, period)
   - Error messages that follow the 404 Principle (no information leakage)
@@ -17,6 +15,13 @@ defmodule TrumanShell.Support.Sandbox do
 
   Implements the "404 Principle" - paths outside the sandbox appear
   as "not found" rather than "permission denied" to avoid information leakage.
+
+  ## Configuration
+
+  Sandbox boundaries are loaded from `agents.yaml` via `TrumanShell.Config`.
+  The `%Config.Sandbox{}` struct contains:
+  - `allowed_paths` - List of directories the agent can access (boundaries)
+  - `home_path` - The agent's home directory (for `~` expansion, default cd, etc.)
 
   ## Security Limitations
 
@@ -32,64 +37,6 @@ defmodule TrumanShell.Support.Sandbox do
   alias TrumanShell.Commands.Context
   alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.DomePath
-
-  @env_var "TRUMAN_DOME"
-
-  @doc """
-  Builds a sandbox configuration struct.
-
-  Returns a `%Config.Sandbox{}` struct with `allowed_paths` and `home_path` fields.
-  This is the preferred way to get sandbox configuration for use with `validate_path/2`.
-
-  ## Examples
-
-      iex> config = TrumanShell.Support.Sandbox.build_config()
-      iex> %TrumanShell.Config.Sandbox{} = config
-      iex> is_list(config.allowed_paths)
-      true
-
-  """
-  @spec build_config() :: SandboxConfig.t()
-  def build_config do
-    root = dome_root()
-    # Use struct! directly since we know root is valid (no validation needed)
-    %SandboxConfig{allowed_paths: [root], home_path: root}
-  end
-
-  @doc """
-  Returns the dome root path from TRUMAN_DOME env var.
-
-  Reads from `TRUMAN_DOME` environment variable, falling back
-  to `File.cwd!()` if not set or empty.
-
-  Handles path expansion:
-  - `~` expands to `$HOME`
-  - `.` and `./path` expand relative to cwd
-  - Trailing slashes are normalized
-
-  Does NOT expand `$VAR` references (security risk).
-
-  ## Examples
-
-      # With env var set
-      System.put_env("TRUMAN_DOME", "~/projects/myapp")
-      TrumanShell.Support.Sandbox.dome_root()
-      #=> "/Users/you/projects/myapp"
-
-      # Without env var
-      System.delete_env("TRUMAN_DOME")
-      TrumanShell.Support.Sandbox.dome_root()
-      #=> File.cwd!()
-
-  """
-  @spec dome_root() :: String.t()
-  def dome_root do
-    case System.get_env(@env_var) do
-      nil -> File.cwd!()
-      "" -> File.cwd!()
-      path -> expand_and_normalize(path)
-    end
-  end
 
   @doc """
   Validates that a path resolves within the sandbox.
@@ -205,43 +152,4 @@ defmodule TrumanShell.Support.Sandbox do
   def error_message({:error, :enoent}), do: "No such file or directory"
   def error_message({:error, :eloop}), do: "Too many levels of symbolic links"
   def error_message({:error, reason}) when is_atom(reason), do: "#{reason}"
-
-  # --- Private Functions ---
-
-  defp expand_and_normalize(path) do
-    path
-    |> expand_tilde()
-    |> expand_relative()
-    |> normalize_trailing_slashes()
-  end
-
-  defp expand_tilde("~" <> rest) do
-    home = System.get_env("HOME") || "~"
-    home <> rest
-  end
-
-  defp expand_tilde(path), do: path
-
-  defp expand_relative(path) do
-    cond do
-      # Don't expand $VAR references - return as-is (intentionally not supported)
-      String.starts_with?(path, "$") ->
-        path
-
-      DomePath.type(path) == :relative ->
-        DomePath.expand(path, File.cwd!())
-
-      true ->
-        path
-    end
-  end
-
-  defp normalize_trailing_slashes(path) do
-    path
-    |> String.trim_trailing("/")
-    |> case do
-      "" -> "/"
-      normalized -> normalized
-    end
-  end
 end

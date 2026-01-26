@@ -14,6 +14,7 @@ defmodule TrumanShell.CLI do
   - `1` — Error (message on stderr, or silent for validate-path deny)
   """
 
+  alias TrumanShell.Config
   alias TrumanShell.Config.Sandbox, as: SandboxConfig
   alias TrumanShell.Support.Sandbox
 
@@ -84,19 +85,26 @@ defmodule TrumanShell.CLI do
   defp validate(path, current_dir) do
     # Normalize empty string to nil for current_dir fallback
     current_dir = if current_dir in [nil, ""], do: nil, else: current_dir
-    dome_root = Sandbox.dome_root()
-    # Build struct-based config for validate_path/2
-    # Use current_dir as home_path for relative path expansion
-    home_path = current_dir || dome_root
-    config = %SandboxConfig{allowed_paths: [dome_root], home_path: home_path}
 
-    case Sandbox.validate_path(path, config) do
-      {:ok, resolved_path} ->
-        IO.puts(resolved_path)
-        System.halt(0)
+    # Load config from agents.yaml (or defaults)
+    case Config.discover() do
+      {:ok, config} ->
+        # Build sandbox config using roots and current_dir (or default_cwd)
+        home_path = current_dir || config.default_cwd
+        sandbox_config = %SandboxConfig{allowed_paths: config.roots, home_path: home_path}
 
-      {:error, _reason} ->
-        # 404 principle: silent deny (no stdout, no stderr)
+        case Sandbox.validate_path(path, sandbox_config) do
+          {:ok, resolved_path} ->
+            IO.puts(resolved_path)
+            System.halt(0)
+
+          {:error, _reason} ->
+            # 404 principle: silent deny (no stdout, no stderr)
+            System.halt(1)
+        end
+
+      {:error, reason} ->
+        IO.puts(:stderr, "Error loading config: #{reason}")
         System.halt(1)
     end
   end
@@ -117,10 +125,13 @@ defmodule TrumanShell.CLI do
       version                              Show version
 
     Environment:
-      TRUMAN_DOME          Sandbox root directory (default: cwd)
       TRUMAN_CMD           Command for execute (alternative to argument)
       TRUMAN_VALIDATE_PATH Path for validate-path (alternative to argument)
       TRUMAN_CURRENT_DIR   Current directory for validate-path (optional)
+
+    Configuration:
+      Sandbox roots and default_cwd are loaded from agents.yaml.
+      See TrumanShell.Config for discovery order and defaults.
     """)
 
     System.halt(1)
