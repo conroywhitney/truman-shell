@@ -51,13 +51,13 @@ defmodule TrumanShell.Support.Sandbox do
   """
   @spec build_config() :: SandboxConfig.t()
   def build_config do
-    root = sandbox_root()
+    root = dome_root()
     # Use struct! directly since we know root is valid (no validation needed)
     %SandboxConfig{allowed_paths: [root], home_path: root}
   end
 
   @doc """
-  Returns the sandbox root path.
+  Returns the dome root path from TRUMAN_DOME env var.
 
   Reads from `TRUMAN_DOME` environment variable, falling back
   to `File.cwd!()` if not set or empty.
@@ -73,17 +73,17 @@ defmodule TrumanShell.Support.Sandbox do
 
       # With env var set
       System.put_env("TRUMAN_DOME", "~/projects/myapp")
-      TrumanShell.Support.Sandbox.sandbox_root()
+      TrumanShell.Support.Sandbox.dome_root()
       #=> "/Users/you/projects/myapp"
 
       # Without env var
       System.delete_env("TRUMAN_DOME")
-      TrumanShell.Support.Sandbox.sandbox_root()
+      TrumanShell.Support.Sandbox.dome_root()
       #=> File.cwd!()
 
   """
-  @spec sandbox_root() :: String.t()
-  def sandbox_root do
+  @spec dome_root() :: String.t()
+  def dome_root do
     case System.get_env(@env_var) do
       nil -> File.cwd!()
       "" -> File.cwd!()

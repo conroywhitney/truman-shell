@@ -1,5 +1,5 @@
 defmodule TrumanShell.Support.SandboxTest do
-  # async: false because sandbox_root/0 tests mutate TRUMAN_DOME env var
+  # async: false because dome_root/0 tests mutate TRUMAN_DOME env var
   use ExUnit.Case, async: false
 
   alias TrumanShell.Config.Sandbox, as: SandboxConfig
@@ -15,59 +15,59 @@ defmodule TrumanShell.Support.SandboxTest do
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 
-  describe "sandbox_root/0" do
+  describe "dome_root/0" do
     test "returns TRUMAN_DOME env var when set" do
       System.put_env("TRUMAN_DOME", "/custom/dome")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       assert result == "/custom/dome"
     end
 
     test "returns File.cwd!() when env var is not set" do
       System.delete_env("TRUMAN_DOME")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       assert result == File.cwd!()
     end
 
     test "returns File.cwd!() when env var is empty string" do
       System.put_env("TRUMAN_DOME", "")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       assert result == File.cwd!()
     end
 
     test "expands tilde to home directory" do
       System.put_env("TRUMAN_DOME", "~/studios/reification-labs")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       home = System.get_env("HOME")
       assert result == Path.join(home, "studios/reification-labs")
     end
 
     test "expands dot to current working directory" do
       System.put_env("TRUMAN_DOME", ".")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       assert result == File.cwd!()
     end
 
     test "expands relative path to absolute" do
       System.put_env("TRUMAN_DOME", "./my-project")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       assert result == Path.join(File.cwd!(), "my-project")
     end
 
     test "does NOT expand dollar-sign env var references" do
       System.put_env("TRUMAN_DOME", "$HOME/projects")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       assert result == "$HOME/projects"
     end
 
     test "normalizes trailing slashes" do
       System.put_env("TRUMAN_DOME", "/custom/dome///")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       assert result == "/custom/dome"
     end
 
     test "normalizes root path to single slash" do
       System.put_env("TRUMAN_DOME", "///")
-      result = Sandbox.sandbox_root()
+      result = Sandbox.dome_root()
       assert result == "/"
     end
 
@@ -85,16 +85,16 @@ defmodule TrumanShell.Support.SandboxTest do
       assert %SandboxConfig{} = config
     end
 
-    test "struct has allowed_paths containing sandbox_root" do
+    test "struct has allowed_paths containing dome_root" do
       config = Sandbox.build_config()
       assert is_list(config.allowed_paths)
       assert length(config.allowed_paths) == 1
-      assert Sandbox.sandbox_root() in config.allowed_paths
+      assert Sandbox.dome_root() in config.allowed_paths
     end
 
-    test "struct has home_path set to sandbox_root" do
+    test "struct has home_path set to dome_root" do
       config = Sandbox.build_config()
-      assert config.home_path == Sandbox.sandbox_root()
+      assert config.home_path == Sandbox.dome_root()
     end
   end
 

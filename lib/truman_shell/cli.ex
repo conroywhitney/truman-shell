@@ -84,11 +84,11 @@ defmodule TrumanShell.CLI do
   defp validate(path, current_dir) do
     # Normalize empty string to nil for current_dir fallback
     current_dir = if current_dir in [nil, ""], do: nil, else: current_dir
-    sandbox_root = Sandbox.sandbox_root()
+    dome_root = Sandbox.dome_root()
     # Build struct-based config for validate_path/2
     # Use current_dir as home_path for relative path expansion
-    home_path = current_dir || sandbox_root
-    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: home_path}
+    home_path = current_dir || dome_root
+    config = %SandboxConfig{allowed_paths: [dome_root], home_path: home_path}
 
     case Sandbox.validate_path(path, config) do
       {:ok, resolved_path} ->
