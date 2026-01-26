@@ -2,14 +2,14 @@ defmodule TrumanShell.Support.Tilde do
   @moduledoc """
   Tilde expansion for TrumanShell.
 
-  Expands `~` to the sandbox root directory, similar to how bash
-  expands `~` to the user's home directory.
+  Expands `~` to the agent's home directory (sandbox home_path),
+  similar to how bash expands `~` to the user's home directory.
   """
 
   alias TrumanShell.DomePath
 
   @doc """
-  Expands tilde (`~`) in a path to the sandbox root.
+  Expands tilde (`~`) in a path to the home directory.
 
   ## Examples
 
@@ -37,19 +37,19 @@ defmodule TrumanShell.Support.Tilde do
   ## Notes
 
   - `~user` syntax is not supported (passes through unchanged)
-  - Multiple leading slashes after `~` are collapsed (e.g., `~//foo` → `/sandbox/foo`)
+  - Multiple leading slashes after `~` are collapsed (e.g., `~//foo` → `/home/foo`)
   """
   @spec expand(String.t(), String.t()) :: String.t()
-  def expand("~", sandbox_root), do: sandbox_root
+  def expand("~", home_path), do: home_path
 
-  def expand("~/", sandbox_root), do: sandbox_root
+  def expand("~/", home_path), do: home_path
 
-  def expand("~/" <> rest, sandbox_root) do
-    # Strip leading slashes to handle ~//lib -> sandbox_root/lib
+  def expand("~/" <> rest, home_path) do
+    # Strip leading slashes to handle ~//lib -> home_path/lib
     subpath = String.trim_leading(rest, "/")
-    DomePath.join(sandbox_root, subpath)
+    DomePath.join(home_path, subpath)
   end
 
   # No tilde or ~user (not supported) → pass through unchanged
-  def expand(path, _sandbox_root), do: path
+  def expand(path, _home_path), do: path
 end

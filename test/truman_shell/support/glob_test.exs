@@ -8,9 +8,9 @@ defmodule TrumanShell.Support.GlobTest do
   @moduletag :support
 
   # Helper to build ctx
-  defp build_ctx(sandbox_root, opts \\ []) do
-    current_path = Keyword.get(opts, :current_path, sandbox_root)
-    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: sandbox_root}
+  defp build_ctx(home_path, opts \\ []) do
+    current_path = Keyword.get(opts, :current_path, home_path)
+    config = %SandboxConfig{allowed_paths: [home_path], home_path: home_path}
     %Context{current_path: current_path, sandbox_config: config}
   end
 
@@ -24,11 +24,11 @@ defmodule TrumanShell.Support.GlobTest do
       File.rm_rf!(tmp_dir)
     end)
 
-    {:ok, sandbox_root: tmp_dir}
+    {:ok, home_path: tmp_dir}
   end
 
   describe "expand/2 with * pattern" do
-    test "expands *.md to matching files", %{sandbox_root: sandbox} do
+    test "expands *.md to matching files", %{home_path: sandbox} do
       # Create test files
       File.write!(Path.join(sandbox, "README.md"), "readme")
       File.write!(Path.join(sandbox, "CHANGELOG.md"), "changelog")
@@ -42,7 +42,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 with ** recursive pattern" do
-    test "expands **/*.md to files in all subdirectories", %{sandbox_root: sandbox} do
+    test "expands **/*.md to files in all subdirectories", %{home_path: sandbox} do
       # Create directory structure
       File.write!(Path.join(sandbox, "README.md"), "root readme")
       File.mkdir_p!(Path.join(sandbox, "docs"))
@@ -58,7 +58,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 sandbox boundary enforcement" do
-    test "rejects glob when base path is outside sandbox before expansion", %{sandbox_root: sandbox} do
+    test "rejects glob when base path is outside sandbox before expansion", %{home_path: sandbox} do
       # Create a file inside sandbox to prove we're not just failing on no-match
       File.write!(Path.join(sandbox, "exists.md"), "exists")
 
@@ -74,7 +74,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == "../../../etc/*.conf"
     end
 
-    test "expands absolute glob pattern within sandbox", %{sandbox_root: sandbox} do
+    test "expands absolute glob pattern within sandbox", %{home_path: sandbox} do
       # Create test files
       File.write!(Path.join(sandbox, "file1.md"), "one")
       File.write!(Path.join(sandbox, "file2.md"), "two")
@@ -91,7 +91,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert "#{sandbox}/file2.md" in result
     end
 
-    test "glob with ../ parent traversal returns original pattern (no escape)", %{sandbox_root: sandbox} do
+    test "glob with ../ parent traversal returns original pattern (no escape)", %{home_path: sandbox} do
       # Create a file in sandbox
       File.write!(Path.join(sandbox, "inside.md"), "inside")
 
@@ -111,7 +111,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == "../*.md"
     end
 
-    test "filters results to only include files inside sandbox", %{sandbox_root: _sandbox} do
+    test "filters results to only include files inside sandbox", %{home_path: _sandbox} do
       # Create nested sandbox structure
       outer_dir = Path.join(Path.join(File.cwd!(), "tmp"), "glob_outer_#{:erlang.unique_integer([:positive])}")
       inner_dir = Path.join(outer_dir, "sandbox")
@@ -139,7 +139,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 no-match behavior" do
-    test "returns original pattern when no files match", %{sandbox_root: sandbox} do
+    test "returns original pattern when no files match", %{home_path: sandbox} do
       ctx = build_ctx(sandbox)
 
       result = Glob.expand("*.nonexistent", ctx)
@@ -147,7 +147,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == "*.nonexistent"
     end
 
-    test "returns original pattern for empty directory glob", %{sandbox_root: sandbox} do
+    test "returns original pattern for empty directory glob", %{home_path: sandbox} do
       # Create empty subdirectory
       empty_dir = Path.join(sandbox, "empty_dir")
       File.mkdir_p!(empty_dir)
@@ -161,7 +161,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 dotfile handling" do
-    test "* pattern excludes dotfiles by default", %{sandbox_root: sandbox} do
+    test "* pattern excludes dotfiles by default", %{home_path: sandbox} do
       # Create regular file and dotfiles
       File.write!(Path.join(sandbox, "file.txt"), "regular")
       File.write!(Path.join(sandbox, ".hidden"), "hidden")
@@ -175,7 +175,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == ["file.txt"]
     end
 
-    test ".* pattern matches dotfiles explicitly", %{sandbox_root: sandbox} do
+    test ".* pattern matches dotfiles explicitly", %{home_path: sandbox} do
       # Create regular file and dotfiles
       File.write!(Path.join(sandbox, "file.txt"), "regular")
       File.write!(Path.join(sandbox, ".hidden"), "hidden")
@@ -189,7 +189,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == [".config", ".hidden"]
     end
 
-    test ".config/* pattern matches files in dotdir", %{sandbox_root: sandbox} do
+    test ".config/* pattern matches files in dotdir", %{home_path: sandbox} do
       # Create dotdir with files
       config_dir = Path.join(sandbox, ".config")
       File.mkdir_p!(config_dir)
@@ -204,7 +204,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == [".config/cache.db", ".config/settings.json"]
     end
 
-    test "*/*.txt does NOT match files in dotdirs (bash compat)", %{sandbox_root: sandbox} do
+    test "*/*.txt does NOT match files in dotdirs (bash compat)", %{home_path: sandbox} do
       # Create visible dir and dotdir with files
       File.mkdir_p!(Path.join(sandbox, "visible"))
       File.write!(Path.join([sandbox, "visible", "file.txt"]), "visible")
@@ -221,7 +221,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 multiple wildcards" do
-    test "matches pattern with multiple underscores *_*_test.exs", %{sandbox_root: sandbox} do
+    test "matches pattern with multiple underscores *_*_test.exs", %{home_path: sandbox} do
       # Create test files
       File.write!(Path.join(sandbox, "foo_bar_test.exs"), "")
       File.write!(Path.join(sandbox, "a_b_test.exs"), "")
@@ -235,7 +235,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == ["a_b_test.exs", "foo_bar_test.exs"]
     end
 
-    test "matches wildcards in both name and extension f*o.*d", %{sandbox_root: sandbox} do
+    test "matches wildcards in both name and extension f*o.*d", %{home_path: sandbox} do
       # Create test files
       File.write!(Path.join(sandbox, "foo.md"), "")
       File.write!(Path.join(sandbox, "filo.txt"), "")
@@ -251,7 +251,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 depth limit" do
-    test "depth limit works correctly with absolute glob patterns", %{sandbox_root: sandbox} do
+    test "depth limit works correctly with absolute glob patterns", %{home_path: sandbox} do
       # Create a structure 5 levels deep
       deep_path = Path.join([sandbox, "a", "b", "c", "d", "e"])
       File.mkdir_p!(deep_path)
@@ -269,7 +269,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert "#{sandbox}/root.ex" in result
     end
 
-    test "recursive glob includes files within depth limit", %{sandbox_root: sandbox} do
+    test "recursive glob includes files within depth limit", %{home_path: sandbox} do
       # Create structure 5 levels deep (well under 100 limit)
       deep_path = Path.join([sandbox, "a", "b", "c", "d", "e"])
       File.mkdir_p!(deep_path)
@@ -285,7 +285,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert "root.md" in result
     end
 
-    test "depth is counted from glob base directory", %{sandbox_root: sandbox} do
+    test "depth is counted from glob base directory", %{home_path: sandbox} do
       # Create nested structure
       File.mkdir_p!(Path.join([sandbox, "src", "lib", "deep"]))
       File.write!(Path.join([sandbox, "src", "lib", "deep", "file.ex"]), "")
@@ -301,7 +301,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 preserves ./ prefix (bash compatibility)" do
-    test "./*.ex preserves ./ prefix in results", %{sandbox_root: sandbox} do
+    test "./*.ex preserves ./ prefix in results", %{home_path: sandbox} do
       File.write!(Path.join(sandbox, "a.ex"), "a")
       File.write!(Path.join(sandbox, "b.ex"), "b")
 
@@ -313,7 +313,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == ["./a.ex", "./b.ex"]
     end
 
-    test "*.ex without prefix has no prefix in results", %{sandbox_root: sandbox} do
+    test "*.ex without prefix has no prefix in results", %{home_path: sandbox} do
       File.write!(Path.join(sandbox, "x.ex"), "x")
 
       ctx = build_ctx(sandbox)
@@ -325,7 +325,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 filenames with spaces" do
-    test "matches files with spaces in name", %{sandbox_root: sandbox} do
+    test "matches files with spaces in name", %{home_path: sandbox} do
       # Create files with spaces
       File.write!(Path.join(sandbox, "my file.txt"), "content")
       File.write!(Path.join(sandbox, "another file.txt"), "content")
@@ -338,7 +338,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == ["another file.txt", "my file.txt", "nospace.txt"]
     end
 
-    test "matches files in directory with spaces", %{sandbox_root: sandbox} do
+    test "matches files in directory with spaces", %{home_path: sandbox} do
       # Create directory with space
       dir_with_space = Path.join(sandbox, "my dir")
       File.mkdir_p!(dir_with_space)
@@ -353,7 +353,7 @@ defmodule TrumanShell.Support.GlobTest do
   end
 
   describe "expand/2 symlink security" do
-    test "rejects glob when base path IS a symlink", %{sandbox_root: sandbox} do
+    test "rejects glob when base path IS a symlink", %{home_path: sandbox} do
       # Create a real directory with files
       real_dir = Path.join(sandbox, "real_dir")
       File.mkdir_p!(real_dir)
@@ -372,7 +372,7 @@ defmodule TrumanShell.Support.GlobTest do
       assert result == "link_to_real/*.md"
     end
 
-    test "rejects glob results that traverse symlinks in subdirectories", %{sandbox_root: sandbox} do
+    test "rejects glob results that traverse symlinks in subdirectories", %{home_path: sandbox} do
       # Create a directory structure
       parent_dir = Path.join(sandbox, "parent")
       File.mkdir_p!(parent_dir)
@@ -399,7 +399,7 @@ defmodule TrumanShell.Support.GlobTest do
       end
     end
 
-    test "glob results through symlinks are filtered by validation", %{sandbox_root: sandbox} do
+    test "glob results through symlinks are filtered by validation", %{home_path: sandbox} do
       # Create structure: dir/link -> outside
       # Pattern: dir/link/*
       # Path.wildcard would return dir/link/file paths
@@ -434,21 +434,21 @@ defmodule TrumanShell.Support.GlobTest do
     # outside the sandbox. The glob_base_dir/1 function correctly extracts "/"
     # as the base, which fails the in_sandbox? check.
 
-    test "rejects /* pattern (wildcard immediately after root)", %{sandbox_root: sandbox} do
+    test "rejects /* pattern (wildcard immediately after root)", %{home_path: sandbox} do
       ctx = build_ctx(sandbox)
 
       # Base would be "/" which is outside any sandbox
       assert Glob.expand("/*", ctx) == "/*"
     end
 
-    test "rejects /**/* pattern (recursive from root)", %{sandbox_root: sandbox} do
+    test "rejects /**/* pattern (recursive from root)", %{home_path: sandbox} do
       ctx = build_ctx(sandbox)
 
       # Base would be "/" - rejected before enumeration
       assert Glob.expand("/**/*", ctx) == "/**/*"
     end
 
-    test "rejects /*/*.conf pattern (nested wildcard from root)", %{sandbox_root: sandbox} do
+    test "rejects /*/*.conf pattern (nested wildcard from root)", %{home_path: sandbox} do
       ctx = build_ctx(sandbox)
 
       # Base would be "/" - rejected before enumeration
@@ -460,7 +460,7 @@ defmodule TrumanShell.Support.GlobTest do
     # The depth limit (100 levels) prevents DoS via deeply nested glob patterns.
     # This test verifies files beyond the limit are actually filtered out.
 
-    test "filters out matches beyond max depth (100 levels)", %{sandbox_root: sandbox} do
+    test "filters out matches beyond max depth (100 levels)", %{home_path: sandbox} do
       # Build 101 directories deep
       deep_dirs = Enum.map(1..101, fn i -> "d#{i}" end)
       deep_path = Path.join([sandbox | deep_dirs])
@@ -480,7 +480,7 @@ defmodule TrumanShell.Support.GlobTest do
              "Found too_deep.md - depth limit not enforced!"
     end
 
-    test "includes matches at exactly max depth (100 levels)", %{sandbox_root: sandbox} do
+    test "includes matches at exactly max depth (100 levels)", %{home_path: sandbox} do
       # Depth is counted as: number of path components from base_dir
       # So 99 directories + 1 filename = depth 100
       deep_dirs = Enum.map(1..99, fn i -> "d#{i}" end)
@@ -548,7 +548,7 @@ defmodule TrumanShell.Support.GlobTest do
       end
     end
 
-    test "accepts glob with valid absolute current_path", %{sandbox_root: sandbox} do
+    test "accepts glob with valid absolute current_path", %{home_path: sandbox} do
       # Create a file
       File.write!(Path.join(sandbox, "valid.md"), "content")
 

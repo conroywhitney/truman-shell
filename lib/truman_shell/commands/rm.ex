@@ -83,13 +83,13 @@ defmodule TrumanShell.Commands.Rm do
     {:error, "rm: missing operand\n"}
   end
 
-  defp soft_delete(safe_path, file_name, sandbox_root, opts) do
+  defp soft_delete(safe_path, file_name, home_path, opts) do
     cond do
       File.regular?(safe_path) ->
-        move_to_trash(safe_path, file_name, sandbox_root)
+        move_to_trash(safe_path, file_name, home_path)
 
       File.dir?(safe_path) && opts[:recursive] ->
-        move_to_trash(safe_path, file_name, sandbox_root)
+        move_to_trash(safe_path, file_name, home_path)
 
       File.dir?(safe_path) ->
         {:error, "rm: #{file_name}: is a directory\n"}
@@ -102,8 +102,8 @@ defmodule TrumanShell.Commands.Rm do
     end
   end
 
-  defp move_to_trash(safe_path, file_name, sandbox_root) do
-    trash_dir = DomePath.join(sandbox_root, ".trash")
+  defp move_to_trash(safe_path, file_name, home_path) do
+    trash_dir = DomePath.join(home_path, ".trash")
     # Ensure .trash exists
     File.mkdir_p(trash_dir)
 

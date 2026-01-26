@@ -11,10 +11,10 @@ defmodule TrumanShell.Stages.ExecutorTest do
     build_ctx(File.cwd!(), opts)
   end
 
-  # Helper to build ctx with sandbox_root as both home and current_path
-  defp build_ctx(sandbox_root, opts \\ []) do
-    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: sandbox_root}
-    current_path = Keyword.get(opts, :current_path, sandbox_root)
+  # Helper to build ctx with home_path as both home and current_path
+  defp build_ctx(home_path, opts \\ []) do
+    config = %SandboxConfig{allowed_paths: [home_path], home_path: home_path}
+    current_path = Keyword.get(opts, :current_path, home_path)
     stdin = Keyword.get(opts, :stdin)
     %Context{current_path: current_path, sandbox_config: config, stdin: stdin}
   end
@@ -88,8 +88,8 @@ defmodule TrumanShell.Stages.ExecutorTest do
       # This tests that cd returns updated ctx and it flows through pipeline
       # cd lib && pwd should show lib (but we can't chain like that)
       # Instead test via TrumanShell.execute which manages ctx internally
-      sandbox_root = File.cwd!()
-      ctx = build_ctx(sandbox_root)
+      home_path = File.cwd!()
+      ctx = build_ctx(home_path)
 
       cd_cmd = %Command{name: :cmd_cd, args: ["lib"], pipes: [], redirects: []}
       {:ok, ""} = Executor.run(cd_cmd, ctx)
@@ -122,8 +122,8 @@ defmodule TrumanShell.Stages.ExecutorTest do
     end
 
     test "dispatches :cmd_cd to Commands.Cd" do
-      sandbox_root = File.cwd!()
-      ctx = build_ctx(sandbox_root)
+      home_path = File.cwd!()
+      ctx = build_ctx(home_path)
 
       cd_cmd = %Command{name: :cmd_cd, args: ["lib"], pipes: [], redirects: []}
 

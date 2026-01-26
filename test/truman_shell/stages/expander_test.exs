@@ -9,9 +9,9 @@ defmodule TrumanShell.Stages.ExpanderTest do
   @moduletag :stages
 
   # Helper to build ctx
-  defp build_ctx(sandbox_root, opts \\ []) do
-    current_path = Keyword.get(opts, :current_path, sandbox_root)
-    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: sandbox_root}
+  defp build_ctx(home_path, opts \\ []) do
+    current_path = Keyword.get(opts, :current_path, home_path)
+    config = %SandboxConfig{allowed_paths: [home_path], home_path: home_path}
     %Context{current_path: current_path, sandbox_config: config}
   end
 
@@ -209,10 +209,10 @@ defmodule TrumanShell.Stages.ExpanderTest do
         File.rm_rf!(tmp_dir)
       end)
 
-      {:ok, sandbox_root: tmp_dir}
+      {:ok, home_path: tmp_dir}
     end
 
-    test "expands {:glob, *.md} to matching files", %{sandbox_root: sandbox} do
+    test "expands {:glob, *.md} to matching files", %{home_path: sandbox} do
       # Create test files
       File.write!(Path.join(sandbox, "README.md"), "readme")
       File.write!(Path.join(sandbox, "CHANGELOG.md"), "changelog")
@@ -226,7 +226,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert result.args == ["CHANGELOG.md", "README.md"]
     end
 
-    test "expands tilde then glob ~/*.md", %{sandbox_root: sandbox} do
+    test "expands tilde then glob ~/*.md", %{home_path: sandbox} do
       # Create test files
       File.write!(Path.join(sandbox, "README.md"), "readme")
       File.write!(Path.join(sandbox, "CHANGELOG.md"), "changelog")
@@ -240,7 +240,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert result.args == ["#{sandbox}/CHANGELOG.md", "#{sandbox}/README.md"]
     end
 
-    test "preserves non-glob args", %{sandbox_root: sandbox} do
+    test "preserves non-glob args", %{home_path: sandbox} do
       command = Command.new(:cmd_ls, ["-la", "src"])
       ctx = build_ctx(sandbox)
 
@@ -249,7 +249,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert result.args == ["-la", "src"]
     end
 
-    test "mixes glob and non-glob args", %{sandbox_root: sandbox} do
+    test "mixes glob and non-glob args", %{home_path: sandbox} do
       # Create test files
       File.write!(Path.join(sandbox, "a.md"), "a")
       File.write!(Path.join(sandbox, "b.md"), "b")
@@ -263,7 +263,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert result.args == ["-n", "a.md", "b.md"]
     end
 
-    test "no-match glob returns original pattern", %{sandbox_root: sandbox} do
+    test "no-match glob returns original pattern", %{home_path: sandbox} do
       command = Command.new(:cmd_ls, [{:glob, "*.nonexistent"}])
       ctx = build_ctx(sandbox)
 
@@ -272,7 +272,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert result.args == ["*.nonexistent"]
     end
 
-    test "expands glob in piped commands", %{sandbox_root: sandbox} do
+    test "expands glob in piped commands", %{home_path: sandbox} do
       # Create test files
       File.write!(Path.join(sandbox, "a.txt"), "content-a")
       File.write!(Path.join(sandbox, "b.txt"), "content-b")
@@ -304,10 +304,10 @@ defmodule TrumanShell.Stages.ExpanderTest do
         File.rm_rf!(tmp_dir)
       end)
 
-      {:ok, sandbox_root: tmp_dir, subdir: subdir}
+      {:ok, home_path: tmp_dir, subdir: subdir}
     end
 
-    test "glob expands relative to current_path, not home_path", %{sandbox_root: sandbox, subdir: subdir} do
+    test "glob expands relative to current_path, not home_path", %{home_path: sandbox, subdir: subdir} do
       # Create files in subdir only
       File.write!(Path.join(subdir, "found.txt"), "in subdir")
 
@@ -326,7 +326,7 @@ defmodule TrumanShell.Stages.ExpanderTest do
       assert result.args == ["found.txt"]
     end
 
-    test "tilde still expands to home_path when current_path differs", %{sandbox_root: sandbox, subdir: subdir} do
+    test "tilde still expands to home_path when current_path differs", %{home_path: sandbox, subdir: subdir} do
       # Create file at sandbox root
       File.write!(Path.join(sandbox, "home.txt"), "at home")
 

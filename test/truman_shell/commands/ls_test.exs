@@ -8,8 +8,8 @@ defmodule TrumanShell.Commands.LsTest do
   @moduletag :commands
 
   # Helper to build context
-  defp build_ctx(current_path, sandbox_root \\ File.cwd!()) do
-    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: sandbox_root}
+  defp build_ctx(current_path, home_path \\ File.cwd!()) do
+    config = %SandboxConfig{allowed_paths: [home_path], home_path: home_path}
     %Context{current_path: current_path, sandbox_config: config}
   end
 

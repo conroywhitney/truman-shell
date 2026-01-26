@@ -7,9 +7,9 @@ defmodule TrumanShell.Commands.CdTest do
 
   @moduletag :commands
 
-  # Helper to build context with sandbox_root as home and given current_path
-  defp build_ctx(current_path, sandbox_root \\ File.cwd!()) do
-    config = %SandboxConfig{allowed_paths: [sandbox_root], home_path: sandbox_root}
+  # Helper to build context with home_path as home and given current_path
+  defp build_ctx(current_path, home_path \\ File.cwd!()) do
+    config = %SandboxConfig{allowed_paths: [home_path], home_path: home_path}
     %Context{current_path: current_path, sandbox_config: config}
   end
 
@@ -31,47 +31,47 @@ defmodule TrumanShell.Commands.CdTest do
     end
 
     test "returns to home_path with no args" do
-      sandbox_root = File.cwd!()
-      current = Path.join(sandbox_root, "lib/truman_shell")
-      ctx = build_ctx(current, sandbox_root)
+      home_path = File.cwd!()
+      current = Path.join(home_path, "lib/truman_shell")
+      ctx = build_ctx(current, home_path)
 
       {:ok, "", ctx: new_ctx} = Cd.handle([], ctx)
 
-      assert new_ctx.current_path == sandbox_root
+      assert new_ctx.current_path == home_path
     end
 
     # NOTE: Tilde expansion is now handled by Stages.Expander before Cd.handle.
     # These tests pass pre-expanded paths to test Cd.handle behavior.
 
     test "navigates to home_path (pre-expanded from ~)" do
-      sandbox_root = File.cwd!()
-      current = Path.join(sandbox_root, "lib/truman_shell")
-      ctx = build_ctx(current, sandbox_root)
+      home_path = File.cwd!()
+      current = Path.join(home_path, "lib/truman_shell")
+      ctx = build_ctx(current, home_path)
 
       # ~ is expanded to home_path by Expander before reaching Cd
-      {:ok, "", ctx: new_ctx} = Cd.handle([sandbox_root], ctx)
+      {:ok, "", ctx: new_ctx} = Cd.handle([home_path], ctx)
 
-      assert new_ctx.current_path == sandbox_root
+      assert new_ctx.current_path == home_path
     end
 
     test "navigates to subdir (pre-expanded from ~/lib)" do
-      sandbox_root = File.cwd!()
-      current = Path.join(sandbox_root, "lib/truman_shell")
-      ctx = build_ctx(current, sandbox_root)
+      home_path = File.cwd!()
+      current = Path.join(home_path, "lib/truman_shell")
+      ctx = build_ctx(current, home_path)
 
-      # ~/lib is expanded to sandbox_root/lib by Expander before reaching Cd
-      expanded_path = Path.join(sandbox_root, "lib")
+      # ~/lib is expanded to home_path/lib by Expander before reaching Cd
+      expanded_path = Path.join(home_path, "lib")
       {:ok, "", ctx: new_ctx} = Cd.handle([expanded_path], ctx)
 
-      assert new_ctx.current_path == Path.join(sandbox_root, "lib")
+      assert new_ctx.current_path == Path.join(home_path, "lib")
     end
 
     test "returns error for nonexistent path (pre-expanded from ~/nonexistent)" do
-      sandbox_root = File.cwd!()
-      ctx = build_ctx(sandbox_root, sandbox_root)
+      home_path = File.cwd!()
+      ctx = build_ctx(home_path, home_path)
 
-      # ~/nonexistent is expanded to sandbox_root/nonexistent by Expander
-      expanded_path = Path.join(sandbox_root, "nonexistent")
+      # ~/nonexistent is expanded to home_path/nonexistent by Expander
+      expanded_path = Path.join(home_path, "nonexistent")
       result = Cd.handle([expanded_path], ctx)
 
       assert {:error, msg} = result
@@ -79,18 +79,18 @@ defmodule TrumanShell.Commands.CdTest do
     end
 
     test "navigates up with .." do
-      sandbox_root = File.cwd!()
-      current = Path.join(sandbox_root, "lib/truman_shell")
-      ctx = build_ctx(current, sandbox_root)
+      home_path = File.cwd!()
+      current = Path.join(home_path, "lib/truman_shell")
+      ctx = build_ctx(current, home_path)
 
       {:ok, "", ctx: new_ctx} = Cd.handle([".."], ctx)
 
-      assert new_ctx.current_path == Path.join(sandbox_root, "lib")
+      assert new_ctx.current_path == Path.join(home_path, "lib")
     end
 
     test "returns error when .. would escape sandbox" do
-      sandbox_root = File.cwd!()
-      ctx = build_ctx(sandbox_root, sandbox_root)
+      home_path = File.cwd!()
+      ctx = build_ctx(home_path, home_path)
 
       result = Cd.handle([".."], ctx)
 
@@ -132,8 +132,8 @@ defmodule TrumanShell.Commands.CdTest do
     # These tests verify sandbox boundaries cannot be escaped via tilde paths
 
     test "~/.. cannot escape sandbox (stays at root)" do
-      sandbox_root = File.cwd!()
-      ctx = build_ctx(sandbox_root, sandbox_root)
+      home_path = File.cwd!()
+      ctx = build_ctx(home_path, home_path)
 
       result = Cd.handle(["~/.."], ctx)
 
@@ -143,8 +143,8 @@ defmodule TrumanShell.Commands.CdTest do
     end
 
     test "~/../../etc cannot escape sandbox (traversal attack)" do
-      sandbox_root = File.cwd!()
-      ctx = build_ctx(sandbox_root, sandbox_root)
+      home_path = File.cwd!()
+      ctx = build_ctx(home_path, home_path)
 
       result = Cd.handle(["~/../../etc"], ctx)
 
@@ -159,14 +159,14 @@ defmodule TrumanShell.Commands.CdTest do
     # since Expander now handles all tilde expansion before Cd.handle.
 
     test "navigates with .. within sandbox" do
-      sandbox_root = File.cwd!()
-      ctx = build_ctx(sandbox_root, sandbox_root)
+      home_path = File.cwd!()
+      ctx = build_ctx(home_path, home_path)
 
-      # Pre-expanded: ~/lib/../test becomes sandbox_root/lib/../test
-      expanded_path = Path.join(sandbox_root, "lib/../test")
+      # Pre-expanded: ~/lib/../test becomes home_path/lib/../test
+      expanded_path = Path.join(home_path, "lib/../test")
       {:ok, "", ctx: new_ctx} = Cd.handle([expanded_path], ctx)
 
-      assert new_ctx.current_path == Path.join(sandbox_root, "test")
+      assert new_ctx.current_path == Path.join(home_path, "test")
     end
   end
 end
