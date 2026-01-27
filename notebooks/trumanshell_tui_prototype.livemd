@@ -1,0 +1,303 @@
+<!-- livebook:{"app_settings":{"auto_shutdown_ms":3600000,"slug":"truman-shell-tui-experiment"}} -->
+
+# TrumanShell TUI Prototype
+
+```elixir
+# Note: Adjust this path if running from a different location
+truman_shell_path = Path.join(System.user_home!(), "code/truman-shell")
+
+Mix.install([
+  {:kino, "~> 0.18.0"},
+  {:truman_shell, path: truman_shell_path}
+])
+```
+
+## Introduction
+
+This is a prototype TrumanShell TUI built with Livebook + Kino.
+
+The vision: **NotebookLM + Terminal + IDE + Sandbox** — all in one.
+
+* Chat with agents (Claude, Gemini, Codex)
+* All commands mediated through TrumanShell
+* Files appear as artifacts
+* Everything observable, everything sandboxed
+
+## Custom Widgets
+
+First, let's define some custom widgets for our TUI.
+
+### Spinner (loading indicator)
+
+```elixir
+defmodule TrumanShell.Widgets.Spinner do
+  def new(text \\ "Working...") do
+    Kino.HTML.new("""
+    <div style="display: flex; align-items: center; gap: 8px; color: #888;">
+      <div class="spinner"></div>
+      <span>#{text}</span>
+    </div>
+    <style>
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #333;
+        border-top: 2px solid #0af;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+    """)
+  end
+end
+```
+
+### Activity Log Entry
+
+```elixir
+defmodule TrumanShell.Widgets.Activity do
+  def new(type, content, status \\ :ok) do
+    {icon, color} = case {type, status} do
+      {:bash, :ok} -> {"$", "#0f0"}
+      {:bash, :error} -> {"$", "#f00"}
+      {:read, _} -> {"📖", "#0af"}
+      {:write, _} -> {"✏️", "#fa0"}
+      {:edit, _} -> {"✂️", "#f0a"}
+      {:blocked, _} -> {"🚫", "#f00"}
+      _ -> {"•", "#888"}
+    end
+
+    Kino.HTML.new("""
+    <div style="font-family: monospace; font-size: 12px; padding: 4px 8px;
+                border-left: 3px solid #{color}; margin: 2px 0; background: #1a1a1a;">
+      <span style="color: #{color};">#{icon}</span>
+      <span style="color: #ccc;">#{content}</span>
+    </div>
+    """)
+  end
+end
+```
+
+### Chat Message
+
+```elixir
+defmodule TrumanShell.Widgets.Message do
+  def new(role, content) do
+    {bg, align, name} = case role do
+      :user -> {"#2a2a4a", "flex-end", "You"}
+      :agent -> {"#1a3a1a", "flex-start", "Agent"}
+      :system -> {"#3a2a1a", "center", "System"}
+    end
+
+    Kino.HTML.new("""
+    <div style="display: flex; justify-content: #{align}; margin: 8px 0;">
+      <div style="max-width: 80%; background: #{bg}; padding: 12px; border-radius: 8px;">
+        <div style="font-size: 10px; color: #888; margin-bottom: 4px;">#{name}</div>
+        <div style="color: #eee; white-space: pre-wrap;">#{content}</div>
+      </div>
+    </div>
+    """)
+  end
+end
+```
+
+## TrumanShell Executor
+
+This module wraps TrumanShell.execute and tracks activity.
+
+```elixir
+defmodule TrumanShell.TUI.Executor do
+  def run(command, activity_frame) do
+    # Log the attempt
+    Kino.Frame.append(activity_frame,
+      TrumanShell.Widgets.Activity.new(:bash, command, :pending))
+
+    # Execute through TrumanShell
+    case TrumanShell.execute(command) do
+      {:ok, output} ->
+        Kino.Frame.append(activity_frame,
+          TrumanShell.Widgets.Activity.new(:bash, "✓ #{command}", :ok))
+        {:ok, output}
+
+      {:error, reason} ->
+        Kino.Frame.append(activity_frame,
+          TrumanShell.Widgets.Activity.new(:bash, "✗ #{command}: #{reason}", :error))
+        {:error, reason}
+    end
+  end
+end
+```
+
+## The TUI Layout
+
+Now let's build the actual interface.
+
+### Create Frames
+
+```elixir
+# Chat panel - shows conversation
+chat_frame = Kino.Frame.new()
+
+# Activity panel - shows what's happening
+activity_frame = Kino.Frame.new()
+
+# Files panel - shows artifacts
+files_frame = Kino.Frame.new()
+
+# Initialize with welcome messages
+Kino.Frame.render(chat_frame,
+  TrumanShell.Widgets.Message.new(:system, "Welcome to TrumanShell TUI"))
+
+Kino.Frame.render(activity_frame,
+  TrumanShell.Widgets.Activity.new(:system, "Session started"))
+
+Kino.Frame.render(files_frame,
+  Kino.HTML.new("<div style='color: #888; padding: 8px;'>No files yet</div>"))
+
+:ok
+```
+
+### Create Input Form
+
+```elixir
+input_form = Kino.Control.form(
+  [
+    message: Kino.Input.text("Message", default: "")
+  ],
+  submit: "Send",
+  reset_on_submit: [:message]
+)
+```
+
+### Assemble Layout
+
+```elixir
+# Header
+header = Kino.HTML.new("""
+<div style="background: linear-gradient(90deg, #1a1a2e, #16213e);
+            padding: 16px; border-radius: 8px 8px 0 0; margin-bottom: 8px;">
+  <h1 style="margin: 0; color: #0af; font-family: monospace;">
+    ░▒▓ TrumanShell ▓▒░
+  </h1>
+  <p style="margin: 4px 0 0 0; color: #888; font-size: 12px;">
+    "We accept the reality of the world with which we are presented."
+  </p>
+</div>
+""")
+
+# Panel headers
+chat_header = Kino.HTML.new("""
+<div style="background: #2a2a2a; padding: 8px; font-weight: bold; color: #0af;">
+  💬 Chat
+</div>
+""")
+
+activity_header = Kino.HTML.new("""
+<div style="background: #2a2a2a; padding: 8px; font-weight: bold; color: #0f0;">
+  📊 Activity
+</div>
+""")
+
+files_header = Kino.HTML.new("""
+<div style="background: #2a2a2a; padding: 8px; font-weight: bold; color: #fa0;">
+  📁 Files
+</div>
+""")
+
+# Combine panels
+chat_panel = Kino.Layout.grid([chat_header, chat_frame], boxed: true)
+activity_panel = Kino.Layout.grid([activity_header, activity_frame], boxed: true)
+files_panel = Kino.Layout.grid([files_header, files_frame], boxed: true)
+
+# Main layout
+main_panels = Kino.Layout.grid([chat_panel, activity_panel], columns: 2)
+
+# Full layout
+layout = Kino.Layout.grid([
+  header,
+  main_panels,
+  files_panel,
+  input_form
+], boxed: true)
+```
+
+## Event Handler
+
+Handle user input and execute through TrumanShell.
+
+````elixir
+Kino.listen(input_form, fn %{data: %{message: message}} ->
+  message = String.trim(message)
+
+  if message != "" do
+    # Show user message
+    Kino.Frame.append(chat_frame, TrumanShell.Widgets.Message.new(:user, message))
+
+    # Check if it's a direct command (starts with $)
+    if String.starts_with?(message, "$") do
+      command = String.trim_leading(message, "$") |> String.trim()
+
+      # Show thinking
+      Kino.Frame.append(chat_frame, TrumanShell.Widgets.Spinner.new("Executing..."))
+
+      # Execute through TrumanShell
+      case TrumanShell.TUI.Executor.run(command, activity_frame) do
+        {:ok, output} ->
+          # Clear spinner and show output
+          output_display = if output == "", do: "(no output)", else: output
+          Kino.Frame.append(chat_frame,
+            TrumanShell.Widgets.Message.new(:agent, "```\n#{output_display}\n```"))
+
+        {:error, reason} ->
+          Kino.Frame.append(chat_frame,
+            TrumanShell.Widgets.Message.new(:agent, "Error: #{reason}"))
+      end
+    else
+      # Regular message - would go to agent via ACP
+      Kino.Frame.append(chat_frame, TrumanShell.Widgets.Spinner.new("Thinking..."))
+
+      # Simulate agent response (TODO: wire up ACP)
+      Process.sleep(500)
+      Kino.Frame.append(chat_frame,
+        TrumanShell.Widgets.Message.new(:agent,
+          "I received: \"#{message}\"\n\n(ACP not connected yet - try $ls or $pwd)"))
+    end
+  end
+end)
+````
+
+## Try It Out!
+
+The TUI is now active. Try:
+
+* `$ls` - List files in sandbox
+* `$pwd` - Show current directory
+* `$cat README.md` - Read a file
+* `$ls /etc` - Try to escape (should fail!)
+* `$rm -rf /` - The classic (safely blocked!)
+
+Or just type a message to see the chat flow.
+
+## Running as an App
+
+To run this as a standalone app:
+
+1. Click the rocket icon (🚀) in the sidebar
+2. Configure the app settings
+3. Click "Launch preview"
+4. Share the URL!
+
+## Next Steps
+
+* [ ] Wire up ACP for real agent communication
+* [ ] Add agent switcher (Claude/Gemini/Codex tabs)
+* [ ] File browser with click-to-open
+* [ ] Drag & drop file upload
+* [ ] URL paste → auto-fetch
+* [ ] `toilet --gay` aesthetic mode 🌈
+
+<!-- livebook:{"offset":8011,"stamp":{"token":"XCP.VZD4RrRSaJivU4S8jheFOEsH2zu12-NmdsUWhHrDBBuPQ7msopwfPuLkDlw6En73YUnMQZl_7qHfBN6AWa5iINwxELBjDACM4ciOa-0hPLWl5rfjpjq7_hY1","version":2}} -->
